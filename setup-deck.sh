@@ -5,10 +5,10 @@
 #   ./setup-deck.sh --all --dev      inclui ferramentas de desenvolvimento (pytest)
 set -euo pipefail
 cd "$(dirname "$0")"
-MODS="" ; DEV=0
+MODS="" ; DEV=0 ; DL=1
 while [ $# -gt 0 ]; do
   case "$1" in
-    --all) MODS="ALL";; --modules) MODS="$2"; shift;; --dev) DEV=1;; --production) DEV=0;;
+    --all) MODS="ALL";; --modules) MODS="$2"; shift;; --dev) DEV=1;; --production) DEV=0;; --no-downloads) DL=0;;
     *) echo "opção desconhecida: $1"; exit 2;;
   esac; shift
 done
@@ -16,5 +16,5 @@ done
 exec /usr/bin/python3 -c "
 import sys; from dc.paths import get_paths; from dc import setup
 mods = setup.ALL_MODULES if '$MODS' == 'ALL' else '$MODS'.split(',')
-for l in setup.setup(get_paths(), mods, dev=$DEV == 1): print(l)
+for l in setup.setup(get_paths(), mods, dev=$DEV == 1, downloads=$DL == 1): print(l)
 "

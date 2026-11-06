@@ -173,7 +173,7 @@ def write_backup_toml(paths: Paths) -> None:
         shutil.copy(REPO / "config/backup.example.toml", p)
 
 
-def setup(paths: Paths, modules: list[str], dev: bool = False) -> list[str]:
+def setup(paths: Paths, modules: list[str], dev: bool = False, downloads: bool = True) -> list[str]:
     log: list[str] = []
     paths.ensure()
     cs = contracts.load(REPO / "modules")
@@ -193,11 +193,18 @@ def setup(paths: Paths, modules: list[str], dev: bool = False) -> list[str]:
     if "M1" in wanted:
         write_plugins_lock(paths, log)
     if "M3" in wanted:
-        install_cores(log); flatpak_overrides(log)
+        if downloads:
+            install_cores(log)
+        else:
+            log.append("PENDENTE: cores do RetroArch (rode ./setup-deck.sh --all para baixar)")
+        flatpak_overrides(log)
         for l in emulators.configure(apply=True):
             log.append("config " + l)
     if "M4" in wanted:
-        install_qbittorrent(log)
+        if downloads:
+            install_qbittorrent(log)
+        else:
+            log.append("PENDENTE: qbittorrent-nox (rode ./setup-deck.sh --all para baixar)")
     if dev:
         venv = H / ".local/share/deck-commander/venv"
         if not venv.exists():
@@ -209,6 +216,8 @@ def setup(paths: Paths, modules: list[str], dev: bool = False) -> list[str]:
             if u == "deck-commander-bot.service" and not (paths.secrets / "telegram").exists():
                 _sc("enable", u); log.append(f"{u}: habilitado, inicia quando houver token (dc secret telegram)")
                 continue
+            if u == "deck-commander-qbittorrent.service" and not QBT_BIN.exists():
+                _sc("enable", u); log.append(f"{u}: habilitado, inicia quando o qbittorrent-nox existir"); continue
             out = _sc("enable", "--now", u)
             log.append(f"ligado {u}" + (f" ({out})" if "Failed" in out else ""))
     (paths.state / "installed-modules.json").write_text(json.dumps(sorted(wanted)), "utf-8")
