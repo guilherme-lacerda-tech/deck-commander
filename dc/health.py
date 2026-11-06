@@ -328,9 +328,21 @@ def installed_plugins() -> dict[str, str]:
 def status_text(paths: Paths, store: Store, qbt=None) -> str:
     L = []
     L.append("🛑 SAFE-MODE ATIVO" if ops.in_safe_mode(paths) else "🟢 Deck Commander ativo")
-    for u in ops.dc_units(ops.unit_dir()):
+    units = ops.dc_units(ops.unit_dir())
+    names = {"qbittorrent": "downloads", "power": "monitor de energia", "bot": "bot", "dashboard": "painel",
+             "backup": "backup diário", "tests": "testes semanais", "updates": "verificação de updates"}
+    for u in units:
+        base = u.replace("deck-commander-", "").rsplit(".", 1)[0]
+        if u.endswith(".service") and f"deck-commander-{base}.timer" in units:
+            continue  # tarefa agendada: o que importa é o timer
         act = subprocess.run(["systemctl", "--user", "is-active", u], capture_output=True, text=True).stdout.strip()
-        L.append(f"• {u.replace('deck-commander-', '')}: {act}")
+        if base == "dashboard" and act != "active":
+            label = "desligado (opcional)"
+        elif u.endswith(".timer"):
+            label = "agendado ✅" if act == "active" else "NÃO agendado ⚠️"
+        else:
+            label = "rodando ✅" if act == "active" else f"{act} ⚠️"
+        L.append(f"• {names.get(base, base)}: {label}")
     if qbt is not None:
         try:
             ts = qbt.torrents()
