@@ -80,3 +80,14 @@ def test_launch_command(tmp_path, roms):
     assert library.build_command("switch-super-mario-galaxy", lm, {"switch": ["/x/ryu", "{rom}"]})[0] == "/x/ryu"
     with pytest.raises(KeyError):
         library.build_command("nao-existe", lm, {})
+
+
+def test_switch2_dump_detected(tmp_path):
+    r = tmp_path / "roms"
+    touch(r, "switch2/Donkey Kong Bananza/base/exefs/main")
+    touch(r, "switch2/Donkey Kong Bananza/updates/458752/exefs/main")   # update não vira jogo
+    touch(r, "switch2/Donkey Kong Bananza/base/romfs/x.bin")
+    games, _ = library.scan([r])
+    assert [(g.title, g.path.replace("\\", "/").endswith("base/exefs/main")) for g in games] == [("Donkey Kong Bananza", True)]
+    cmd = library.build_command(games[0].game_id, {games[0].game_id: {"console": "switch2", "rom": games[0].path}}, {})
+    assert cmd[1:3] == ["-f", "-g"] and "lichii" in cmd[0]

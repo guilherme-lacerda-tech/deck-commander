@@ -17,7 +17,7 @@ from .emulators import CONSOLES
 SETTINGS = Path.home() / "homebrew/settings/TabMaster/settings.json"
 GAMES_AND_SOFTWARE = 1 | 2
 EMULATOR_HINTS = ("pcsx2", "duckstation", "ryujinx", "lichii", "dolphin", "retroarch", "ppsspp", "eden")
-ORDER = ["ps2", "psx", "switch", "gc", "wii", "psp", "n64", "snes", "gba"]
+ORDER = ["ps2", "psx", "switch", "switch2", "gc", "wii", "psp", "n64", "snes", "gba"]
 
 
 def _tab(tid: str, title: str, pos: int, appids: list[int]) -> dict:

@@ -75,6 +75,12 @@ def scan(roots: Iterable[Path]) -> tuple[list[Game], list[str]]:
             d = root / console
             if not d.is_dir():
                 continue
+            if spec.get("dump"):  # Switch 2: <jogo>/base/exefs/main
+                for main in sorted(d.rglob("main")):
+                    if main.parent.name == "exefs" and main.parent.parent.name == "base":
+                        title = clean_title(main.parent.parent.parent.name)
+                        games.setdefault(f"{console}-{slug(title)}", Game(f"{console}-{slug(title)}", title, console, str(main)))
+                continue
             files = sorted(f for f in d.rglob("*") if f.is_file() and f.suffix.lower() in spec["exts"])
             for f in files:
                 if console == "switch":
