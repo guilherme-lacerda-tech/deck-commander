@@ -15,8 +15,8 @@ Suíte completa no Linux real (`fcntl.flock` de verdade): **54 passed**.
   (F13 corrigida: o conflito existe, mas é com o steamwebhelper, não com o Decky).
 
 ### S1 — Concorrência + reboot
-Status: **PARCIAL** — testes de lock/crash passaram no Linux real; reboot armado (`deck/s1_reboot.py prepare`,
-op `aa4c93f7b312` em `running` com escritor contínuo). Falta: reiniciar e rodar `check`.
+Status: **PASSOU** — op `aa4c93f7b312` em `running` com escritor gravando sem parar; Deck reiniciado
+(voltou no Gaming Mode). `check`: `integrity_check: ok`, `running -> interrupted`, lock adquirível após o boot.
 
 ### S2 — Backup corrompido
 Status: **PASSOU** nos testes do Linux real. Aplicar em arquivos reais fica para quando houver o que restaurar.
@@ -39,7 +39,8 @@ Status: **PASSOU (leitura) — premissa da v5.1 corrigida.**
   favoritos/coleções, perde arte, versão do Proton e o vínculo das capturas. M2.6 deve proteger esses itens.
 
 ### S5 — Adaptadores
-Status: **PARCIAL — 2 de 5** (só DuckStation e PCSX2 existem no Deck).
+Status: **PARCIAL — 2 de 5**. RetroArch 1.22.2, Dolphin 2609a e PPSSPP 1.20.4 instalados depois (Flatpak `--user`);
+faltam os arquivos de config, que só nascem quando cada emulador é aberto uma vez.
 - Chaves reais: DuckStation `[GPU] ResolutionScale` (atual 5), `Renderer=Vulkan`, `WidescreenHack`;
   PCSX2 `[EmuCore/GS] upscale_multiplier` (atual 3), `Renderer=14` (Vulkan), `[EmuCore] EnableWideScreenPatches`.
 - `deck/s5_real_copy.py`: 3 perfis × 2 emuladores aplicados em **cópias**; cada perfil mudou exatamente 1 linha,
@@ -51,7 +52,8 @@ Status: **PARCIAL — 2 de 5** (só DuckStation e PCSX2 existem no Deck).
 ### S6 — Energia
 Status: **PARCIAL** — no carregador: `ACAD` (Mains) online, `BAT1` 92% "Not charging", decisão RUN.
 Achado: um mouse Logitech aparece como `hidpp_battery_0` (type=Battery, **scope=Device**) — agora ignorado
-(teste novo). Falta: leitura com o carregador desconectado. OLED: não se aplica (usuário só tem LCD).
+(teste novo). Sem carregador (após o reboot): `ACAD online=0`, `BAT1 91% Discharging`, decisão PAUSE
+("na bateria"). **PASSOU no LCD.** OLED: não se aplica (usuário só tem LCD).
 
 ### Conclusão
 - **Liberados:** M18+M19, M0 (backup/quarentena), M4.6 (ZIP), M3 para DuckStation/PCSX2 (só resolução/backend/widescreen).
