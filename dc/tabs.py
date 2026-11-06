@@ -21,14 +21,31 @@ STORE_TITLES = {"epic": "Epic Games", "gog": "GOG", "amazon": "Amazon Games", "i
 ORDER = ["ps2", "psx", "switch", "switch2", "gc", "wii", "psp", "n64", "snes", "gba"]
 
 
+COLLECTION_IDS: dict[str, str] = {}  # título -> id da coleção do Steam (preenchido por apply())
+
+
 def _tab(tid: str, title: str, pos: int, appids: list[int]) -> dict:
+    cid = COLLECTION_IDS.get(title)
+    flt = ({"type": "collection", "inverted": False, "params": {"id": cid, "name": title}} if cid else
+           {"type": "whitelist", "inverted": False, "params": {"games": sorted(appids)}})
     return {"id": tid, "title": title, "position": pos,
-            "filters": [{"type": "whitelist", "inverted": False, "params": {"games": sorted(appids)}}],
+            "filters": [flt],
             "filtersMode": "and", "categoriesToInclude": GAMES_AND_SOFTWARE, "autoHide": True,
             "visibleToOthers": False, "sortByOverride": -1}
 
 
-def build(tabs: dict, shortcuts: list[dict], launch_map: dict) -> dict:
+def groups(shortcuts: list[dict], launch_map: dict, plugin_done: dict | None = None) -> dict[str, list[int]]:
+    """Título da aba/coleção -> AppIDs. Inclui atalhos criados ao vivo pelo plugin (plugin-done.json)."""
+    rows = list(shortcuts)
+    known = {r.get("LaunchOptions") for r in rows}
+    for gid, v in (plugin_done or {}).items():
+        if v.get("appid") and gid not in known:
+            rows.append({"appid": v["appid"], "exe": "dc-launch", "LaunchOptions": gid})
+    tabs = build({}, rows, launch_map, _ids_only=True)
+    return {t["title"]: t["_apps"] for t in tabs.values()}
+
+
+def build(tabs: dict, shortcuts: list[dict], launch_map: dict, _ids_only: bool = False) -> dict:
     by_console: dict[str, list[int]] = {c: [] for c in ORDER}
     emus: list[int] = []
     stores: dict[str, list[int]] = {}
@@ -65,10 +82,40 @@ def build(tabs: dict, shortcuts: list[dict], launch_map: dict) -> dict:
     out["dc-emuladores"] = _tab("dc-emuladores", "Emuladores", pos, emus); pos += 1
     for t in tail:
         out[t["id"]] = {**t, "position": pos}; pos += 1
+    if _ids_only:
+        apps = {f"dc-{c}": by_console[c] for c in ORDER}
+        apps["dc-emuladores"] = emus
+        apps.update({f"dc-loja-{s.lower()}": v for s, v in stores.items()})
+        return {k: {"title": v["title"], "_apps": sorted(set(apps[k]))} for k, v in out.items() if k in apps}
     return out
 
 
-def apply(shortcuts: list[dict], launch_map: dict, user_id: str, settings_path: Path = SETTINGS) -> dict:
+def write_collections(data_dir: Path, shortcuts: list[dict], launch_map: dict) -> dict:
+    """Gera collections.json para o plugin manter as coleções do Steam (atualização ao vivo das abas)."""
+    try:
+        done = json.loads((data_dir / "plugin-done.json").read_text("utf-8"))
+    except (OSError, ValueError):
+        done = {}
+    spec = {k: v for k, v in groups(shortcuts, launch_map, done).items() if v}
+    tmp = data_dir / "collections.json.tmp"
+    tmp.write_text(json.dumps(spec, ensure_ascii=False, indent=1), "utf-8")
+    os.replace(tmp, data_dir / "collections.json")
+    return spec
+
+
+def load_collection_ids(data_dir: Path) -> None:
+    try:
+        COLLECTION_IDS.clear()
+        COLLECTION_IDS.update(json.loads((data_dir / "collection-ids.json").read_text("utf-8")))
+    except (OSError, ValueError):
+        pass
+
+
+def apply(shortcuts: list[dict], launch_map: dict, user_id: str, settings_path: Path = SETTINGS,
+          data_dir: Path | None = None) -> dict:
+    if data_dir is not None:
+        write_collections(data_dir, shortcuts, launch_map)
+        load_collection_ids(data_dir)
     data = json.loads(settings_path.read_text("utf-8"))
     user = data.setdefault("usersDict", {}).setdefault(str(user_id), {})
     new = build(user.get("tabs", {}), shortcuts, launch_map)
@@ -81,4 +128,4 @@ def apply(shortcuts: list[dict], launch_map: dict, user_id: str, settings_path: 
     tmp = settings_path.with_name("settings.json.dc-tmp")
     tmp.write_text(json.dumps(data, indent=4, ensure_ascii=False), "utf-8")
     os.replace(tmp, settings_path)
-    return {k: len(v["filters"][0]["params"]["games"]) for k, v in new.items() if k.startswith("dc-")}
+    return {k: v["filters"][0]["type"] for k, v in new.items() if k.startswith("dc-")}

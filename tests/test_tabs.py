@@ -30,7 +30,7 @@ def test_apply_backs_up_and_is_idempotent(tmp_path):
     p.write_text(json.dumps({"usersDict": {"1": {"tabs": DEFAULT}}, "tags": []}))
     sc = [{"appid": 5, "exe": "dc-launch", "LaunchOptions": "psx-fft"}]
     res = tabs.apply(sc, {"psx-fft": {"console": "psx"}}, "1", p)
-    assert res["dc-psx"] == 1 and (tmp_path / "settings.json.antes-deck-commander").exists()
+    assert res["dc-psx"] == "whitelist" and (tmp_path / "settings.json.antes-deck-commander").exists()
     assert tabs.apply(sc, {"psx-fft": {"console": "psx"}}, "1", p) == {}
 
 
@@ -44,3 +44,20 @@ def test_store_tabs_from_unifideck_tags():
     assert out["Favorites"]["position"] < out["dc-loja-epic"]["position"] < out["dc-ps2"]["position"]
     assert "dc-emuladores" in out and all(1 not in t["filters"][0]["params"]["games"]
                                            for k, t in out.items() if k == "dc-emuladores")
+
+
+def test_collections_spec_includes_plugin_created_and_switches_filter(tmp_path):
+    sc = [{"appid": 7, "exe": '"/x/dc-launch"', "LaunchOptions": "ps2-gow"},
+          {"appid": 8, "exe": '"/x/unifideck-launcher"', "tags": {"0": "Gog"}}]
+    lm = {"ps2-gow": {"console": "ps2"}, "switch-cv": {"console": "switch"}}
+    (tmp_path / "plugin-done.json").write_text(json.dumps({"switch-cv": {"appid": 3616886574, "error": ""}}))
+    spec = tabs.write_collections(tmp_path, sc, lm)
+    assert spec == {"PlayStation 2": [7], "Nintendo Switch": [3616886574], "GOG": [8]}
+    (tmp_path / "collection-ids.json").write_text(json.dumps({"Nintendo Switch": "uc-abc"}))
+    p = tmp_path / "settings.json"
+    p.write_text(json.dumps({"usersDict": {"1": {"tabs": DEFAULT}}}))
+    res = tabs.apply(sc, lm, "1", p, data_dir=tmp_path)
+    assert res["dc-switch"] == "collection" and res["dc-ps2"] == "whitelist"
+    t = json.loads(p.read_text())["usersDict"]["1"]["tabs"]["dc-switch"]
+    assert t["filters"][0]["params"] == {"id": "uc-abc", "name": "Nintendo Switch"}
+    tabs.COLLECTION_IDS.clear()

@@ -59,7 +59,7 @@ def power_loop(paths: Paths, interval: float = 30) -> None:
                 plugin_bridge.collect(paths, store)
                 if tabs.SETTINGS.exists():
                     tabs.apply(vdf.read_shortcuts(sc), json.loads((paths.data / "launch-map.json").read_text("utf-8")),
-                               sc.parents[1].name)
+                               sc.parents[1].name, data_dir=paths.data)
         except Exception as e:  # noqa: BLE001
             _log(paths, "worker", f"plugin: {e}")
         # fila: roda operações pendentes (ex.: /sync enfileirado durante jogo) quando o jogo fecha

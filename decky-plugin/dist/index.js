@@ -53,6 +53,31 @@ async function addOne(it) {
     return appid;
 }
 
+// Coleções do Steam por console/loja: o TabMaster acompanha coleções ao vivo (sem reiniciar).
+// Só ACRESCENTA jogos; nunca remove nada de coleção nenhuma.
+async function syncCollections() {
+    const spec = (await call("get_collections")) || {};
+    const ids = {};
+    for (const [name, appids] of Object.entries(spec)) {
+        let col = collectionStore.GetUserCollectionsByName(name)[0];
+        if (!col) {
+            col = collectionStore.NewUnsavedCollection(name, undefined, []);
+            await col.Save();
+            col = collectionStore.GetUserCollectionsByName(name)[0] || col;
+            note("coleção criada: " + name);
+        }
+        const missing = appids.filter((a) => !col.apps.has(a))
+            .map((a) => appStore.GetAppOverviewByAppID(a)).filter(Boolean);
+        if (missing.length) {
+            col.AsDragDropCollection().AddApps(missing);
+            await col.Save();
+            note(name + ": +" + missing.length);
+        }
+        ids[name] = col.id;
+    }
+    await call("set_collection_ids", ids);
+}
+
 async function processQueue() {
     if (busy) return;
     busy = true;
@@ -71,6 +96,11 @@ async function processQueue() {
         }
     } catch (e) {
         note("erro na fila: " + e);
+    }
+    try {
+        await syncCollections();
+    } catch (e) {
+        note("erro nas coleções: " + e);
     } finally {
         busy = false;
     }

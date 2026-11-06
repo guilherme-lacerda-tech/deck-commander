@@ -55,6 +55,17 @@ class Plugin:
             data = base64.b64encode(f.read()).decode()
         return {"data": data, "ext": os.path.splitext(real)[1].lstrip(".").lower() or "png"}
 
+    async def get_collections(self):
+        """{nome da coleção: [appids]} gerado pelo Deck Commander (consoles, Emuladores, lojas)."""
+        return _load(os.path.join(BASE, "collections.json"), {})
+
+    async def set_collection_ids(self, ids):
+        path = os.path.join(BASE, "collection-ids.json")
+        cur = _load(path, {})
+        if cur != ids:
+            _save(path, ids)
+        return True
+
     async def get_status(self):
         done = _load(DONE, {})
         return {"pending": len(await self.get_pending()),

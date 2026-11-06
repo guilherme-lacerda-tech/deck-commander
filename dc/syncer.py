@@ -88,7 +88,7 @@ def add_to_steam(paths: Paths, store: Store, op: str) -> list[str]:
         from . import tabs
         if tabs.SETTINGS.exists():
             tabs.apply(vdf.read_shortcuts(sc), json.loads((paths.data / "launch-map.json").read_text("utf-8")),
-                       sc.parents[1].name)
+                       sc.parents[1].name, data_dir=paths.data)
     except Exception:  # noqa: BLE001 — aba é conforto, nunca bloqueia o /sync
         pass
     return [r["AppName"] for r in pl.add]
