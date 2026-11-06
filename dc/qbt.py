@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import urllib.error
 import urllib.parse
 import urllib.request
 from http.cookiejar import CookieJar
@@ -65,6 +66,10 @@ class Qbt:
         try:
             with self.opener.open(req, timeout=self.timeout) as r:
                 out = r.read().decode()
+        except urllib.error.HTTPError as e:
+            if e.code in (409, 415):  # qBittorrent 5: 415 = arquivo inválido, 409 = já existe
+                raise QbtError("arquivo .torrent inválido" if e.code == 415 else "esse torrent já está na lista") from e
+            raise QbtError(f"qBittorrent respondeu erro {e.code}") from e
         except OSError as e:
             raise QbtError(f"qBittorrent indisponível: {e}") from e
         if "Fails" in out:
