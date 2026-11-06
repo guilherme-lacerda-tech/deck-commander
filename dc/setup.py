@@ -28,6 +28,7 @@ PY = "/usr/bin/python3"
 UNIT_FILES = {
     "deck-commander-qbittorrent.service": f"""[Unit]
 Description=Deck Commander — qBittorrent (WebUI só em 127.0.0.1:8790)
+ConditionPathExists={QBT_BIN}
 [Service]
 ExecStart={QBT_BIN} --profile={QBT_PROFILE} --confirm-legal-notice
 Restart=on-failure
