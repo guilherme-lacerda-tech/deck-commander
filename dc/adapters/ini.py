@@ -37,6 +37,18 @@ class IniDoc:
         i = self._find(section, key)
         return None if i is None else _KV.match(self.lines[i]).group(4)
 
+    def ensure(self, section: str, key: str, value: str) -> None:
+        """set() se a chave existe; senão insere logo após o cabeçalho da seção (que precisa existir)."""
+        if self._find(section, key) is not None:
+            return self.set(section, key, value)
+        for i, ln in enumerate(self.lines):
+            m = _SECTION.match(ln)
+            if m and m.group(1) == section:
+                eol = "\r\n" if ln.endswith("\r\n") else "\n"
+                self.lines.insert(i + 1, f"{key} = {value}{eol}")
+                return
+        raise KeyError(f"seção [{section}] não existe")
+
     def set(self, section: str, key: str, value: str) -> None:
         i = self._find(section, key)
         if i is None:

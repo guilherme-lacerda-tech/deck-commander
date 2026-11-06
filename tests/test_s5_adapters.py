@@ -30,7 +30,7 @@ def test_profiles_write_and_read_back(files, emu, profile):
     after = path.read_bytes().splitlines(keepends=True)
     assert len(before) == len(after)
     changed = [i for i, (x, y) in enumerate(zip(before, after)) if x != y]
-    assert all(b"Scale" in after[i] or b"multiplier" in after[i] for i in changed)
+    assert all(b"Scale" in after[i] or b"multiplier" in after[i] or b"Renderer" in after[i] for i in changed)
     assert all(after[i].endswith(before[i][len(before[i].rstrip(b"\r\n")):]) for i in changed)  # EOL igual
 
 
@@ -63,3 +63,14 @@ def test_dry_run_does_not_write(files):
     raw = path.read_bytes()
     ch = get_adapter("pcsx2").apply(path, console, "economico", files["state"], force=True)
     assert ch and path.read_bytes() == raw
+
+
+def test_ini_ensure_inserts_into_existing_section(tmp_path):
+    from dc.adapters.ini import IniDoc
+    p = tmp_path / "s.ini"; p.write_bytes(b"[AutoUpdater]\r\nLastVersion = abc\r\n\r\n[GPU]\r\nX = 1\r\n")
+    d = IniDoc.load(p)
+    d.ensure("AutoUpdater", "CheckAtStartup", "false")
+    d.ensure("GPU", "X", "2")
+    assert d.dump() == b"[AutoUpdater]\r\nCheckAtStartup = false\r\nLastVersion = abc\r\n\r\n[GPU]\r\nX = 2\r\n"
+    with pytest.raises(KeyError):
+        d.ensure("Nada", "k", "v")

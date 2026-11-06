@@ -11,12 +11,12 @@ class PCSX2(IniAdapter):
     name = "pcsx2"
     FIELDS = {
         "resolution_scale": ("EmuCore/GS", "upscale_multiplier", str),
-        "backend": ("EmuCore/GS", "Renderer", str),   # 14 = Vulkan (valor atual no Deck)
+        "backend": ("EmuCore/GS", "Renderer", str),   # -1 = Automático (14 = Vulkan forçado gera aviso na tela)
         "widescreen_hack": ("EmuCore", "EnableWideScreenPatches", _bool),
     }
     UNSUPPORTED = ("aspect_ratio", "shader", "frame_limit", "precision")
     PROFILES = {"ps2": {
-        "economico":   {"resolution_scale": 1, "backend": 14, "widescreen_hack": False},
-        "equilibrado": {"resolution_scale": 2, "backend": 14, "widescreen_hack": False},
-        "desempenho":  {"resolution_scale": 3, "backend": 14, "widescreen_hack": False},
+        "economico":   {"resolution_scale": 1, "backend": -1, "widescreen_hack": False},
+        "equilibrado": {"resolution_scale": 2, "backend": -1, "widescreen_hack": False},
+        "desempenho":  {"resolution_scale": 3, "backend": -1, "widescreen_hack": False},
     }}
