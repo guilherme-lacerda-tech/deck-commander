@@ -52,11 +52,12 @@ def power_loop(paths: Paths, interval: float = 30) -> None:
         try:
             from . import plugin_bridge, syncer, tabs, vdf
             done_p = plugin_bridge.done_path(paths)
-            if done_p.exists() and done_p.stat().st_mtime > getattr(power_loop, "_seen", 0):
-                power_loop._seen = done_p.stat().st_mtime
+            sc = syncer.shortcuts_path()
+            stamp = max(done_p.stat().st_mtime if done_p.exists() else 0, sc.stat().st_mtime)
+            if stamp > getattr(power_loop, "_seen", 0):  # plugin criou atalho ou Unifideck/Steam mudou a lista
+                power_loop._seen = stamp
                 plugin_bridge.collect(paths, store)
                 if tabs.SETTINGS.exists():
-                    sc = syncer.shortcuts_path()
                     tabs.apply(vdf.read_shortcuts(sc), json.loads((paths.data / "launch-map.json").read_text("utf-8")),
                                sc.parents[1].name)
         except Exception as e:  # noqa: BLE001

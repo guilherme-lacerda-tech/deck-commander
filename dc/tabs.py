@@ -1,7 +1,7 @@
 """M2.3 — Abas do TabMaster geradas a partir dos atalhos do Deck Commander.
 
-Uma aba por console (filtro whitelist com os AppIDs; some sozinha se vazia — autoHide) e uma aba
-"Emuladores" com os atalhos de emulador. A aba padrão "Non-Steam" é escondida (v5.1 M2.3).
+Uma aba por console (filtro whitelist com os AppIDs; some sozinha se vazia — autoHide), uma aba
+"Emuladores" e uma aba por loja do Unifideck (Epic, GOG...), pedido do usuário em 2026-11-06. A aba padrão "Non-Steam" é escondida (v5.1 M2.3).
 Abas que o usuário criou no TabMaster são preservadas; só as abas "dc-*" são reescritas.
 O TabMaster lê o arquivo ao iniciar: as mudanças aparecem depois de reiniciar o Deck.
 """
@@ -17,6 +17,7 @@ from .emulators import CONSOLES
 SETTINGS = Path.home() / "homebrew/settings/TabMaster/settings.json"
 GAMES_AND_SOFTWARE = 1 | 2
 EMULATOR_HINTS = ("pcsx2", "duckstation", "ryujinx", "lichii", "dolphin", "retroarch", "ppsspp", "eden")
+STORE_TITLES = {"epic": "Epic Games", "gog": "GOG", "amazon": "Amazon Games", "itch": "itch.io"}
 ORDER = ["ps2", "psx", "switch", "switch2", "gc", "wii", "psp", "n64", "snes", "gba"]
 
 
@@ -30,9 +31,15 @@ def _tab(tid: str, title: str, pos: int, appids: list[int]) -> dict:
 def build(tabs: dict, shortcuts: list[dict], launch_map: dict) -> dict:
     by_console: dict[str, list[int]] = {c: [] for c in ORDER}
     emus: list[int] = []
+    stores: dict[str, list[int]] = {}
     for r in shortcuts:
         appid = (r.get("appid") or 0) & 0xFFFFFFFF
         exe = (r.get("exe") or r.get("Exe") or "").lower()
+        if "unifideck" in exe:  # lojas do Unifideck: a etiqueta diz a loja (Epic, Gog...)
+            tags = [v for v in (r.get("tags") or {}).values() if v not in ("Installed", "Not Installed")]
+            for tg in tags[:1]:
+                stores.setdefault(tg, []).append(appid)
+            continue
         if "dc-launch" in exe:
             entry = launch_map.get(r.get("LaunchOptions", ""))
             if entry and entry["console"] in by_console:
@@ -50,6 +57,9 @@ def build(tabs: dict, shortcuts: list[dict], launch_map: dict) -> dict:
     pos = 0
     for t in head:
         out[t["id"]] = {**t, "position": pos}; pos += 1
+    for store in sorted(stores):  # uma aba por loja, logo depois dos Favoritos
+        title = STORE_TITLES.get(store.lower(), store)
+        out[f"dc-loja-{store.lower()}"] = _tab(f"dc-loja-{store.lower()}", title, pos, stores[store]); pos += 1
     for c in ORDER:
         out[f"dc-{c}"] = _tab(f"dc-{c}", CONSOLES[c]["label"], pos, by_console[c]); pos += 1
     out["dc-emuladores"] = _tab("dc-emuladores", "Emuladores", pos, emus); pos += 1

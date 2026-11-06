@@ -32,3 +32,15 @@ def test_apply_backs_up_and_is_idempotent(tmp_path):
     res = tabs.apply(sc, {"psx-fft": {"console": "psx"}}, "1", p)
     assert res["dc-psx"] == 1 and (tmp_path / "settings.json.antes-deck-commander").exists()
     assert tabs.apply(sc, {"psx-fft": {"console": "psx"}}, "1", p) == {}
+
+
+def test_store_tabs_from_unifideck_tags():
+    sc = [{"appid": 1, "exe": '"/x/unifideck-launcher"', "tags": {"0": "Not Installed", "1": "Epic"}},
+          {"appid": 2, "exe": '"/x/unifideck-launcher"', "tags": {"0": "Gog", "1": "Installed"}},
+          {"appid": 3, "exe": '"/x/unifideck-launcher"', "tags": {"0": "Epic"}}]
+    out = tabs.build(DEFAULT, sc, {})
+    assert out["dc-loja-epic"]["title"] == "Epic Games" and out["dc-loja-epic"]["filters"][0]["params"]["games"] == [1, 3]
+    assert out["dc-loja-gog"]["title"] == "GOG" and out["dc-loja-gog"]["filters"][0]["params"]["games"] == [2]
+    assert out["Favorites"]["position"] < out["dc-loja-epic"]["position"] < out["dc-ps2"]["position"]
+    assert "dc-emuladores" in out and all(1 not in t["filters"][0]["params"]["games"]
+                                           for k, t in out.items() if k == "dc-emuladores")
