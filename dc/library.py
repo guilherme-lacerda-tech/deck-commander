@@ -185,7 +185,10 @@ def build_command(game_id: str, launch_map: dict, emulators: dict) -> list[str]:
     entry = launch_map.get(game_id)
     if entry is None:
         raise KeyError(f"jogo '{game_id}' não está no mapa")
-    tmpl = emulators.get(entry["console"]) or DEFAULT_EMULATORS[entry["console"]]
+    tmpl = emulators.get(entry["console"])
+    if not tmpl:
+        from .emulators import detect
+        tmpl = detect().get(entry["console"]) or DEFAULT_EMULATORS[entry["console"]]
     return [entry["rom"] if a == "{rom}" else a for a in tmpl]
 
 

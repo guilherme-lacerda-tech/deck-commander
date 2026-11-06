@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """S1 (parte física) — operação 'running' + reboot real do Deck.
 
-  python3 deck/s1_reboot.py prepare   # cria op running segurando o lock, num DC_ROOT isolado
+  python3 tools/s1_reboot.py prepare   # cria op running segurando o lock, num DC_ROOT isolado
   (reiniciar o Deck)
-  python3 deck/s1_reboot.py check     # depois do boot: DB íntegro + op vira 'interrupted'
+  python3 tools/s1_reboot.py check     # depois do boot: DB íntegro + op vira 'interrupted'
 
 Usa ~/deck-commander-spikes/s1 como raiz — não toca em nada do sistema.
 """
@@ -49,7 +49,7 @@ with OperationLock({str(paths.lock)!r}, {op!r}, 'spike-s1-reboot'):
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(2)
     print(f"op {op} em 'running', escritor pid {p.pid} gravando continuamente.")
-    print("AGORA: reinicie o Deck (botão Power > Reiniciar) e depois rode: python3 deck/s1_reboot.py check")
+    print("AGORA: reinicie o Deck (botão Power > Reiniciar) e depois rode: python3 tools/s1_reboot.py check")
 
 
 def check():

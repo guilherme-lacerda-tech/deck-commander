@@ -1,8 +1,12 @@
-# Índice
+# Índice do repositório
 
-- `dc/` — núcleo (ver ARCHITECTURE.md)
-- `tests/` — pytest: `test_s1_concurrency`, `test_s2_backup`, `test_s6_power`, `test_s10_extract`, `test_store`, `test_vdf`
-- `deck/` — para rodar no Steam Deck: `DECK-PROMPT.md`, `deck_probe.py` (somente leitura), `s1_reboot.py`
-- `config/backup.example.toml` — fontes de backup
-- `docs/ANALISE-v5.1.md` — falhas F1–F18 da spec
-- `docs/SPIKES-REPORT.md` — resultado dos spikes no PC
+- `README.md` — o que é, instalação, uso · `docs/STATUS.md` — estado de cada módulo · `CHANGELOG.md`
+- `ARCHITECTURE.md` · `TROUBLESHOOTING.md` · `PRIVACY.md` · `FORK.md` · `recovery/README.md` · `docs/COMANDOS.md`
+- `dc/` — núcleo Python (ver ARCHITECTURE.md) · `dc/adapters/` — adaptadores de emulador
+- `decky-plugin/` — plugin do Decky (JS puro + backend Python)
+- `modules/*/contract.toml` — contratos entre módulos (M27)
+- `config/backup.example.toml` — modelo de fontes de backup
+- `setup-deck.sh` · `uninstall-module.sh` · `uninstall-deck-commander.sh` · `safe-mode.sh`
+- `tests/` — pytest (rodam no CI e semanalmente no Deck)
+- `tools/` — diagnóstico no Deck: `cef_eval.py`, `bootstrap_collections.py`, `deck_probe.py`, spikes `s1_reboot.py`/`s5_real_copy.py`
+- `docs/desenvolvimento/` — análise da spec v5.1, relatórios de spikes, histórico

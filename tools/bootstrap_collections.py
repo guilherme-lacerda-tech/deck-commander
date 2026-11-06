@@ -12,7 +12,8 @@ from dc.paths import get_paths  # noqa: E402
 from cef_eval import ws_eval  # noqa: E402
 
 paths = get_paths()
-sc = Path(glob.glob(str(Path.home() / ".steam/steam/userdata/*/config/shortcuts.vdf"))[0])
+from dc.steam import shortcuts_path  # noqa: E402
+sc = shortcuts_path()
 lm = json.loads((paths.data / "launch-map.json").read_text("utf-8"))
 spec = tabs.write_collections(paths.data, vdf.read_shortcuts(sc), lm)
 js = """(async (spec) => {

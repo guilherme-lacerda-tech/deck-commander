@@ -2,7 +2,7 @@
 """Coletor SOMENTE LEITURA do ambiente do Steam Deck (base de M-1 e dos spikes S3–S6).
 
 Não escreve nada fora de ~/deck-commander-probe/. Não lê senhas: linhas com
-pass/token/user/key/secret são descartadas. Uso:  python3 deck/deck_probe.py
+pass/token/user/key/secret são descartadas. Uso:  python3 tools/deck_probe.py
 """
 import glob
 import json

@@ -8,6 +8,7 @@ Multidisco (M4.11): CD1/CD2/(Disc 1) de PS1 => gera .m3u e vira UM jogo.
 """
 from __future__ import annotations
 
+import os
 import re
 import shutil
 from dataclasses import dataclass, field
@@ -26,6 +27,14 @@ NAME_HINTS = [(re.compile(p, re.I), c) for p, c in (
     (r"\bps2\b|playstation 2", "ps2"), (r"\bpsx\b|\bps1\b|playstation(?! [2-9])", "psx"),
     (r"gamecube|\bngc\b", "gc"), (r"\bwii\b", "wii"), (r"\bpsp\b", "psp"), (r"\bswitch\b|\bnsw\b", "switch"),
     (r"\bsnes\b|super nintendo", "snes"), (r"\bn64\b|nintendo 64", "n64"), (r"\bgba\b|game boy advance", "gba"))]
+
+
+def _link_or_copy(src: Path, dst: Path) -> None:
+    """Hardlink no mesmo disco (instantâneo, 0 bytes extras); cópia entre discos."""
+    try:
+        os.link(src, dst)
+    except OSError:
+        shutil.copy2(src, dst)
 
 
 def classify(name: str, explicit: Optional[str] = None) -> Optional[str]:
@@ -106,7 +115,7 @@ def ingest(content: Path, console: Optional[str], roms_root: Path, quarantine_ro
             else:
                 dst = staging / f.relative_to(content.parent if content.is_file() else content)
                 dst.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(f, dst)
+                _link_or_copy(f, dst)
                 collected.append(dst)
         empty = [f for f in collected if f.stat().st_size == 0]
         if empty:

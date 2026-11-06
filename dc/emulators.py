@@ -43,6 +43,41 @@ CONSOLES = {
     "switch2": {"label": "Nintendo Switch 2", "exts": [], "dump": True,
                 "cmd": [str(H / "Emulation/Lichii/lichii-linux-x86_64-pgo.AppImage"), "-f", "-g", "{rom}"]},
 }
+# Emuladores que não são Flatpak fixo: procurados em locais comuns (EmuDeck, ~/Applications, Downloads).
+# Ordem = preferência. Flatpak entra como alternativa. Resultado pode ser sobrescrito em emulators.json.
+SEARCH = {
+    "psx": {"globs": ["Applications/DuckStation*.AppImage", "Applications/duckstation*.AppImage",
+                      "Downloads/DuckStation*.AppImage", "Downloads/*/DuckStation*.AppImage"],
+            "flatpak": "org.duckstation.DuckStation", "args": ["-fullscreen", "-batch", "--"]},
+    "switch": {"globs": ["Applications/publish/Ryujinx", "Applications/Ryujinx*/Ryujinx", "Applications/Ryujinx*.AppImage",
+                         "Applications/ryujinx*.AppImage", "Downloads/publish/Ryujinx", "Downloads/*/publish/Ryujinx"],
+               "flatpak": "io.github.ryubing.Ryujinx", "args": ["--fullscreen"]},
+    "switch2": {"globs": ["Emulation/Lichii/lichii-linux-x86_64-pgo.AppImage", "Emulation/Lichii/*.AppImage",
+                          "Applications/*[Ll]ichii*.AppImage"], "flatpak": None, "args": ["-f", "-g"]},
+}
+
+
+def _flatpak_installed(app_id: str) -> bool:
+    import subprocess
+    try:
+        return subprocess.run([FLATPAK, "info", app_id], capture_output=True, timeout=10).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def detect(home: Path = H, check_flatpak: bool = True) -> dict[str, list[str]]:
+    """Comando de cada console cujo emulador foi encontrado neste Deck."""
+    import glob
+    out: dict[str, list[str]] = {}
+    for console, s in SEARCH.items():
+        hits = [h for g in s["globs"] for h in sorted(glob.glob(str(home / g)), reverse=True) if os.access(h, os.X_OK)]
+        if hits:
+            out[console] = [hits[0], *s["args"], "{rom}"]
+        elif s["flatpak"] and check_flatpak and _flatpak_installed(s["flatpak"]):
+            out[console] = [FLATPAK, "run", s["flatpak"], *s["args"], "{rom}"]
+    return out
+
+
 RA_CORE_FILES = ["snes9x_libretro.so", "mupen64plus_next_libretro.so", "mgba_libretro.so"]
 RA_CORE_URL = "https://buildbot.libretro.com/nightly/linux/x86_64/latest/{core}.zip"
 FLATPAK_IDS = ["net.pcsx2.PCSX2", "org.DolphinEmu.dolphin-emu", "org.libretro.RetroArch", "org.ppsspp.PPSSPP"]

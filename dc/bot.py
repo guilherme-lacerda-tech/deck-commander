@@ -79,6 +79,7 @@ class Bot:
             return json.loads(r.read())["result"]
 
     def send(self, chat: int, text: str) -> None:
+        text = text.replace(self.token, "***")
         for i in range(0, len(text), 3900):
             self.call("sendMessage", chat_id=chat, text=text[i:i + 3900])
 
@@ -211,6 +212,8 @@ class Bot:
             name = doc.get("file_name") or "arquivo"
             if not name.lower().endswith(".torrent"):
                 return f"Recebi {name}, mas só sei usar arquivos .torrent."
+            if (doc.get("file_size") or 0) > 5 * 1024 * 1024:
+                return "Esse .torrent é grande demais (>5 MB) — não parece um .torrent válido."
             console = self._console_for(uid, parse_console(caption) or parse_console(name))
             if console == "switch2":
                 return "Switch 2 ainda não é suportado no Deck (o Lichii é experimental). Não baixei."

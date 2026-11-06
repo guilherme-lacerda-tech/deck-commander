@@ -1,6 +1,6 @@
 """S5 — adaptadores: escreve, lê de volta, preserva o resto, respeita override manual.
 Fixtures com as linhas reais do Deck do usuário (2026-11-06), sem dados pessoais.
-No Deck, deck/s5_real_copy.py repete o teste numa CÓPIA do arquivo real."""
+No Deck, tools/s5_real_copy.py repete o teste numa CÓPIA do arquivo real."""
 import pytest
 
 from dc.adapters import ManualOverride, SchemaChanged, get_adapter

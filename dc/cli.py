@@ -36,18 +36,10 @@ def backup_sources(paths) -> dict[str, Path]:
 
 
 def _library(paths, apply: bool) -> int:
-    from datetime import datetime, timezone
-    from . import library, vdf
-    from .lock import OperationLock
-    home = Path.home()
-    roots = [home / "Emulation/roms"] + [Path(p) for p in sorted(glob.glob("/run/media/*/*/Emulation/roms"))]
-    games, notes = library.scan(roots)
-    scs = sorted(glob.glob(str(home / ".steam/steam/userdata/*/config/shortcuts.vdf")))
-    if len(scs) != 1:
-        print(f"esperado 1 usuário Steam, achei {len(scs)}: {scs}"); return 1
-    sc_path = Path(scs[0])
-    launcher = library.launcher_path(home)
-    pl = library.plan(vdf.read_shortcuts(sc_path), games, launcher)
+    """Coloca jogos novos no Steam. Com o plugin do Decky: ao vivo; sem ele: grava shortcuts.vdf (+ reiniciar Steam)."""
+    from . import library, plugin_bridge, syncer, vdf
+    games, notes = library.scan(syncer.rom_roots())
+    pl = library.plan(vdf.read_shortcuts(syncer.shortcuts_path()), games, library.launcher_path(Path.home()))
     for n in notes:
         print("nota:", n)
     print(f"jogos encontrados: {len(games)} | novos atalhos: {len(pl.add)} | já existem: {len(pl.already)}"
@@ -56,33 +48,21 @@ def _library(paths, apply: bool) -> int:
         print(f"  + [{row['tags']['0']}] {row['AppName']}  ->  {row['LaunchOptions']}")
     if not apply:
         print("(dry-run; use --apply)"); return 0
-
     s = _store(paths)
     op = s.enqueue("library-add", {"count": len(pl.add)})
     s.claim_next()
     try:
+        from .lock import OperationLock
         with OperationLock(paths.lock, op, "library-add", is_running=s.is_running):
-            res = backup.create_snapshot({"shortcuts": sc_path}, paths.backups, paths.quarantine, kind="steam")
-            if not res.ok:
-                raise RuntimeError(f"backup falhou: {res.error}")
-            print("backup:", res.path)
-            library.write_launcher(home, Path(__file__).resolve().parents[1])
-            library.write_map(paths.data / "launch-map.json", games)
-            emu = paths.config / "emulators.json"
-            if not emu.exists():
-                emu.write_text(json.dumps(library.DEFAULT_EMULATORS, indent=1), "utf-8")
-            n = library.write_shortcuts(sc_path, pl.add)
-            now = datetime.now(timezone.utc).isoformat()
-            with s.tx(critical=True) as c:
-                for row in pl.add:
-                    c.execute("INSERT OR IGNORE INTO provenance(appid, source, created_at, operation_id)"
-                              " VALUES(?,?,?,?)", (str(row["appid"] & 0xFFFFFFFF), "dc", now, op))
-        s.finish(op, True, result={"added": n, "backup": str(res.path)})
-        print(f"ok: {n} atalhos adicionados (op {op}). Reinicie o Steam para ver.")
-        return 0
-    except Exception as e:
-        s.finish(op, False, error=str(e))
-        print(f"FALHOU: {e}"); return 1
+            new = syncer.add_to_steam(paths, s, op)
+        s.finish(op, True, result={"added": len(new)})
+    except Exception as e:  # noqa: BLE001
+        s.finish(op, False, error=str(e)); print(f"FALHOU: {e}"); return 1
+    if plugin_bridge.installed():
+        print(f"ok: {len(new)} jogo(s) na fila do plugin — aparecem na biblioteca em ~10 s, sem reiniciar.")
+    else:
+        print(f"ok: {len(new)} atalho(s) gravados. Reinicie o Steam para ver (ou instale o plugin do Decky).")
+    return 0
 
 
 def _extra(paths, args) -> int:
@@ -147,6 +127,44 @@ def _extra(paths, args) -> int:
         res = tabs.apply(vdf.read_shortcuts(sc), json.loads((paths.data / "launch-map.json").read_text("utf-8")),
                          sc.parents[1].name, data_dir=paths.data)
         print(res or "abas já atualizadas"); print("reinicie o Deck para o TabMaster carregar")
+    elif c == "profile":  # M3: perfil de qualidade em DuckStation (ps1) / PCSX2 (ps2)
+        from .adapters import ManualOverride, SchemaChanged, get_adapter
+        if len(r) < 2:
+            print("uso: dc x profile <ps1|ps2> <economico|equilibrado|desempenho> [--apply] [--force]"); return 2
+        console = {"ps1": "psx", "psx": "psx", "ps2": "ps2"}[r[0]]
+        emu, cfg = (("duckstation", Path.home() / ".local/share/duckstation/settings.ini") if console == "psx" else
+                    ("pcsx2", Path.home() / ".var/app/net.pcsx2.PCSX2/config/PCSX2/inis/PCSX2.ini"))
+        try:
+            ch = get_adapter(emu).apply(cfg, "ps1" if console == "psx" else "ps2", r[1],
+                                        paths.state / "adapters-state.json", force="--force" in r, dry_run=not apply)
+        except (ManualOverride, SchemaChanged) as e:
+            print(f"recusado: {e}"); return 1
+        for x in ch:
+            print(f"[{x.section}] {x.key}: {x.old} -> {x.new}")
+        print("nada a mudar" if not ch else ("aplicado (lido de volta e confirmado)" if apply else "(dry-run; use --apply)"))
+    elif c == "dedup":  # M2.4: só relatório — nunca remove nada
+        import hashlib
+        from collections import defaultdict
+        by_size = defaultdict(list)
+        for root in syncer.rom_roots():
+            for f in (root.rglob("*") if root.exists() else []):
+                if f.is_file() and f.stat().st_size > 1024 * 1024:
+                    by_size[f.stat().st_size].append(f)
+        groups = defaultdict(list)
+        for size, fs in by_size.items():
+            if len(fs) > 1:
+                for f in fs:
+                    h = hashlib.sha256()
+                    with open(f, "rb") as fh:
+                        for chunk in iter(lambda: fh.read(1 << 22), b""):
+                            h.update(chunk)
+                    groups[h.hexdigest()].append(f)
+        dups = [v for v in groups.values() if len(v) > 1]
+        for v in dups:
+            print("cópias idênticas (sugestão: manter só uma):")
+            for f in v:
+                print("   ", f)
+        print(f"{len(dups)} grupo(s) de duplicatas. Nada foi apagado.")
     elif c == "telegram-pair":
         from .bot import pair_code
         print("Código de pareamento (mande  /start CODIGO  para o seu bot):", pair_code(paths))
@@ -206,7 +224,8 @@ def main(argv=None) -> int:
         key = artwork.read_key(paths.secrets)
         if not key:
             print("sem chave: rode  python3 -m dc secret steamgriddb"); return 1
-        sc = sorted(glob.glob(str(Path.home() / ".steam/steam/userdata/*/config/shortcuts.vdf")))[0]
+        from .steam import shortcuts_path
+        sc = shortcuts_path()
         grid = Path(sc).parent / "grid"
         fetch = artwork.make_fetch(key)
         ok = fail = 0
@@ -289,10 +308,8 @@ def main(argv=None) -> int:
         for src, dst in plan:
             print(f"{src} -> {dst}")
         if a.apply:
-            if backup.touches_steam(snap):
-                raise SystemExit("este snapshot toca arquivos do Steam; o fechamento coordenado do Steam "
-                                 "depende do spike S3 — restore aplicado bloqueado por enquanto")
-            backup.restore_snapshot(snap, dry_run=False)
+            from .ops import SteamGuard
+            backup.restore_snapshot(snap, dry_run=False, steam_guard=SteamGuard() if backup.touches_steam(snap) else None)
             print("restaurado")
         else:
             print("(dry-run; use --apply)")

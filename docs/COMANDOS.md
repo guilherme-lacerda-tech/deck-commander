@@ -14,11 +14,14 @@ Tudo roda a partir de `~/deck-commander` (Konsole no modo Desktop, ou SSH).
 ## Biblioteca e emuladores (M2/M3/M5)
 | Comando | O que faz |
 |---|---|
-| `python3 -m dc library [--apply]` | coloca jogos novos de `~/Emulation/roms` e do SD no Steam |
+| `python3 -m dc library [--apply]` | coloca jogos novos de `~/Emulation/roms` e do SD no Steam (ao vivo com o plugin) |
 | `python3 -m dc artwork` | baixa capas do SteamGridDB (não sobrescreve as suas) |
 | `python3 -m dc x configure [--apply]` | perfil equilibrado em Dolphin/PPSSPP/RetroArch (respeita ajustes manuais) |
+| `python3 -m dc x profile <ps1\|ps2> <economico\|equilibrado\|desempenho> [--apply] [--force]` | perfil de qualidade no DuckStation/PCSX2 (recusa sobrescrever ajuste manual sem --force) |
+| `python3 -m dc x dedup` | lista cópias idênticas de ROMs (só sugere, nunca apaga) |
+| `python3 -m dc x tabs` | regera as abas do TabMaster |
 | `python3 -m dc x patch <rom> <patch>` | aplica tradução IPS/BPS/UPS numa cópia "(patch)" |
-| `python3 -m dc x steam-restart` | reinicia o Steam (recusa se houver jogo aberto) |
+| `python3 -m dc x steam-restart` | reinicia o Steam (recusa se houver jogo aberto; só necessário sem o plugin) |
 
 ## Conteúdo (M4) — pelo Telegram: `/help`
 | Comando | O que faz |

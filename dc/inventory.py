@@ -166,7 +166,7 @@ def collect(home: Path, paths: Paths, sysroot: Path = Path("/")) -> dict:
 
     prov = _provenance(paths.db)
     roms = []
-    # interno + cartões SD (no Deck do usuário os jogos de Switch ficam no SD "LX512")
+    # armazenamento interno + qualquer cartão SD montado em /run/media
     roots = [h / "Emulation/roms"] + [Path(p) for p in sorted(glob.glob(str(sysroot / "run/media/*/*/Emulation/roms")))]
     files = [(root, f) for root in roots if root.exists() for f in sorted(root.rglob("*"))]
     for root, f in files:

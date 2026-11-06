@@ -1,55 +1,75 @@
-# Arquitetura (estado atual)
+# Arquitetura
 
-Núcleo Python 3.11+ stdlib (correção F6 — nada a instalar no SteamOS imutável).
+Núcleo em **Python 3.11+ só com biblioteca padrão** (nada a instalar no SteamOS imutável) + um plugin
+do Decky em **JavaScript puro** (sem build). Tudo em `$HOME`.
 
-| Camada v5.1 | Módulo | Arquivo |
-|---|---|---|
-| 0 Segurança | M0.1/M0.2 backup verificado, fallback, restore com guarda do Steam | `dc/backup.py` |
-| 0 Segurança | M0.4 quarentena com `review_by` | `dc/quarantine.py` |
-| 4 Orquestração | M18.1 lock + reentrância validada | `dc/lock.py` |
-| 4 Orquestração | M18/M19 Operation Store SQLite (WAL, FULL, integrity, aprovação 1h) | `dc/store.py` |
-| 4 Orquestração | worker FIFO + recover + operations.log | `dc/worker.py` |
-| 2 Biblioteca | leitura de VDF (base de M2.6) | `dc/vdf.py` |
-| 2 Biblioteca | M2 launcher fixo + mapa (AppID estável, sem SRM) | `dc/library.py`, `dc/launch.py` |
-| 3 Conteúdo | M4.6 extração protegida | `dc/safe_extract.py` |
-| 3/5 | M4.4 energia + M20 sensor de bateria | `dc/power.py` |
-| — | caminhos XDG separados | `dc/paths.py` |
-| — | CLI | `dc/cli.py` |
+## Diretórios (separação física)
+| O quê | Onde |
+|---|---|
+| Código | `~/deck-commander/` |
+| Configurações | `~/.config/deck-commander/` (`emulators.json`, `deck.json`, `power.json`, `backup.toml`, `plugins.lock`) |
+| Segredos (600) | `~/.config/deck-commander/secrets/` (token do Telegram, chave SteamGridDB) |
+| Banco, mapa, fila do plugin | `~/.local/share/deck-commander/` (`deck.db`, `launch-map.json`, `plugin-*.json`, `collections.json`, `art/`) |
+| Logs e estado | `~/.local/state/deck-commander/` |
+| Backups e quarentena | `~/Backups/DeckCommander/` (`DC_BACKUP_DIR` redireciona para SD/HD externo) |
+| ROMs | `~/Emulation/roms/<console>/` e `/run/media/*/*/Emulation/roms/<console>/` |
 
-Regras de fluxo:
-- Toda operação destrutiva: `store.enqueue` → (aprovação) → `worker.run_once` adquire o lock →
-  handler recebe `env` com `DC_OPERATION_ID` para scripts internos.
-- Reentrância só vale se o lock está preso pela mesma operação e ela está `running`.
-- Só `dc library` grava `shortcuts.vdf`, e só ACRESCENTA (nunca altera/remove atalhos de outras origens).
+## Fluxo de um jogo novo
+```
+Telegram ("Switch" + .torrent) -> bot -> qBittorrent (127.0.0.1:8790)
+download concluído -> /sync automático -> content.ingest (classifica, extrai ZIP com segurança,
+   multidisco .m3u, hardlink no mesmo disco) -> ~/Emulation/roms/<console>/<jogo>/
+   -> banco (files, origem=torrent) -> launch-map.json -> plugin-queue.json (+ capas em art/)
+plugin do Decky (a cada 10 s, só com o Steam já carregado):
+   SteamClient.Apps.AddShortcut -> capas (SetCustomArtworkForApp) -> coleção do console -> aviso na tela
+   autocorreção: atalho criado por ele que sumiu é recriado
+TabMaster: aba = coleção do Steam -> jogo aparece na aba na hora
+```
+Sem o plugin instalado, o Deck Commander grava `shortcuts.vdf` (com backup) e pede para reiniciar o Steam.
 
-M2 (decisão do usuário 2026-11-06): todos os atalhos de ROM apontam para
-`~/.local/share/deck-commander/bin/dc-launch <game_id>`; o mapa fica em
-`~/.local/share/deck-commander/launch-map.json` e os emuladores em `~/.config/deck-commander/emulators.json`.
-Trocar ROM/emulador = editar o mapa, sem reiniciar o Steam. Adicionar jogos novos = `python3 -m dc library --apply`
-+ reiniciar o Steam uma vez.
+## Módulos
+| Módulo v5.1 | Arquivo |
+|---|---|
+| M-1 inventário | `dc/inventory.py` |
+| M0 backup/restore/quarentena/safe-mode | `dc/backup.py`, `dc/quarantine.py`, `dc/ops.py` |
+| M18/M19 lock, Operation Store, índice | `dc/lock.py`, `dc/store.py`, `dc/worker.py`, `dc/ops.py` |
+| M27 contratos | `dc/contracts.py`, `modules/*/contract.toml` |
+| M2 biblioteca (lançador fixo + mapa), abas, plugin | `dc/library.py`, `dc/launch.py`, `dc/tabs.py`, `dc/plugin_bridge.py`, `dc/steam.py`, `decky-plugin/` |
+| M2.5 capas | `dc/artwork.py` |
+| M3 emuladores, perfis, detecção | `dc/emulators.py`, `dc/adapters/` |
+| M4 Telegram, torrents, /sync, energia | `dc/bot.py`, `dc/qbt.py`, `dc/content.py`, `dc/syncer.py`, `dc/safe_extract.py`, `dc/power.py` |
+| M5 traduções IPS/BPS/UPS | `dc/patches.py` |
+| M6/M7/M20/M21/M10.1 | `dc/health.py` |
+| M10/M11 serviços, testes, updates, painel | `dc/services.py` |
+| M12/M15 instalação por módulo | `dc/setup.py`, `setup-deck.sh`, `uninstall-*.sh` |
+| M17 export/import | `dc/export.py` |
 
-## M1 — Dono único por hardware/função (Deck do usuário, 2026-11-06)
-| Hardware / função | Dono | Observação |
-|---|---|---|
-| TDP, curva de ventoinha, clock da GPU | Panel de Control | PowerTools não deve mexer nisso |
-| CPU (SMT, boost, núcleos) | PowerTools | Panel não mexe |
-| Launch options de compatibilidade | Proton Pulse (opcional) | **não instalado** → M8 bloqueado |
-| Abas da biblioteca | TabMaster | **não instalado** (instalação manual pela loja do Decky) |
-| Lojas Epic/GOG | Unifideck | 500 atalhos; o DC nunca toca neles |
-| ROMs no Steam | Deck Commander (`dc-launch`) | 22 atalhos; só acrescenta |
-| Geração de quadros | decky-lsfg-vk | ativado por jogo pela própria interface do plugin |
-| Badges ProtonDB | protondb-decky | v5.1 sugeria remover; mantido (não conflita com nada instalado) |
+## Regras que o código garante
+- Operação destrutiva: fila (`store.enqueue`) -> lock universal (`OperationLock`; reentrância só para a
+  mesma operação em execução) -> log JSONL.
+- `shortcuts.vdf`: só o Deck Commander **acrescenta** (com backup e verificação de round-trip); nunca
+  altera/remove atalhos de outras origens (Unifideck, manuais).
+- AppID estável: nome e executável dos atalhos nunca mudam; ROM/emulador mudam só no mapa.
+- Leitura ausente nunca vira "ok" (sensores = `unknown`, decisão adiada).
+- Nada é apagado automaticamente (quarentena com prazo de revisão; `--purge` exige confirmação).
 
-Versões travadas em `~/.config/deck-commander/plugins.lock`; `x updates` e `x diagnose` avisam se mudarem.
-Instalar/remover plugins do Decky não tem interface oficial por linha de comando (achado F7): é manual.
+## Dono único por função (M1)
+| Função | Dono |
+|---|---|
+| TDP, ventoinha, clock da GPU | Panel de Control |
+| CPU (SMT, boost) | PowerTools |
+| Abas | TabMaster (abas `dc-*` geradas pelo Deck Commander; as suas são preservadas) |
+| Lojas Epic/GOG | Unifideck |
+| ROMs no Steam | Deck Commander |
+| Geração de quadros | decky-lsfg-vk |
 
 ## Serviços (systemd --user)
-| Unidade | Módulo | Padrão |
-|---|---|---|
-| deck-commander-qbittorrent | M4 | ligado (WebUI só em 127.0.0.1:8790; a 8080 é do steamwebhelper) |
-| deck-commander-power | M4.4/M18 | ligado (pausa downloads fora do carregador, roda fila) |
-| deck-commander-bot | M4 | liga sozinho quando existir o token |
-| deck-commander-backup.timer | M0/M6 | diário (configs + saves) |
-| deck-commander-tests.timer | M10.4 | semanal + 15 min após o boot; 2 falhas seguidas → safe-mode |
-| deck-commander-updates.timer | M11 | semanal; só avisa |
-| deck-commander-dashboard | M10.1 | desligado (127.0.0.1:8765) |
+| Unidade | Padrão |
+|---|---|
+| `deck-commander-qbittorrent` | ligado (WebUI só local, porta 8790 — a 8080 é do steamwebhelper) |
+| `deck-commander-power` | ligado (pausa downloads fora do carregador, fila, coleções/abas) |
+| `deck-commander-bot` | liga quando existe token |
+| `deck-commander-backup.timer` | diário (configs + saves) |
+| `deck-commander-tests.timer` | semanal (2 falhas seguidas -> safe-mode) |
+| `deck-commander-updates.timer` | semanal (só avisa, não atualiza) |
+| `deck-commander-dashboard` | desligado (opcional, 127.0.0.1:8765) |

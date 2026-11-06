@@ -144,6 +144,20 @@ def install_cores(log: list[str]) -> None:
         log.append(f"core RetroArch instalado: {core}")
 
 
+def install_flatpaks(log: list[str]) -> None:
+    """Instala (modo usuário, Flathub oficial) os emuladores Flatpak que faltarem."""
+    have = subprocess.run(["flatpak", "list", "--app", "--columns=application"], capture_output=True, text=True).stdout.split()
+    missing = [a for a in emulators.FLATPAK_IDS if a not in have]
+    if not missing:
+        return
+    subprocess.run(["flatpak", "remote-add", "--user", "--if-not-exists", "flathub",
+                    "https://dl.flathub.org/repo/flathub.flatpakrepo"], capture_output=True)
+    r = subprocess.run(["flatpak", "install", "--user", "-y", "--noninteractive", "flathub", *missing],
+                       capture_output=True, text=True)
+    log.append(f"emuladores instalados (Flathub): {', '.join(missing)}" if r.returncode == 0
+               else f"AVISO: falha ao instalar {missing}: {r.stderr.strip()[-200:]}")
+
+
 def flatpak_overrides(log: list[str]) -> None:
     for app in emulators.FLATPAK_IDS:
         for fs in (str(H / "Emulation"), "/run/media/deck"):
@@ -160,12 +174,64 @@ def write_units(log: list[str]) -> None:
     _sc("daemon-reload")
 
 
+PLUGIN_SRC = REPO / "decky-plugin"
+PLUGIN_ZIP = H / "Downloads/deck-commander-plugin.zip"
+
+
+def find_installed_plugin() -> Path | None:
+    for pj in (H / "homebrew/plugins").glob("*/plugin.json"):
+        try:
+            if json.loads(pj.read_text("utf-8")).get("name") == "Deck Commander":
+                return pj.parent
+        except (OSError, ValueError):
+            pass
+    return None
+
+
+def setup_plugin(log: list[str]) -> None:
+    """Gera o .zip para instalar pelo Decky e, se já instalado, atualiza os arquivos no lugar."""
+    PLUGIN_ZIP.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(PLUGIN_ZIP, "w", zipfile.ZIP_DEFLATED) as z:
+        for f in sorted(PLUGIN_SRC.rglob("*")):
+            if f.is_file() and "__pycache__" not in f.parts:
+                z.write(f, Path("deck-commander") / f.relative_to(PLUGIN_SRC))
+    inst = find_installed_plugin()
+    if inst is None:
+        log.append(f"PLUGIN: instale pelo Decky -> Configurações -> Desenvolvedor -> Instalar plugin de ZIP -> {PLUGIN_ZIP}")
+        return
+    changed = []
+    for rel in ("dist/index.js", "main.py", "package.json"):
+        src, dst = PLUGIN_SRC / rel, inst / rel
+        if not dst.exists() or dst.read_bytes() != src.read_bytes():
+            try:
+                shutil.copyfile(src, dst); changed.append(rel)
+            except PermissionError:
+                log.append(f"PLUGIN: sem permissão para atualizar {dst} — reinstale pelo ZIP {PLUGIN_ZIP}")
+                return
+    log.append("plugin já instalado" + (f"; atualizado ({', '.join(changed)}) — vale no próximo reinício" if changed else ", em dia"))
+
+
 def write_plugins_lock(paths: Paths, log: list[str]) -> None:
     from .health import installed_plugins
     lock = paths.config / "plugins.lock"
     if not lock.exists():
         lock.write_text(json.dumps(installed_plugins(), indent=1, ensure_ascii=False), "utf-8")
         log.append(f"plugins.lock gerado com as versões atuais ({lock})")
+
+
+def write_emulators_json(paths: Paths, log: list[str]) -> None:
+    """Grava os emuladores encontrados; mantém o que o usuário já configurou e ainda existe."""
+    p = paths.config / "emulators.json"
+    cur = json.loads(p.read_text("utf-8")) if p.exists() else {}
+    found = emulators.detect()
+    for console, cmd in found.items():
+        if console not in cur or not Path(cur[console][0]).exists():
+            cur[console] = cmd
+            log.append(f"emulador de {console}: {cmd[0] if cmd[0] != emulators.FLATPAK else cmd[2]}")
+    for console in emulators.SEARCH:
+        if console not in cur:
+            log.append(f"AVISO: emulador de {console} não encontrado (jogos desse console não abrem)")
+    p.write_text(json.dumps(cur, indent=1, ensure_ascii=False), "utf-8")
 
 
 def write_backup_toml(paths: Paths) -> None:
@@ -191,16 +257,21 @@ def setup(paths: Paths, modules: list[str], dev: bool = False, downloads: bool =
                     wanted.add(d); frontier.append(d); log.append(f"{m} depende de {d}: incluído")
     write_units(log)
     write_backup_toml(paths)
+    if "M2" in wanted or "M3" in wanted:
+        write_emulators_json(paths, log)
     if "M1" in wanted:
         write_plugins_lock(paths, log)
     if "M3" in wanted:
         if downloads:
+            install_flatpaks(log)
             install_cores(log)
         else:
             log.append("PENDENTE: cores do RetroArch (rode ./setup-deck.sh --all para baixar)")
         flatpak_overrides(log)
         for l in emulators.configure(apply=True):
             log.append("config " + l)
+    if "M2" in wanted:
+        setup_plugin(log)
     if "M4" in wanted:
         if downloads:
             install_qbittorrent(log)

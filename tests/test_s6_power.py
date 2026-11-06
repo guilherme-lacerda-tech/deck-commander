@@ -1,6 +1,6 @@
 """S6 (parte simulável) — descoberta dinâmica + histerese + unknown != carregando.
 Os nomes de pasta são variados de propósito: a lógica não pode depender de AC/ ou BAT0/.
-A validação com o sysfs REAL (LCD e OLED) fica para o Deck (deck/DECK-PROMPT.md)."""
+Validado no Deck LCD real (docs/desenvolvimento/SPIKES-DECK-REPORT.md)."""
 import pytest
 
 from dc.power import PowerPolicy, read_power

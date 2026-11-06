@@ -48,7 +48,8 @@ def _save_state(paths: Paths, st: dict) -> None:
 
 
 def shortcuts_path() -> Path:
-    return Path(sorted(glob.glob(str(Path.home() / ".steam/steam/userdata/*/config/shortcuts.vdf")))[0])
+    from .steam import shortcuts_path as _sp
+    return _sp()
 
 
 def rom_roots() -> list[Path]:

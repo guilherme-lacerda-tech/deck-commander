@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Diagnóstico: avalia uma expressão JS no contexto do Steam (SharedJSContext) via CEF DevTools
 em 127.0.0.1:8080 (porta que o Decky já abre). Só leitura/diagnóstico.
-Uso: python3 deck/cef_eval.py 'expressão JS'"""
+Uso: python3 tools/cef_eval.py 'expressão JS'"""
 import base64
 import json
 import os
