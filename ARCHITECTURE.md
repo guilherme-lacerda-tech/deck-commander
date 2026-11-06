@@ -20,7 +20,7 @@ Regras de fluxo:
 - Toda operação destrutiva: `store.enqueue` → (aprovação) → `worker.run_once` adquire o lock →
   handler recebe `env` com `DC_OPERATION_ID` para scripts internos.
 - Reentrância só vale se o lock está preso pela mesma operação e ela está `running`.
-- O DB nunca escreve `shortcuts.vdf` (SRM é o dono).
+- Só `dc library` grava `shortcuts.vdf`, e só ACRESCENTA (nunca altera/remove atalhos de outras origens).
 
 M2 (decisão do usuário 2026-11-06): todos os atalhos de ROM apontam para
 `~/.local/share/deck-commander/bin/dc-launch <game_id>`; o mapa fica em
