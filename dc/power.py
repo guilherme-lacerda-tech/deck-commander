@@ -29,6 +29,7 @@ class Supply:
     online: Optional[bool]
     capacity: Optional[int]
     status: Optional[str]
+    scope: Optional[str] = None   # "Device" = periférico (mouse/controle), não alimenta o Deck
 
 
 @dataclass
@@ -50,12 +51,13 @@ def discover(sysfs: Path = DEFAULT_SYSFS) -> list[Supply]:
         out.append(Supply(d.name, t,
                           None if online is None else online == "1",
                           int(cap) if cap and cap.isdigit() else None,
-                          _read(d / "status")))
+                          _read(d / "status"), _read(d / "scope")))
     return out
 
 
 def read_power(sysfs: Path = DEFAULT_SYSFS) -> PowerReading:
-    sup = discover(sysfs)
+    # Achado no Deck real: mouse Logitech aparece como hidpp_battery_0 (type=Battery, scope=Device)
+    sup = [s for s in discover(sysfs) if s.scope != "Device"]
     ext = [s for s in sup if s.type in EXTERNAL_TYPES and s.online is not None]
     bats = [s for s in sup if s.type == "Battery"]
     ac = any(s.online for s in ext) if ext else None

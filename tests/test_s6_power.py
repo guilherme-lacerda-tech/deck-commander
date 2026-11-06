@@ -24,6 +24,16 @@ def test_discovers_any_layout(tmp_path, layout):
     assert r.ac_online is True and r.battery_pct == 80
 
 
+def test_peripheral_battery_ignored(tmp_path):
+    """Layout real do Deck LCD do usuário (2026-11-06): ACAD, BAT1 e mouse Logitech."""
+    r = read_power(fake_sysfs(tmp_path / "ps", {
+        "ACAD": {"type": "Mains", "online": 0},
+        "BAT1": {"type": "Battery", "capacity": 40, "status": "Discharging"},
+        "aaa_mouse": {"type": "Battery", "capacity": 5, "status": "Discharging", "scope": "Device"},
+        "hidpp_battery_0": {"type": "Battery", "capacity": 99, "status": "Full", "scope": "Device"}}))
+    assert r.ac_online is False and r.battery_pct == 40
+
+
 def test_usb_c_only_charger(tmp_path):
     r = read_power(fake_sysfs(tmp_path / "ps", {
         "ACAD": {"type": "Mains", "online": 0}, "usbc": {"type": "USB", "online": 1},
