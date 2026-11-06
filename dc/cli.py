@@ -85,6 +85,72 @@ def _library(paths, apply: bool) -> int:
         print(f"FALHOU: {e}"); return 1
 
 
+def _extra(paths, args) -> int:
+    """Subcomandos do projeto completo (M0, M3, M5, M6, M7, M10, M11, M17, M19, M20, M21)."""
+    from . import emulators, export, health, ops, patches, services, syncer, library, vdf
+    from .store import Store
+    if not args:
+        print(open(Path(__file__).resolve().parents[1] / "docs/COMANDOS.md", encoding="utf-8").read()); return 0
+    c, r = args[0], args[1:]
+    apply = "--apply" in r
+    r = [x for x in r if x != "--apply"]
+    if c == "configure":
+        for l in emulators.configure(apply=apply) or ["nada a mudar"]:
+            print(l)
+        print("" if apply else "(dry-run; use --apply)")
+    elif c == "patch":
+        print("gerado:", patches.apply_file(Path(r[0]), Path(r[1])))
+    elif c == "safe-mode":
+        out = ops.safe_mode_off(paths) if r and r[0] == "off" else ops.safe_mode_on(paths, "manual", _store(paths))
+        print("\n".join(out) or "ok")
+    elif c == "uninstall":
+        confirm = r[r.index("--confirm") + 1] if "--confirm" in r else ""
+        for l in ops.uninstall(paths, Path(__file__).resolve().parents[1], "--purge" in r, "--purge-backups" in r, confirm):
+            print(l)
+    elif c == "db":
+        s = _store(paths); games, _ = library.scan(syncer.rom_roots())
+        if r and r[0] == "index":
+            print("registrados:", ops.index_files(s, games))
+        else:
+            print(json.dumps(ops.db_verify(s, games, vdf.read_shortcuts(syncer.shortcuts_path())), indent=1, ensure_ascii=False))
+    elif c == "saves":
+        if r and r[0] == "import":
+            print(json.dumps(health.import_saves(Path(r[1]), dry_run=not apply), indent=1, ensure_ascii=False))
+        else:
+            print(json.dumps(health.backup_saves(paths), indent=1, ensure_ascii=False))
+    elif c == "disk":
+        for i in health.disk_report(syncer.rom_roots(), vdf.read_shortcuts(syncer.shortcuts_path())):
+            print(f"{i['size'] / 1e9:6.1f} GB  {i['last_played']:10}  {'candidato ' if i['suggest_remove'] else '          '}{i['path']}")
+        for n in health.stale_downloads(paths):
+            print("download já importado (pode apagar o original):", n)
+    elif c == "sensors":
+        for s in health.read_sensors().values():
+            print(f"{s.name:10} {s.state:12} {'' if s.value is None else s.value}{s.unit}")
+    elif c == "diagnose":
+        for f in health.diagnose(paths, _store(paths), repair=apply):
+            print(f"{'OK ' if f.ok else '!! '}[{f.mode}] {f.problem}: {f.detail} {('-> ' + f.action) if f.action else ''}")
+    elif c == "status":
+        print(health.status_text(paths, _store(paths)))
+    elif c == "sync":
+        from .qbt import Qbt
+        print(syncer.run_sync(paths, _store(paths), Qbt(), confirm_many="tudo" in r))
+    elif c == "steam-restart":
+        print(ops.restart_steam())
+    elif c == "export":
+        out = Path(r[0] if r else Path.home() / "deck-commander-export.zip")
+        print("\n".join(export.export_config(paths, out))); print("->", out)
+    elif c == "import":
+        print("\n".join(export.import_config(paths, Path(r[0]), dry_run=not apply)))
+    elif c == "telegram-pair":
+        from .bot import pair_code
+        print("Código de pareamento (mande  /start CODIGO  para o seu bot):", pair_code(paths))
+    elif c in ("tests", "updates", "backup"):
+        return services.main([c])
+    else:
+        print("comando desconhecido; veja: python3 -m dc x"); return 2
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="dc")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -99,7 +165,8 @@ def main(argv=None) -> int:
     p = sub.add_parser("power"); p.add_argument("--sysfs", default="/sys/class/power_supply")
     e = sub.add_parser("extract"); e.add_argument("archive"); e.add_argument("dest")
     lb = sub.add_parser("library"); lb.add_argument("--apply", action="store_true")
-    sk = sub.add_parser("secret"); sk.add_argument("name", choices=["steamgriddb"])
+    sk = sub.add_parser("secret"); sk.add_argument("name", choices=["steamgriddb", "telegram"])
+    x = sub.add_parser("x", help="comandos do projeto: veja docs/COMANDOS.md"); x.add_argument("args", nargs="*")
     sub.add_parser("artwork")
     sub.add_parser("inventory")
     sub.add_parser("contracts")
@@ -112,6 +179,8 @@ def main(argv=None) -> int:
         print(m.read_text("utf-8"))
         print(f"(salvo em {j} e {m})")
         return 0
+    if a.cmd == "x":
+        return _extra(paths, a.args)
     if a.cmd == "secret":
         import getpass, os
         paths.ensure()

@@ -27,3 +27,29 @@ M2 (decisão do usuário 2026-11-06): todos os atalhos de ROM apontam para
 `~/.local/share/deck-commander/launch-map.json` e os emuladores em `~/.config/deck-commander/emulators.json`.
 Trocar ROM/emulador = editar o mapa, sem reiniciar o Steam. Adicionar jogos novos = `python3 -m dc library --apply`
 + reiniciar o Steam uma vez.
+
+## M1 — Dono único por hardware/função (Deck do usuário, 2026-11-06)
+| Hardware / função | Dono | Observação |
+|---|---|---|
+| TDP, curva de ventoinha, clock da GPU | Panel de Control | PowerTools não deve mexer nisso |
+| CPU (SMT, boost, núcleos) | PowerTools | Panel não mexe |
+| Launch options de compatibilidade | Proton Pulse (opcional) | **não instalado** → M8 bloqueado |
+| Abas da biblioteca | TabMaster | **não instalado** (instalação manual pela loja do Decky) |
+| Lojas Epic/GOG | Unifideck | 500 atalhos; o DC nunca toca neles |
+| ROMs no Steam | Deck Commander (`dc-launch`) | 22 atalhos; só acrescenta |
+| Geração de quadros | decky-lsfg-vk | ativado por jogo pela própria interface do plugin |
+| Badges ProtonDB | protondb-decky | v5.1 sugeria remover; mantido (não conflita com nada instalado) |
+
+Versões travadas em `~/.config/deck-commander/plugins.lock`; `x updates` e `x diagnose` avisam se mudarem.
+Instalar/remover plugins do Decky não tem interface oficial por linha de comando (achado F7): é manual.
+
+## Serviços (systemd --user)
+| Unidade | Módulo | Padrão |
+|---|---|---|
+| deck-commander-qbittorrent | M4 | ligado (WebUI só em 127.0.0.1:8790; a 8080 é do steamwebhelper) |
+| deck-commander-power | M4.4/M18 | ligado (pausa downloads fora do carregador, roda fila) |
+| deck-commander-bot | M4 | liga sozinho quando existir o token |
+| deck-commander-backup.timer | M0/M6 | diário (configs + saves) |
+| deck-commander-tests.timer | M10.4 | semanal + 15 min após o boot; 2 falhas seguidas → safe-mode |
+| deck-commander-updates.timer | M11 | semanal; só avisa |
+| deck-commander-dashboard | M10.1 | desligado (127.0.0.1:8765) |
