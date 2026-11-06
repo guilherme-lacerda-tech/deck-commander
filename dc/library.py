@@ -132,10 +132,12 @@ class Plan:
 def plan(existing: list[dict], games: list[Game], launcher: Path) -> Plan:
     ids = {(r.get("appid") or 0) & 0xFFFFFFFF for r in existing}
     names = {(r.get("AppName") or r.get("appname") or "").casefold(): r for r in existing}
+    # atalhos criados pelo plugin têm AppID aleatório do Steam: reconhecidos pelo game_id nas opções
+    dc_ids = {r.get("LaunchOptions") for r in existing if "dc-launch" in (r.get("exe") or r.get("Exe") or "")}
     add, already, conflicts = [], [], []
     for g in games:
         sc = shortcut_for(g, launcher)
-        if sc["appid"] & 0xFFFFFFFF in ids:
+        if sc["appid"] & 0xFFFFFFFF in ids or g.game_id in dc_ids:
             already.append(g.title)
         elif g.title.casefold() in names:
             conflicts.append(g.title)  # atalho de outra origem com o mesmo nome: não duplica, não toca

@@ -258,11 +258,24 @@ class Bot:
         except QbtError:
             return
         new = [t for t in ts if t["state"] in DONE_STATES and t["hash"] not in done]
-        if new:
-            self.send(chat, "✅ Download concluído: " + ", ".join(t["name"] for t in new) +
-                      "\nMande /sync para colocar na biblioteca.")
-            self.cfg["notified"] = sorted(done | {t["hash"] for t in new})[-500:]
-            self.save_cfg()
+        if not new:
+            return
+        names = ", ".join(t["name"] for t in new)
+        # Decisão do usuário (2026-11-06): download concluído => /sync automático (substitui o /sync manual da v5.1)
+        auto = syncer._cfg(self.paths).get("auto_sync", True)
+        if auto and ops.game_running():
+            if not self.cfg.get("waiting_game"):
+                self.send(chat, f"✅ Download concluído: {names}\nVou colocar na biblioteca quando você fechar o jogo.")
+                self.cfg["waiting_game"] = True; self.save_cfg()
+            return  # tenta de novo no próximo ciclo
+        self.cfg["waiting_game"] = False
+        self.cfg["notified"] = sorted(done | {t["hash"] for t in new})[-500:]
+        self.save_cfg()
+        if not auto:
+            self.send(chat, f"✅ Download concluído: {names}\nMande /sync para colocar na biblioteca.")
+            return
+        result = syncer.run_sync(self.paths, self.store, self.qbt, explicit=self.cfg.get("explicit"))
+        self.send(chat, f"✅ Download concluído: {names}\n\n{result}")
 
     def run(self) -> None:
         offset = self.cfg.get("offset", 0)

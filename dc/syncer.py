@@ -65,6 +65,14 @@ def add_to_steam(paths: Paths, store: Store, op: str) -> list[str]:
     if not pl.add:
         library.write_map(paths.data / "launch-map.json", games)
         return []
+    from . import plugin_bridge
+    if plugin_bridge.installed():  # ao vivo: o plugin cria o atalho e aplica as capas (sem reiniciar)
+        library.write_launcher(Path.home(), Path(__file__).resolve().parents[1])
+        library.write_map(paths.data / "launch-map.json", games)
+        busy = set(plugin_bridge.pending(paths))
+        rows = [r for r in pl.add if r["LaunchOptions"] not in busy]
+        plugin_bridge.enqueue(paths, rows)
+        return [r["AppName"] for r in rows]
     res = backup.create_snapshot({"shortcuts": sc}, paths.backups, paths.quarantine, kind="steam")
     if not res.ok:
         raise RuntimeError(f"backup falhou: {res.error}")
@@ -139,7 +147,11 @@ def run_sync(paths: Paths, store: Store, qbt: Qbt | None, confirm_many: bool = F
         _save_state(paths, st)
         store.finish(op, True, result={"files": added_files, "shortcuts": len(new)})
         head = f"{len(new)} jogo(s) novo(s) no Steam" + (": " + ", ".join(new[:10]) if new else "")
-        tail = "\nPara aparecerem: /reiniciar (reinicia o Steam)." if new else ""
+        from . import plugin_bridge
+        if new and plugin_bridge.installed():
+            tail = "\n✨ Aparecem na biblioteca em ~10 segundos, já com capa (sem reiniciar)."
+        else:
+            tail = "\n👉 Toque em /reiniciar para aparecer no Steam (fecha e abre o Steam, ~20 s)." if new else ""
         return "\n".join([head] + lines) + tail
     except TimeoutError as e:
         st["timeouts"] = st.get("timeouts", 0) + 1

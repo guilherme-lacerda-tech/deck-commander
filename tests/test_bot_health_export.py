@@ -142,11 +142,26 @@ def test_forwarded_torrent_after_console_text(b, monkeypatch):
     assert "TOKEN123" not in (b.paths.logs / "bot.log").read_text()
 
 
-def test_notify_finished_once(b):
+def test_finished_download_auto_syncs_once(b, monkeypatch):
     b.cfg["notify_chat"] = 9
-    sent = []
+    sent, syncs = [], []
     b.send = lambda chat, text: sent.append(text)
+    monkeypatch.setattr(bot.syncer, "run_sync", lambda *a, **k: syncs.append(1) or "1 jogo(s) novo(s) no Steam")
     b.qbt.torrents = lambda *a, **k: [{"hash": "h", "name": "Castlevania", "state": "stalledUP"},
                                       {"hash": "i", "name": "Outro", "state": "downloading"}]
     b.notify_finished(); b.notify_finished()
-    assert len(sent) == 1 and "Castlevania" in sent[0] and "Outro" not in sent[0]
+    assert len(sent) == 1 and "Castlevania" in sent[0] and "Outro" not in sent[0] and syncs == [1]
+
+
+def test_finished_download_waits_for_game(b, monkeypatch):
+    b.cfg["notify_chat"] = 9
+    sent, syncs = [], []
+    b.send = lambda chat, text: sent.append(text)
+    monkeypatch.setattr(bot.syncer, "run_sync", lambda *a, **k: syncs.append(1) or "ok")
+    b.qbt.torrents = lambda *a, **k: [{"hash": "h", "name": "Castlevania", "state": "stalledUP"}]
+    monkeypatch.setattr(bot.ops, "game_running", lambda: True)
+    b.notify_finished(); b.notify_finished()
+    assert len(sent) == 1 and "fechar o jogo" in sent[0] and syncs == []
+    monkeypatch.setattr(bot.ops, "game_running", lambda: False)
+    b.notify_finished()
+    assert syncs == [1] and len(sent) == 2

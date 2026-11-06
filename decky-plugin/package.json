@@ -1,0 +1,7 @@
+{
+  "name": "deck-commander",
+  "version": "0.1.0",
+  "description": "Ponte entre o Deck Commander e o Steam: cria atalhos ao vivo.",
+  "license": "MIT",
+  "author": "Deck Commander"
+}
