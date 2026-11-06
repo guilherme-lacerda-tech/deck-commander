@@ -64,3 +64,42 @@ def test_zip_slip_quarantined(tmp_path):
         f.writestr("../../evil.gba", b"x")
     it = content.ingest(z, "gba", tmp_path / "roms", tmp_path / "q", tmp_path / "work")
     assert it.status == "quarantined" and not (tmp_path / "evil.gba").exists()
+
+
+import shutil as _sh
+import subprocess as _sp
+
+import pytest as _pt
+
+needs_7z = _pt.mark.skipif(not _sh.which("7z"), reason="7-Zip não instalado (no Deck ele existe)")
+
+
+@needs_7z
+def test_ingest_7z_like_hercules(tmp_path):
+    src = tmp_path / "src" / "[SLUS-00529] Hercules"; src.mkdir(parents=True)
+    (src / "[SLUS-00529] Hercules.bin").write_bytes(b"\x01" * 4096)
+    (src / "[SLUS-00529] Hercules.cue").write_text('FILE "[SLUS-00529] Hercules.bin" BINARY\n')
+    arc = tmp_path / "dl" / "[SLUS-00529] Hercules.7z"; arc.parent.mkdir()
+    _sp.run(["7z", "a", "-bd", str(arc), str(src)], check=True, capture_output=True)
+    it = content.ingest(arc, "psx", tmp_path / "roms", tmp_path / "q", tmp_path / "work")
+    assert it.status == "added" and it.files[0].endswith("Hercules.cue")
+
+
+@needs_7z
+def test_7z_slip_rejected(tmp_path):
+    from dc import safe_extract
+    work = tmp_path / "w" / "a" / "b"; work.mkdir(parents=True)
+    (tmp_path / "w" / "evil.gba").write_bytes(b"x")
+    arc = tmp_path / "mal.7z"
+    _sp.run(["7z", "a", "-bd", "-spf2", str(arc), "../../evil.gba"], cwd=work, capture_output=True)
+    if arc.exists():
+        with _pt.raises(safe_extract.UnsafeArchive):
+            safe_extract.extract_any(arc, tmp_path / "out")
+
+
+def test_ps2_mdf_becomes_iso(tmp_path):
+    d = tmp_path / "dl" / "Shadow of the Colossus"; d.mkdir(parents=True)
+    (d / "Shadow of the Colossus.mdf").write_bytes(b"\x00" * 2048 * 3)
+    (d / "Shadow of the Colossus.mds").write_bytes(b"x")
+    it = content.ingest(d, "ps2", tmp_path / "roms", tmp_path / "q", tmp_path / "work")
+    assert it.status == "added" and it.files[0].endswith("Shadow of the Colossus.iso")

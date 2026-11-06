@@ -19,7 +19,7 @@ from . import safe_extract
 from .emulators import CONSOLES
 from .quarantine import quarantine
 
-ARCHIVES = {".zip"}
+ARCHIVES = {".zip", ".7z", ".rar"}
 AMBIGUOUS = {".iso", ".chd", ".zip", ".bin", ".cue", ".pbp"}  # existe em vários consoles
 _DISC = re.compile(r"\s*[\(\[]?\s*(disc|disco|cd)\s*([0-9]+)\s*[\)\]]?", re.I)
 _HACK = re.compile(r"\[(br|pt-?br|t[-+]?por?)\]|\((br|pt-?br|translated|traduzido)\)|\(t\s?\d", re.I)
@@ -107,7 +107,7 @@ def ingest(content: Path, console: Optional[str], roms_root: Path, quarantine_ro
         for f in src_files:
             if f.suffix.lower() in ARCHIVES:
                 try:
-                    out = safe_extract.extract(f, staging / f.stem)
+                    out = safe_extract.extract_any(f, staging / f.stem)
                 except safe_extract.UnsafeArchive as e:
                     q = quarantine(f, quarantine_root, f"arquivo suspeito no /sync: {e}")
                     return SyncItem(name, console, "quarantined", note=f"{e} (em {q.name})")
@@ -121,6 +121,12 @@ def ingest(content: Path, console: Optional[str], roms_root: Path, quarantine_ro
         if empty:
             q = quarantine(staging, quarantine_root, f"arquivos vazios: {[e.name for e in empty][:3]}")
             return SyncItem(name, console, "quarantined", note=f"arquivo vazio (em {q.name})", integrity="corrupted")
+        if console == "ps2":  # imagem .mdf de DVD = setores de 2048 bytes = .iso (o PCSX2 abre .iso)
+            for i, f in enumerate(collected):
+                if f.suffix.lower() == ".mdf" and f.stat().st_size % 2048 == 0:
+                    iso = f.with_suffix(".iso")
+                    f.rename(iso)
+                    collected[i] = iso
         games = playable(collected, console)
         if not games:
             return SyncItem(name, console, "skipped", note="nenhum arquivo jogável para " + console)

@@ -137,3 +137,105 @@ def extract(archive: Path, dest: Path, limits: Limits = Limits(),
         shutil.rmtree(tmp, ignore_errors=True)
         raise
     return [dest.joinpath(*_check_name(i.filename, limits).parts) for i in files]
+
+
+# ---------------------------------------------------------------- .7z / .rar (7-Zip do SteamOS)
+SEVEN_ZIP = "7z"
+
+
+def list_external(archive: Path) -> list[dict]:
+    """Lista o arquivo com `7z l -slt` (lê .7z e .rar) sem extrair nada."""
+    import subprocess
+    try:
+        r = subprocess.run([SEVEN_ZIP, "l", "-slt", "-ba", "-p", str(archive)], capture_output=True, text=True, timeout=120)
+    except FileNotFoundError as e:
+        raise UnsafeArchive("7-Zip não encontrado (o SteamOS normalmente traz /usr/bin/7z)") from e
+    if r.returncode != 0:
+        raise UnsafeArchive(f"arquivo inválido ou protegido por senha: {r.stderr.strip()[-200:]}")
+    entries, cur = [], {}
+    for line in r.stdout.splitlines() + [""]:
+        if not line.strip():
+            if cur.get("Path"):
+                entries.append(cur)
+            cur = {}
+            continue
+        k, sep, v = line.partition(" = ")
+        if sep:
+            cur[k.strip()] = v
+    return entries
+
+
+def inspect_external(archive: Path, limits: Limits = Limits()) -> list[dict]:
+    import re as _re
+    entries = list_external(archive)
+    if len(entries) > limits.max_files:
+        raise UnsafeArchive(f"{len(entries)} entradas > limite {limits.max_files}")
+    seen, total, files = set(), 0, []
+    for e in entries:
+        name = e["Path"]
+        p = _check_name(name, limits)
+        attrs = e.get("Attributes", "")
+        if e.get("Encrypted") == "+":
+            raise UnsafeArchive("arquivo protegido por senha")
+        if _re.search(r"(^|\s)l[r-][w-][x-]", attrs):
+            raise UnsafeArchive(f"link simbólico no arquivo: {name}")
+        key = str(p).casefold()
+        if key in seen:
+            raise UnsafeArchive(f"colisão de nomes: {name}")
+        seen.add(key)
+        is_dir = "D" in attrs.split(" ")[0] or e.get("Folder") == "+"
+        if is_dir:
+            continue
+        size = int(e.get("Size") or 0)
+        total += size
+        if total > limits.max_total_bytes:
+            raise UnsafeArchive(f"expansão total > {limits.max_total_bytes} B")
+        packed = int(e.get("Packed Size") or 0)
+        if packed and size >= limits.min_ratio_check_bytes and size / packed > limits.max_ratio:
+            raise UnsafeArchive(f"proporção de compressão {size / packed:.0f}:1 (possível bomb): {name}")
+        files.append({"path": str(p), "size": size})
+    return files
+
+
+def extract_external(archive: Path, dest: Path, limits: Limits = Limits()) -> list[Path]:
+    import subprocess
+    archive, dest = Path(archive), Path(dest)
+    if dest.exists():
+        raise FileExistsError(f"destino já existe: {dest}")
+    files = inspect_external(archive, limits)
+    declared = sum(f["size"] for f in files)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    free = shutil.disk_usage(dest.parent).free
+    if free < declared * limits.free_space_margin:
+        raise UnsafeArchive(f"espaço insuficiente: precisa {declared} B, livre {free} B")
+    tmp = dest.parent / f".dc-extract-{uuid.uuid4().hex[:8]}"
+    tmp.mkdir()
+    try:
+        r = subprocess.run([SEVEN_ZIP, "x", "-y", "-bd", "-p", f"-o{tmp}", str(archive)],
+                           capture_output=True, text=True, timeout=3600)
+        if r.returncode != 0:
+            raise UnsafeArchive(f"falha ao extrair: {r.stderr.strip()[-200:]}")
+        real_total, out = 0, []
+        root = tmp.resolve()
+        for f in tmp.rglob("*"):  # confere de novo o que saiu de fato
+            if f.is_symlink():
+                raise UnsafeArchive(f"link simbólico extraído: {f.name}")
+            if os.path.commonpath([root, f.resolve()]) != str(root):
+                raise UnsafeArchive(f"arquivo fora da pasta: {f}")
+            if f.is_file():
+                real_total += f.stat().st_size
+                out.append(f)
+        if real_total > limits.max_total_bytes:
+            raise UnsafeArchive("bytes reais excedem o limite")
+        os.replace(tmp, dest)
+    except BaseException:
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise
+    return sorted(dest / f.relative_to(tmp) for f in out)
+
+
+def extract_any(archive: Path, dest: Path, limits: Limits = Limits()) -> list[Path]:
+    """.zip pelo extrator interno; .7z/.rar pelo 7-Zip do sistema — mesmas regras de segurança."""
+    if Path(archive).suffix.lower() == ".zip":
+        return extract(archive, dest, limits)
+    return extract_external(archive, dest, limits)
