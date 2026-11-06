@@ -1,0 +1,12 @@
+# Copiar para ~/.config/deck-commander/backup.toml e conferir os caminhos com o deck_probe.py.
+# Globs são expandidos; vários resultados viram fontes separadas (nome-0, nome-1...).
+[sources]
+shortcuts   = "~/.steam/steam/userdata/*/config/shortcuts.vdf"
+localconfig = "~/.steam/steam/userdata/*/config/localconfig.vdf"
+duckstation = "~/.config/duckstation/settings.ini"
+pcsx2       = "~/.config/PCSX2/inis"
+dolphin     = "~/.var/app/org.DolphinEmu.dolphin-emu/config/dolphin-emu"
+retroarch   = "~/.var/app/org.libretro.RetroArch/config/retroarch/retroarch.cfg"
+ppsspp      = "~/.var/app/org.ppsspp.PPSSPP/config/ppsspp/PSP/SYSTEM"
+# NÃO listar o deck.db aqui: cópia de arquivo com WAL não é consistente.
+# O banco é copiado por Store.snapshot_to() (VACUUM INTO).
