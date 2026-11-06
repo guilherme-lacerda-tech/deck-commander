@@ -99,6 +99,8 @@ def main(argv=None) -> int:
     p = sub.add_parser("power"); p.add_argument("--sysfs", default="/sys/class/power_supply")
     e = sub.add_parser("extract"); e.add_argument("archive"); e.add_argument("dest")
     lb = sub.add_parser("library"); lb.add_argument("--apply", action="store_true")
+    sk = sub.add_parser("secret"); sk.add_argument("name", choices=["steamgriddb"])
+    sub.add_parser("artwork")
     sub.add_parser("inventory")
     sub.add_parser("contracts")
     a = ap.parse_args(argv)
@@ -110,6 +112,39 @@ def main(argv=None) -> int:
         print(m.read_text("utf-8"))
         print(f"(salvo em {j} e {m})")
         return 0
+    if a.cmd == "secret":
+        import getpass, os
+        paths.ensure()
+        val = getpass.getpass(f"Cole a chave {a.name} e aperte Enter (não aparece na tela): ").strip()
+        if not val:
+            print("nada gravado"); return 1
+        p = paths.secrets / a.name
+        fd = os.open(p, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as f:
+            f.write(val + "\n")
+        print(f"chave gravada em {p} (permissão 600)"); return 0
+    if a.cmd == "artwork":
+        from . import artwork, vdf
+        key = artwork.read_key(paths.secrets)
+        if not key:
+            print("sem chave: rode  python3 -m dc secret steamgriddb"); return 1
+        sc = sorted(glob.glob(str(Path.home() / ".steam/steam/userdata/*/config/shortcuts.vdf")))[0]
+        grid = Path(sc).parent / "grid"
+        fetch = artwork.make_fetch(key)
+        ok = fail = 0
+        for r in vdf.read_shortcuts(Path(sc)):
+            if "dc-launch" not in (r.get("exe") or ""):
+                continue
+            try:
+                res = artwork.fetch_for(r["appid"] & 0xFFFFFFFF, r["AppName"], grid, fetch)
+                ok += bool(res["game"])
+                print(f"{r['AppName'][:45]:45} -> {res['game']}  novos={len(res['saved'])} já_tinha={len(res['skipped'])}"
+                      + (f"  {res.get('error')}" if res.get("error") else ""))
+            except Exception as e:  # noqa: BLE001
+                fail += 1
+                print(f"{r['AppName'][:45]:45} -> ERRO {e}")
+        print(f"pronto: {ok} com arte, {fail} erros. Reinicie o Steam se as capas não aparecerem.")
+        return 0 if not fail else 1
     if a.cmd == "library":
         return _library(paths, a.apply)
     if a.cmd == "contracts":
