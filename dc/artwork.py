@@ -31,7 +31,14 @@ def search_term(title: str) -> str:
     t = title
     for rx in _STRIP:
         t = rx.sub("", t)
-    return re.sub(r"\s{2,}", " ", t).strip(" -")
+    t = re.sub(r"\s{2,}", " ", t).strip(" -")
+    return re.sub(r"\s+1$", "", t)  # "God of War 1" -> "God of War" (senão o site devolve o II)
+
+
+def best_match(results: list[dict], term: str) -> dict:
+    norm = lambda s: re.sub(r"[^a-z0-9]+", "", s.casefold())  # noqa: E731
+    exact = [r for r in results if norm(r.get("name", "")) == norm(term)]
+    return (exact or results)[0]
 
 
 def read_key(secrets_dir: Path) -> Optional[str]:
@@ -64,10 +71,11 @@ def _api(fetch: Fetch, path: str, params: Optional[dict] = None):
 def fetch_for(appid32: int, title: str, grid_dir: Path, fetch: Fetch) -> dict:
     """Baixa o que faltar para um atalho. Retorna {'game': nome encontrado, 'saved': [...], 'skipped': [...]}."""
     grid_dir.mkdir(parents=True, exist_ok=True)
-    found = _api(fetch, "search/autocomplete/" + urllib.parse.quote(search_term(title)))
+    term = search_term(title)
+    found = _api(fetch, "search/autocomplete/" + urllib.parse.quote(term))
     if not found:
         return {"game": None, "saved": [], "skipped": [], "error": "não encontrado"}
-    game = found[0]
+    game = best_match(found, term)
     out = {"game": game.get("name"), "saved": [], "skipped": []}
     for endpoint, params, suffix in KINDS:
         base = f"{appid32}{suffix}"
