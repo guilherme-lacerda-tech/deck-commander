@@ -86,15 +86,24 @@ def test_ingest_7z_like_hercules(tmp_path):
 
 
 @needs_7z
-def test_7z_slip_rejected(tmp_path):
+def test_7z_slip_never_escapes(tmp_path):
+    """Se o 7z guardou '../', a inspeção recusa; se ele mesmo saneou o nome, nada sai da pasta."""
     from dc import safe_extract
     work = tmp_path / "w" / "a" / "b"; work.mkdir(parents=True)
     (tmp_path / "w" / "evil.gba").write_bytes(b"x")
     arc = tmp_path / "mal.7z"
     _sp.run(["7z", "a", "-bd", "-spf2", str(arc), "../../evil.gba"], cwd=work, capture_output=True)
-    if arc.exists():
+    if not arc.exists():
+        _pt.skip("7z não criou o arquivo de teste")
+    names = [e["Path"] for e in safe_extract.list_external(arc)]
+    out = tmp_path / "x" / "out"
+    if any(".." in n.replace("\\", "/").split("/") for n in names):
         with _pt.raises(safe_extract.UnsafeArchive):
-            safe_extract.extract_any(arc, tmp_path / "out")
+            safe_extract.extract_any(arc, out)
+    else:
+        files = safe_extract.extract_any(arc, out)
+        assert all(str(f.resolve()).startswith(str(out.resolve())) for f in files)
+    assert not (tmp_path / "x" / "evil.gba").exists()
 
 
 def test_ps2_mdf_becomes_iso(tmp_path):
