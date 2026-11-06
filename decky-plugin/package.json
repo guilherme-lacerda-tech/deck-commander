@@ -1,7 +1,11 @@
 {
   "name": "deck-commander",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Ponte entre o Deck Commander e o Steam: cria atalhos ao vivo.",
+  "type": "module",
   "license": "MIT",
-  "author": "Deck Commander"
+  "author": "Deck Commander",
+  "dependencies": {
+    "@decky/api": "^1.1.2"
+  }
 }
