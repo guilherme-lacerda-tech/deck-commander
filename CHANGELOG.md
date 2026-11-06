@@ -11,6 +11,8 @@
 - /sync usa hardlink no mesmo disco (não duplica GBs).
 - `dc x profile` (perfis de qualidade PS1/PS2), `dc x dedup` (relatório de duplicatas, nunca apaga).
 - `dc restore --apply` fecha e reabre o Steam quando necessário.
+- /sync abre **.7z e .rar** (7-Zip do SteamOS) com as mesmas regras de segurança do .zip; `.mdf` de PS2 vira `.iso`.
+- Download que não entrou na biblioteca é tentado de novo sozinho (1x por hora, avisa só se entrar).
 
 ## 0.2.0
 - Projeto v5.1 completo: segurança (M0), Operation Store (M18/M19), contratos (M27), biblioteca (M2),

@@ -1,6 +1,6 @@
 # Estado do projeto (v0.3.0)
 
-Validado num Steam Deck LCD (SteamOS 3.9.5). 109 testes automatizados (CI no GitHub + timer semanal no Deck).
+Validado num Steam Deck LCD (SteamOS 3.9.5). 113 testes automatizados (CI no GitHub + timer semanal no Deck).
 
 | Módulo (spec v5.1) | Estado | Observação |
 |---|---|---|
@@ -11,7 +11,7 @@ Validado num Steam Deck LCD (SteamOS 3.9.5). 109 testes automatizados (CI no Git
 | M1 Plugins | ✅ parcial | dono por função documentado, `plugins.lock`; instalar plugins do Decky é manual (não há CLI oficial) |
 | M2 Biblioteca | ✅ | lançador fixo + mapa, plugin ao vivo, autocorreção, coleções/abas por console e por loja, capas |
 | M3 Qualidade | ✅ parcial | 10 consoles; perfis com read-back (DuckStation, PCSX2, Dolphin, PPSSPP, RetroArch); respeita ajuste manual. Shader/aspect ratio por emulador ainda não mapeados |
-| M4 Telegram/torrent | ✅ | console por texto, .torrent/magnet, /sync automático, ZIP seguro, multidisco, energia com histerese |
+| M4 Telegram/torrent | ✅ | console por texto, .torrent/magnet, /sync automático com nova tentativa, .zip/.7z/.rar seguros, multidisco, energia com histerese |
 | M5 Traduções | ✅ parcial | IPS/BPS/UPS nativos com CRC; XDelta e instaladores .exe são detectados e recusados |
 | M6 Saves | ✅ | 4 tipos, backup diário, import que nunca sobrescreve em conflito |
 | M7 Disco | ✅ | top 10 + sugestões (nunca apaga) |
