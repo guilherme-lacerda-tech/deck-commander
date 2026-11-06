@@ -19,7 +19,8 @@ from .paths import Paths
 from .vdf import VdfError, read_shortcuts
 
 ROM_EXTS = {".iso", ".chd", ".cue", ".bin", ".m3u", ".pbp", ".cso", ".gcz", ".rvz", ".wbfs", ".wad",
-            ".sfc", ".smc", ".z64", ".n64", ".v64", ".gba", ".gb", ".gbc", ".nds", ".zip", ".7z"}
+            ".sfc", ".smc", ".z64", ".n64", ".v64", ".gba", ".gb", ".gbc", ".nds", ".zip", ".7z",
+            ".nsp", ".xci", ".nsz", ".xcz"}
 EMULATORS = {
     "duckstation": ["~/.local/share/duckstation/settings.ini",
                     "~/.var/app/org.duckstation.DuckStation/config/duckstation/settings.ini"],
@@ -165,10 +166,13 @@ def collect(home: Path, paths: Paths, sysroot: Path = Path("/")) -> dict:
 
     prov = _provenance(paths.db)
     roms = []
-    for f in sorted((h / "Emulation/roms").rglob("*")) if (h / "Emulation/roms").exists() else []:
+    # interno + cartões SD (no Deck do usuário os jogos de Switch ficam no SD "LX512")
+    roots = [h / "Emulation/roms"] + [Path(p) for p in sorted(glob.glob(str(sysroot / "run/media/*/*/Emulation/roms")))]
+    for root in roots:
+      for f in sorted(root.rglob("*")) if root.exists() else []:
         if f.is_file() and f.suffix.lower() in ROM_EXTS:
             origin, ref = prov.get(str(f), ("unknown", None))
-            item = {"path": str(f), "console": f.relative_to(h / "Emulation/roms").parts[0],
+            item = {"path": str(f), "console": f.relative_to(root).parts[0],
                     "size": f.stat().st_size, "origin": origin}
             if origin == "unknown":
                 item["note"] = "sem registro no banco do Deck Commander — origem não rastreável"
