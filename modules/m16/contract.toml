@@ -1,0 +1,10 @@
+id = "M16"
+name = "Casos de borda"
+inputs = ["cenários"]
+outputs = ["recovery/README.md"]
+owns = ["doc:recovery"]
+forbids = []
+depends_on = ["M0", "M18+M19"]
+optional_depends = []
+fail_mode = "documentação + simulação"
+reversibility = "read_only"

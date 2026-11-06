@@ -1,0 +1,10 @@
+id = "M0"
+name = "Rede de segurança"
+inputs = ["config/backup.toml"]
+outputs = ["snapshot", "relatório de verificação"]
+owns = ["backups:snapshots", "backups:quarantine"]
+forbids = ["roms:delete"]
+depends_on = ["M18+M19"]
+optional_depends = []
+fail_mode = "falha -> quarentena + aviso; todos inválidos -> /sos"
+reversibility = "compensation"

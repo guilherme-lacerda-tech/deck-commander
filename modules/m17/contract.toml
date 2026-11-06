@@ -1,0 +1,10 @@
+id = "M17"
+name = "Privacidade e export"
+inputs = ["configs"]
+outputs = ["zip de configs", "PRIVACY.md"]
+owns = ["state:export"]
+forbids = ["secrets:export"]
+depends_on = ["M0"]
+optional_depends = []
+fail_mode = "export recusa segredos"
+reversibility = "read_only"

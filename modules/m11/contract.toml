@@ -1,0 +1,10 @@
+id = "M11"
+name = "Versionamento"
+inputs = ["VERSION"]
+outputs = ["migrações aplicadas"]
+owns = ["state:version", "migrations"]
+forbids = []
+depends_on = ["M18+M19", "M0"]
+optional_depends = []
+fail_mode = "migração testada em snapshot; rollback"
+reversibility = "rollback_full"

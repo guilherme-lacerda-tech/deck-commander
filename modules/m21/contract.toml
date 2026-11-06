@@ -1,0 +1,10 @@
+id = "M21"
+name = "Diagnóstico + autorreparo"
+inputs = ["todos os módulos"]
+outputs = ["/diagnostico"]
+owns = ["state:diagnostics"]
+forbids = ["decky:install"]
+depends_on = ["M18+M19", "M0", "M20"]
+optional_depends = []
+fail_mode = "máx 3 tentativas -> /sos"
+reversibility = "compensation"

@@ -1,0 +1,10 @@
+id = "M6"
+name = "Saves e estados"
+inputs = ["saves", "save states"]
+outputs = ["backup de saves"]
+owns = ["backups:saves"]
+forbids = ["emu:saves-live-write"]
+depends_on = ["M0"]
+optional_depends = []
+fail_mode = "conflito -> pergunta com preview"
+reversibility = "compensation"

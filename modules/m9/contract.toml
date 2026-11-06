@@ -1,0 +1,10 @@
+id = "M9"
+name = "Fork do Panel"
+inputs = ["upstream"]
+outputs = ["PRs"]
+owns = ["panel:fork"]
+forbids = []
+depends_on = []
+optional_depends = []
+fail_mode = "safe-mode volta ao vanilla"
+reversibility = "compensation"

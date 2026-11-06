@@ -1,0 +1,10 @@
+id = "M20"
+name = "Resource monitor"
+inputs = ["sysfs", "/proc"]
+outputs = ["leituras", "decisões"]
+owns = ["state:sensors"]
+forbids = []
+depends_on = []
+optional_depends = []
+fail_mode = "sensor ausente = unknown; decisão adiada"
+reversibility = "read_only"

@@ -1,0 +1,10 @@
+id = "M5"
+name = "Traduções"
+inputs = ["patch", "ROM"]
+outputs = ["ROM traduzida"]
+owns = ["roms:patched-copies"]
+forbids = ["roms:originals"]
+depends_on = ["M0", "M18+M19"]
+optional_depends = []
+fail_mode = "falha -> quarentena, original intacto"
+reversibility = "rollback_full"

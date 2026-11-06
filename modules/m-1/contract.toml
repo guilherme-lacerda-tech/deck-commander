@@ -1,0 +1,10 @@
+id = "M-1"
+name = "Inventário"
+inputs = ["home", "deck.db (ro)"]
+outputs = ["inventory.json", "inventory.md"]
+owns = ["state:inventory.json", "state:inventory.md"]
+forbids = ["steam:shortcuts.vdf", "emu:configs", "roms"]
+depends_on = []
+optional_depends = ["M18+M19"]
+fail_mode = "relatório com avisos; nunca aborta por ausência"
+reversibility = "read_only"

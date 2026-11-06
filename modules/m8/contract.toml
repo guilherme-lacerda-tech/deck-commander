@@ -1,0 +1,10 @@
+id = "M8"
+name = "Proton Pulse bridge"
+inputs = ["Proton Pulse"]
+outputs = ["launch options"]
+owns = ["steam:launch-options-dc"]
+forbids = ["panel:tdp-watts"]
+depends_on = []
+optional_depends = ["M1"]
+fail_mode = "blocked sem bloquear o resto"
+reversibility = "compensation"

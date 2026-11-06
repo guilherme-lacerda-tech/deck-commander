@@ -1,0 +1,10 @@
+id = "M10"
+name = "Status/benchmark/LSFG/testes"
+inputs = ["testes"]
+outputs = ["/status", "relatórios"]
+owns = ["state:tests-reports", "dashboard:8765"]
+forbids = ["steam:processes-not-started-by-test"]
+depends_on = ["M18+M19"]
+optional_depends = ["M20", "M4"]
+fail_mode = "relatório"
+reversibility = "read_only"

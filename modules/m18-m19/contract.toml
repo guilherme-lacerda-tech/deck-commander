@@ -1,0 +1,10 @@
+id = "M18+M19"
+name = "Operation Store"
+inputs = ["operações enfileiradas"]
+outputs = ["estado das operações", "operations.log"]
+owns = ["db:operations", "db:games", "db:files", "db:content_hashes", "db:provenance", "state:operation.lock"]
+forbids = ["steam:shortcuts.vdf"]
+depends_on = []
+optional_depends = []
+fail_mode = "transação desfeita; op -> failed/interrupted"
+reversibility = "rollback_full"

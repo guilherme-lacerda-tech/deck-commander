@@ -1,0 +1,10 @@
+id = "M15"
+name = "Install/uninstall"
+inputs = ["módulos"]
+outputs = ["serviços"]
+owns = ["systemd:user-units"]
+forbids = ["backups:delete-without-flag"]
+depends_on = ["M27", "M0"]
+optional_depends = []
+fail_mode = "--purge pede confirmação dupla"
+reversibility = "irreversible_requires_approval"

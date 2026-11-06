@@ -1,0 +1,10 @@
+id = "M27"
+name = "Contratos"
+inputs = ["modules/*/contract.toml"]
+outputs = ["relatório"]
+owns = ["modules:contracts"]
+forbids = []
+depends_on = []
+optional_depends = []
+fail_mode = "lista de problemas; exit 1"
+reversibility = "read_only"

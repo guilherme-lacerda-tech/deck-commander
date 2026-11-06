@@ -1,0 +1,10 @@
+id = "M3"
+name = "Qualidade por console"
+inputs = ["quality-defaults.toml", "perfil"]
+outputs = ["config efetiva + read-back"]
+owns = ["emu:quality-keys", "state:adapters-state.json"]
+forbids = ["emu:controls", "emu:credentials"]
+depends_on = ["M0", "M18+M19"]
+optional_depends = []
+fail_mode = "schema mudou -> avisa e não aplica; override manual -> recusa sem force"
+reversibility = "rollback_full"

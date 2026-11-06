@@ -1,0 +1,10 @@
+id = "M1"
+name = "Consolidação de plugins"
+inputs = ["inventário"]
+outputs = ["plugins.lock", "checklist"]
+owns = ["config:plugins.lock", "doc:ARCHITECTURE.md"]
+forbids = ["decky:install"]
+depends_on = ["M-1"]
+optional_depends = []
+fail_mode = "orienta instalação manual (sem CLI oficial do Decky)"
+reversibility = "read_only"

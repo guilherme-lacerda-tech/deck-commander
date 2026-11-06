@@ -1,0 +1,10 @@
+id = "M12"
+name = "Onboarding + aprovação"
+inputs = ["perfil do usuário"]
+outputs = ["instalação do MVP"]
+owns = ["state:onboarding"]
+forbids = []
+depends_on = ["M-1", "M0", "M18+M19"]
+optional_depends = ["M4"]
+fail_mode = "aprovação expira em 1h"
+reversibility = "irreversible_requires_approval"

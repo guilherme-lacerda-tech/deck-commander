@@ -1,0 +1,10 @@
+id = "M2"
+name = "Biblioteca"
+inputs = ["ROMs", "consoles/*.toml"]
+outputs = ["atalhos via launcher fixo", "provenance"]
+owns = ["dc:launcher-map", "steam:shortcuts-dc"]
+forbids = ["steam:shortcuts-manual", "steam:shortcuts-unifideck", "srm:nuke"]
+depends_on = ["M0", "M18+M19"]
+optional_depends = ["M1"]
+fail_mode = "bloqueia sem backup; dry-run obrigatório"
+reversibility = "compensation"

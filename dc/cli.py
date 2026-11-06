@@ -48,8 +48,22 @@ def main(argv=None) -> int:
     q = sub.add_parser("quarantine"); q.add_argument("action", choices=["list", "clear"]); q.add_argument("id", nargs="?")
     p = sub.add_parser("power"); p.add_argument("--sysfs", default="/sys/class/power_supply")
     e = sub.add_parser("extract"); e.add_argument("archive"); e.add_argument("dest")
+    sub.add_parser("inventory")
+    sub.add_parser("contracts")
     a = ap.parse_args(argv)
     paths = get_paths()
+
+    if a.cmd == "inventory":
+        from . import inventory
+        j, m, inv = inventory.run(Path.home(), paths)
+        print(m.read_text("utf-8"))
+        print(f"(salvo em {j} e {m})")
+        return 0
+    if a.cmd == "contracts":
+        from . import contracts
+        problems = contracts.validate(Path(__file__).resolve().parents[1] / "modules")
+        print("\n".join(problems) if problems else "contratos OK")
+        return 1 if problems else 0
 
     if a.cmd == "init":
         s = _store(paths)

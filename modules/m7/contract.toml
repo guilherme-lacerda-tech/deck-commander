@@ -1,0 +1,10 @@
+id = "M7"
+name = "Disco"
+inputs = ["inventário", "localconfig.vdf"]
+outputs = ["top 10", "sugestões"]
+owns = ["state:disk-report"]
+forbids = ["roms:delete"]
+depends_on = ["M-1", "M18+M19"]
+optional_depends = []
+fail_mode = "só sugere"
+reversibility = "read_only"

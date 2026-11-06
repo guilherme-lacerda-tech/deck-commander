@@ -1,0 +1,10 @@
+id = "M4"
+name = "Telegram + torrent"
+inputs = ["mensagens do Telegram", "qBittorrent WebAPI"]
+outputs = ["downloads", "/sync"]
+owns = ["config:telegram.toml", "secrets:telegram", "state:bot.log"]
+forbids = ["steam:shortcuts.vdf"]
+depends_on = ["M18+M19", "M0"]
+optional_depends = ["M20", "M2"]
+fail_mode = "comando recusado com motivo; timeout -> /sos após 2 retries"
+reversibility = "compensation"
