@@ -22,19 +22,9 @@ from . import vdf
 
 LAUNCHER_NAME = "dc-launch"
 
-# console -> extensões jogáveis (ordem = preferência quando há vários formatos do mesmo jogo)
-CONSOLES = {
-    "psx": {"label": "PlayStation", "exts": [".m3u", ".chd", ".pbp", ".cue"]},
-    "ps2": {"label": "PlayStation 2", "exts": [".chd", ".iso", ".cso"]},
-    "switch": {"label": "Nintendo Switch", "exts": [".xci", ".nsp", ".nsz", ".xcz"]},
-}
+from .emulators import CONSOLES  # fonte única dos consoles (M2.2)
 
-# {rom} é substituído pelo caminho. Editável em ~/.config/deck-commander/emulators.json
-DEFAULT_EMULATORS = {
-    "psx": ["/home/deck/Applications/DuckStation-x64.AppImage", "-fullscreen", "-batch", "--", "{rom}"],
-    "ps2": ["/usr/bin/flatpak", "run", "net.pcsx2.PCSX2", "-fullscreen", "-batch", "--", "{rom}"],
-    "switch": ["/home/deck/Downloads/publish/Ryujinx", "--fullscreen", "{rom}"],
-}
+DEFAULT_EMULATORS = {k: v["cmd"] for k, v in CONSOLES.items()}
 
 _TITLE_ID = re.compile(r"\[([0-9A-Fa-f]{16})\]")
 _NOISE = [re.compile(p, re.I) for p in (

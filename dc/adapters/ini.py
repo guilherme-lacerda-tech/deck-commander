@@ -49,9 +49,52 @@ class IniDoc:
                 return
         raise KeyError(f"seção [{section}] não existe")
 
+    def ensure_section(self, section: str, key: str, value: str) -> None:
+        """Como ensure(), mas cria a seção no fim se ela não existir (arquivos recém-criados)."""
+        try:
+            self.ensure(section, key, value)
+        except KeyError:
+            if self.lines and not self.lines[-1].endswith("\n"):
+                self.lines[-1] += "\n"
+            self.lines += [f"[{section}]\n", f"{key} = {value}\n"]
+
+
     def set(self, section: str, key: str, value: str) -> None:
         i = self._find(section, key)
         if i is None:
             raise KeyError(f"[{section}] {key}")
         m = _KV.match(self.lines[i])
         self.lines[i] = f"{m.group(1)}{m.group(2)}{m.group(3)}{value}{m.group(5)}"
+
+
+class CfgDoc:
+    """Formato do RetroArch: chave = "valor" sem seções. Preserva todo o resto."""
+    _RX = re.compile(r'^(\s*)([A-Za-z0-9_\-]+)(\s*=\s*)"(.*)"(\r?\n?)$')
+
+    def __init__(self, lines: list[str]):
+        self.lines = lines
+
+    @classmethod
+    def load(cls, path: Path) -> "CfgDoc":
+        p = Path(path)
+        return cls(p.read_text("utf-8").splitlines(keepends=True) if p.exists() else [])
+
+    def dump(self) -> bytes:
+        return "".join(self.lines).encode("utf-8")
+
+    def get(self, key: str) -> Optional[str]:
+        for ln in self.lines:
+            m = self._RX.match(ln)
+            if m and m.group(2) == key:
+                return m.group(4)
+        return None
+
+    def set(self, key: str, value: str) -> None:
+        for i, ln in enumerate(self.lines):
+            m = self._RX.match(ln)
+            if m and m.group(2) == key:
+                self.lines[i] = f'{m.group(1)}{key}{m.group(3)}"{value}"{m.group(5) or chr(10)}'
+                return
+        if self.lines and not self.lines[-1].endswith("\n"):
+            self.lines[-1] += "\n"
+        self.lines.append(f'{key} = "{value}"\n')
