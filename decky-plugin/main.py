@@ -17,6 +17,7 @@ except Exception:  # noqa: BLE001
 BASE = os.path.join(HOME, ".local/share/deck-commander")
 QUEUE = os.path.join(BASE, "plugin-queue.json")
 DONE = os.path.join(BASE, "plugin-done.json")
+ITEMS = os.path.join(BASE, "plugin-items.json")  # escrito pelo Deck Commander e pelo plugin
 
 
 def _load(path, default):
@@ -38,6 +39,17 @@ class Plugin:
     async def get_pending(self):
         done = _load(DONE, {})
         return [q for q in _load(QUEUE, []) if q.get("game_id") not in done]
+
+    async def get_done(self):
+        items = _load(ITEMS, {})
+        return {k: {**v, "item": items.get(k)} for k, v in _load(DONE, {}).items()}
+
+    async def remember_item(self, game_id, item):
+        """Guarda o item para a autocorreção poder recriar o atalho se ele sumir."""
+        items = _load(ITEMS, {})
+        items[game_id] = item
+        _save(ITEMS, items)
+        return True
 
     async def report(self, game_id, appid, error):
         done = _load(DONE, {})

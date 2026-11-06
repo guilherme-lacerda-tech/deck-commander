@@ -78,6 +78,9 @@ def enqueue(paths: Paths, rows: list[dict], with_art: bool = True) -> int:
                   "launch_options": gid, "art": prepare_art(paths, gid, r["AppName"]) if with_art else {}})
         n += 1
     _save(queue_path(paths), q)
+    items = _load(paths.data / "plugin-items.json", {})  # para a autocorreção do plugin
+    items.update({x["game_id"]: x for x in q})
+    _save(paths.data / "plugin-items.json", items)
     return n
 
 
