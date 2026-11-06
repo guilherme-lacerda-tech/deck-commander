@@ -52,7 +52,8 @@ def test_collections_spec_includes_plugin_created_and_switches_filter(tmp_path):
     lm = {"ps2-gow": {"console": "ps2"}, "switch-cv": {"console": "switch"}}
     (tmp_path / "plugin-done.json").write_text(json.dumps({"switch-cv": {"appid": 3616886574, "error": ""}}))
     spec = tabs.write_collections(tmp_path, sc, lm)
-    assert spec == {"PlayStation 2": [7], "Nintendo Switch": [3616886574], "GOG": [8]}
+    assert {k: v for k, v in spec.items() if v} == {"PlayStation 2": [7], "Nintendo Switch": [3616886574], "GOG": [8]}
+    assert spec["GameCube"] == [] and "Epic Games" not in spec
     (tmp_path / "collection-ids.json").write_text(json.dumps({"Nintendo Switch": "uc-abc"}))
     p = tmp_path / "settings.json"
     p.write_text(json.dumps({"usersDict": {"1": {"tabs": DEFAULT}}}))

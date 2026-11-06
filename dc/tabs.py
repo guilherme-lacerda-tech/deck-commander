@@ -96,7 +96,9 @@ def write_collections(data_dir: Path, shortcuts: list[dict], launch_map: dict) -
         done = json.loads((data_dir / "plugin-done.json").read_text("utf-8"))
     except (OSError, ValueError):
         done = {}
-    spec = {k: v for k, v in groups(shortcuts, launch_map, done).items() if v}
+    # consoles e Emuladores sempre existem (mesmo vazios) para as abas acompanharem ao vivo; lojas só se houver jogos
+    spec = {k: v for k, v in groups(shortcuts, launch_map, done).items()
+            if v or k in {CONSOLES[c]["label"] for c in ORDER} | {"Emuladores"}}
     tmp = data_dir / "collections.json.tmp"
     tmp.write_text(json.dumps(spec, ensure_ascii=False, indent=1), "utf-8")
     os.replace(tmp, data_dir / "collections.json")
