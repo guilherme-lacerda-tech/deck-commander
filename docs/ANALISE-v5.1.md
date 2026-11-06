@@ -94,7 +94,7 @@ físico continua pendente no Deck.
 
 ## P2 — inconsistências menores
 
-- **F13.** Porta 8080 "conflito com Decky": o Decky Loader usa a porta **1337**. Usar 8765 é
+- **F13 (corrigida no Deck).** A 8080 está mesmo ocupada, mas pelo `steamwebhelper` (o Decky usa a 1337). Usar 8765 é
   inofensivo, mas a justificativa está errada — vale verificar `ss -ltn` no Deck.
 - **F14.** M5: o DoD diz "5 formatos" e a tabela lista 6 (inclui substituição). Definir.
 - **F15.** M0.1 "mesmo dispositivo via df": `df` engana com bind mounts. Usar `st_dev` /
