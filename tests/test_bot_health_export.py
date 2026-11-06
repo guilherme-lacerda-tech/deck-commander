@@ -105,3 +105,48 @@ def test_save_import_never_overwrites_conflict(tmp_path):
     rep = health.import_saves(res.path, dry_run=False)
     assert (src / "slot1.mcd").read_bytes() == b"NOVO-PROGRESSO"  # nunca sobrescreve
     assert len(rep["conflitos"]) == 1 and list(src.glob("slot1.mcd.conflito-*"))
+
+
+def test_parse_console_aliases():
+    from dc.bot import parse_console
+    assert parse_console("Switch 1") == "switch" and parse_console("switch") == "switch"
+    assert parse_console("Switch 2") == "switch2"
+    assert parse_console("PS2") == "ps2" and parse_console("PlayStation 2") == "ps2"
+    assert parse_console("ps1") == "psx" and parse_console("Super Nintendo") == "snes"
+    assert parse_console("bom dia") is None
+
+
+def test_forwarded_torrent_after_console_text(b, monkeypatch):
+    b.cfg["allowed"] = [1]
+    got = {}
+    b.qbt.add_file = lambda data, name, cat, path: got.update(data=data, name=name, cat=cat)
+    b.call = lambda method, **p: {"file_path": "documents/x.torrent"}
+
+    class R:
+        def __init__(self, *a, **k): pass
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def read(self): return b"d8:announce..."
+    monkeypatch.setattr(bot.urllib.request, "urlopen", R)
+    msg = lambda **k: {"from": {"id": 1}, "chat": {"id": 9}, **k}
+    assert "próximo" in b.handle_message(msg(text="Switch 1"))
+    r = b.handle_message(msg(document={"file_id": "F", "file_name": "Castlevania - Belmonts Curse.torrent"}))
+    assert "Baixando Castlevania - Belmonts Curse (Switch)" in r and got["cat"] == "switch"
+    assert b.cfg["pending_console"] == {}  # usado uma vez
+    r = b.handle_message(msg(document={"file_id": "F", "file_name": "Jogo.torrent"}, caption="ps2"))
+    assert got["cat"] == "ps2"
+    assert "não é suportado" in b.handle_message(msg(document={"file_id": "F", "file_name": "DK.torrent"}, caption="switch 2"))
+    assert "só sei usar" in b.handle_message(msg(document={"file_id": "F", "file_name": "foto.jpg"}))
+    assert b.handle_message(msg(text="valeu")) is None
+    assert "negado" in b.handle_message({"from": {"id": 7}, "chat": {"id": 7}, "text": "ps2"})
+    assert "TOKEN123" not in (b.paths.logs / "bot.log").read_text()
+
+
+def test_notify_finished_once(b):
+    b.cfg["notify_chat"] = 9
+    sent = []
+    b.send = lambda chat, text: sent.append(text)
+    b.qbt.torrents = lambda *a, **k: [{"hash": "h", "name": "Castlevania", "state": "stalledUP"},
+                                      {"hash": "i", "name": "Outro", "state": "downloading"}]
+    b.notify_finished(); b.notify_finished()
+    assert len(sent) == 1 and "Castlevania" in sent[0] and "Outro" not in sent[0]

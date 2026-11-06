@@ -21,7 +21,31 @@ from .qbt import Qbt, QbtError
 from .store import ApprovalError, Store
 
 RATE = (20, 60)  # 20 comandos por 60 s
+PENDING_TTL = 600  # "Switch 1" vale para o próximo arquivo nos próximos 10 min
+
+# Texto livre -> console. "switch 2" é reconhecido para responder que não é suportado.
+ALIASES = [
+    (r"switch\s*2|nsw\s*2|sw2", "switch2"),
+    (r"switch(\s*1)?|nsw|nintendo switch", "switch"),
+    (r"ps\s*2|playstation\s*2|play\s*2", "ps2"),
+    (r"ps\s*1|psx|ps\s*one|playstation(\s*1)?|play\s*1", "psx"),
+    (r"psp", "psp"), (r"game\s*cube|gamecube|ngc|\bgc\b", "gc"), (r"wii", "wii"),
+    (r"n64|nintendo\s*64", "n64"), (r"snes|super\s*nintendo|super\s*nes", "snes"),
+    (r"gba|game\s*boy\s*advance", "gba"),
+]
+
+
+def parse_console(text: str):
+    import re
+    t = (text or "").strip().lower()
+    for rx, c in ALIASES:
+        if re.fullmatch(rf"\s*(?:{rx})\s*", t) or re.search(rf"(?:^|\W)(?:{rx})(?:$|\W)", t):
+            return c
+    return None
 HELP = """Deck Commander — comandos
+Mais fácil: mande o nome do console (ex.: Switch 1, PS2) e depois encaminhe o .torrent ou cole o magnet.
+Aviso aqui quando o download terminar.
+
 /add [console] <magnet> — baixa (console: ps2 psx gc wii snes n64 gba psp switch)
 /sync — leva downloads concluídos para a biblioteca  (/sync tudo confirma pacotes grandes)
 /console <id> <console> — responde quando o /sync perguntar
@@ -166,6 +190,80 @@ class Bot:
             return "Safe-mode ATIVADO.\n" + "\n".join(ops.safe_mode_on(P, f"/sos por {uid}", S))
         return "Comando desconhecido. /help"
 
+    # -- mensagens sem "/" (console em texto, .torrent, magnet solto) ----------
+    def handle_message(self, m: dict) -> str | None:
+        uid, chat = m["from"]["id"], m["chat"]["id"]
+        text = m.get("text") or ""
+        if text.startswith("/"):
+            return self.handle(uid, chat, text)
+        if uid not in self.cfg["allowed"]:
+            return "Acesso negado. Pareie com /start <código> (o código é gerado no Deck)."
+        if self.limited(uid):
+            return "Calma 🙂 muitos comandos por minuto."
+        self.cfg["notify_chat"] = chat
+        pend = self.cfg.setdefault("pending_console", {})
+        doc = m.get("document")
+        caption = m.get("caption") or ""
+        if text.strip().startswith("magnet:?"):
+            c = self._console_for(uid, None)
+            return self.handle(uid, chat, f"/add {c} {text.strip()}" if c else f"/add {text.strip()}")
+        if doc:
+            name = doc.get("file_name") or "arquivo"
+            if not name.lower().endswith(".torrent"):
+                return f"Recebi {name}, mas só sei usar arquivos .torrent."
+            console = self._console_for(uid, parse_console(caption) or parse_console(name))
+            if console == "switch2":
+                return "Switch 2 ainda não é suportado no Deck (o Lichii é experimental). Não baixei."
+            if ops.in_safe_mode(self.paths):
+                return "Safe-mode ativo."
+            info = self.call("getFile", file_id=doc["file_id"])
+            with urllib.request.urlopen(f"https://api.telegram.org/file/bot{self.token}/{info['file_path']}",
+                                        timeout=60) as r:
+                data = r.read()
+            cat = console or "auto"
+            try:
+                self.qbt.add_file(data, name, cat, str(Path(syncer._cfg(self.paths)["downloads_root"]) / cat))
+            except QbtError as e:
+                return f"❌ {e}"
+            pend.pop(str(uid), None); self.save_cfg()
+            self.log(f"{uid}: torrent {name} ({cat})")
+            label = {"switch": "Switch", "ps2": "PS2", "psx": "PS1"}.get(cat, cat)
+            return (f"⬇️ Baixando {name[:-8]} ({label}). Aviso aqui quando terminar."
+                    if console else f"⬇️ Baixando {name[:-8]}. Não sei o console ainda — o /sync vai perguntar.")
+        c = parse_console(text)
+        if c == "switch2":
+            return "Switch 2 ainda não é suportado no Deck (o Lichii é experimental)."
+        if c:
+            pend[str(uid)] = {"console": c, "at": time.time()}; self.save_cfg()
+            return f"Ok, próximo .torrent ou magnet = {c}. Pode encaminhar."
+        return None  # conversa comum: ignora
+
+    def _console_for(self, uid: int, found):
+        if found:
+            return found
+        p = self.cfg.get("pending_console", {}).get(str(uid))
+        if p and time.time() - p["at"] < PENDING_TTL:
+            return p["console"]
+        return None
+
+    def notify_finished(self) -> None:
+        """Avisa uma vez quando cada download termina."""
+        chat = self.cfg.get("notify_chat")
+        if not chat:
+            return
+        from .qbt import DONE_STATES
+        done = set(self.cfg.get("notified", []))
+        try:
+            ts = self.qbt.torrents()
+        except QbtError:
+            return
+        new = [t for t in ts if t["state"] in DONE_STATES and t["hash"] not in done]
+        if new:
+            self.send(chat, "✅ Download concluído: " + ", ".join(t["name"] for t in new) +
+                      "\nMande /sync para colocar na biblioteca.")
+            self.cfg["notified"] = sorted(done | {t["hash"] for t in new})[-500:]
+            self.save_cfg()
+
     def run(self) -> None:
         offset = self.cfg.get("offset", 0)
         self.log("bot iniciado")
@@ -177,16 +275,21 @@ class Bot:
             for u in ups:
                 offset = u["update_id"] + 1
                 m = u.get("message") or {}
-                if not m.get("text", "").startswith("/"):
+                if "from" not in m:
                     continue
                 try:
-                    reply = self.handle(m["from"]["id"], m["chat"]["id"], m["text"])
+                    reply = self.handle_message(m)
                 except Exception as e:  # noqa: BLE001
                     self.log(f"erro: {e}"); reply = f"❌ erro interno: {e}"
-                try:
-                    self.send(m["chat"]["id"], reply)
-                except Exception as e:  # noqa: BLE001
-                    self.log(f"falha ao responder: {e}")
+                if reply:
+                    try:
+                        self.send(m["chat"]["id"], reply)
+                    except Exception as e:  # noqa: BLE001
+                        self.log(f"falha ao responder: {e}")
+            try:
+                self.notify_finished()
+            except Exception as e:  # noqa: BLE001
+                self.log(f"aviso de download: {e}")
             self.cfg["offset"] = offset; self.save_cfg()
 
 

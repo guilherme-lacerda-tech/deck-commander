@@ -49,6 +49,27 @@ class Qbt:
         if "Fails" in out:
             raise QbtError("o qBittorrent recusou o magnet")
 
+    def add_file(self, data: bytes, filename: str, category: str, save_path: str) -> None:
+        """Envia um arquivo .torrent (multipart/form-data)."""
+        if not data.startswith(b"d"):
+            raise QbtError("isso não parece um arquivo .torrent")
+        boundary = "----deckcommander" + str(abs(hash(data)) % 10**12)
+        parts = []
+        for k, v in (("category", category), ("savepath", save_path), ("tags", "deck-commander")):
+            parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode())
+        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="torrents"; filename="{filename}"\r\n'
+                     f"Content-Type: application/x-bittorrent\r\n\r\n".encode() + data + b"\r\n")
+        body = b"".join(parts) + f"--{boundary}--\r\n".encode()
+        req = urllib.request.Request(f"{self.url}/api/v2/torrents/add", data=body, headers={
+            "Content-Type": f"multipart/form-data; boundary={boundary}", "Referer": self.url})
+        try:
+            with self.opener.open(req, timeout=self.timeout) as r:
+                out = r.read().decode()
+        except OSError as e:
+            raise QbtError(f"qBittorrent indisponível: {e}") from e
+        if "Fails" in out:
+            raise QbtError("o qBittorrent recusou o arquivo .torrent")
+
     def torrents(self, category: Optional[str] = None, tag: str = "deck-commander") -> list[dict]:
         q = {"tag": tag}
         if category:
