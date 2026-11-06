@@ -118,6 +118,9 @@ def main(argv=None) -> int:
         val = getpass.getpass(f"Cole a chave {a.name} e aperte Enter (não aparece na tela): ").strip()
         if not val:
             print("nada gravado"); return 1
+        if len(val) % 2 == 0 and val[:len(val) // 2] == val[len(val) // 2:]:
+            val = val[:len(val) // 2]
+            print("aviso: a chave foi colada duas vezes — guardei uma cópia só")
         p = paths.secrets / a.name
         fd = os.open(p, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w") as f:
