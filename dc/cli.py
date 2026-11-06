@@ -141,6 +141,12 @@ def _extra(paths, args) -> int:
         print("\n".join(export.export_config(paths, out))); print("->", out)
     elif c == "import":
         print("\n".join(export.import_config(paths, Path(r[0]), dry_run=not apply)))
+    elif c == "tabs":
+        from . import tabs
+        sc = syncer.shortcuts_path()
+        res = tabs.apply(vdf.read_shortcuts(sc), json.loads((paths.data / "launch-map.json").read_text("utf-8")),
+                         sc.parents[1].name)
+        print(res or "abas já atualizadas"); print("reinicie o Deck para o TabMaster carregar")
     elif c == "telegram-pair":
         from .bot import pair_code
         print("Código de pareamento (mande  /start CODIGO  para o seu bot):", pair_code(paths))

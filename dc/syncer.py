@@ -76,6 +76,13 @@ def add_to_steam(paths: Paths, store: Store, op: str) -> list[str]:
         for row in pl.add:
             c.execute("INSERT OR IGNORE INTO provenance VALUES(?,?,?,?)",
                       (str(row["appid"] & 0xFFFFFFFF), "dc", now, op))
+    try:  # abas do TabMaster (se instalado) acompanham os jogos novos
+        from . import tabs
+        if tabs.SETTINGS.exists():
+            tabs.apply(vdf.read_shortcuts(sc), json.loads((paths.data / "launch-map.json").read_text("utf-8")),
+                       sc.parents[1].name)
+    except Exception:  # noqa: BLE001 — aba é conforto, nunca bloqueia o /sync
+        pass
     return [r["AppName"] for r in pl.add]
 
 
