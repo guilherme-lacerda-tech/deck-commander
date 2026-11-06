@@ -52,8 +52,8 @@ python3 -m dc power
 ```
 Rode com o carregador **conectado**, depois peça ao usuário para **desconectar**, rode de novo, e
 peça para reconectar. Critério: `ac_online` correto nos dois casos, fontes descobertas pelo `type`
-(não por nome fixo), bateria lida. Se o usuário tiver os dois modelos (LCD e OLED), repetir no outro;
-se não, registrar como parcial.
+(não por nome fixo), bateria lida. O usuário tem só o **Deck LCD**: validar no LCD; OLED fica como
+"não testado — lógica independente de nomes, coberta por testes simulados".
 
 ## Passo 3 — S1 Reboot real (1 ação física)
 ```bash
