@@ -262,6 +262,7 @@ class Bot:
             return
         new = [t for t in ts if t["state"] in DONE_STATES and t["hash"] not in done]
         if not new:
+            self._retry_stuck(chat, ts)
             return
         names = ", ".join(t["name"] for t in new)
         # Decisão do usuário (2026-11-06): download concluído => /sync automático (substitui o /sync manual da v5.1)
@@ -277,8 +278,26 @@ class Bot:
         if not auto:
             self.send(chat, f"✅ Download concluído: {names}\nMande /sync para colocar na biblioteca.")
             return
+        self.cfg["last_retry"] = time.time(); self.save_cfg()  # acabou de sincronizar: nova tentativa só em 1 h
         result = syncer.run_sync(self.paths, self.store, self.qbt, explicit=self.cfg.get("explicit"))
         self.send(chat, f"✅ Download concluído: {names}\n\n{result}")
+
+    def _retry_stuck(self, chat, ts) -> None:
+        """Download concluído que não entrou na biblioteca (ex.: erro corrigido depois): tenta de novo
+        a cada hora, em silêncio; avisa só se algum jogo entrar."""
+        if not syncer._cfg(self.paths).get("auto_sync", True) or ops.game_running():
+            return
+        from .qbt import DONE_STATES
+        st = syncer._state(self.paths)
+        stuck = [t for t in ts if t["state"] in DONE_STATES and t["hash"] not in st.get("ingested", {})
+                 and t["hash"] not in st.get("pending", {})]
+        last = self.cfg.get("last_retry", 0)
+        if not stuck or time.time() - last < 3600:
+            return
+        self.cfg["last_retry"] = time.time(); self.save_cfg()
+        result = syncer.run_sync(self.paths, self.store, self.qbt, explicit=self.cfg.get("explicit"))
+        if result.split(" ", 1)[0] not in ("0", "Feche", "Safe-mode", "Jogo"):
+            self.send(chat, "🔁 Nova tentativa automática:\n" + result)
 
     def run(self) -> None:
         offset = self.cfg.get("offset", 0)

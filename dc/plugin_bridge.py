@@ -92,6 +92,8 @@ def collect(paths: Paths, store: Store) -> list[str]:
     with store.tx() as c:
         for gid, v in done.items():
             if v.get("appid"):
+                # atalho recriado (autocorreção) ganha AppID novo: o antigo deixa de existir
+                c.execute("DELETE FROM provenance WHERE operation_id=? AND appid<>?", (f"plugin:{gid}", str(v["appid"])))
                 c.execute("INSERT OR IGNORE INTO provenance VALUES(?,?,?,?)", (str(v["appid"]), "dc", now, f"plugin:{gid}"))
             elif v.get("error"):
                 errors.append(f"{gid}: {v['error']}")

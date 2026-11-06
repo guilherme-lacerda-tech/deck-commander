@@ -165,3 +165,18 @@ def test_finished_download_waits_for_game(b, monkeypatch):
     monkeypatch.setattr(bot.ops, "game_running", lambda: False)
     b.notify_finished()
     assert syncs == [1] and len(sent) == 2
+
+
+def test_stuck_download_retried_hourly_and_silent_when_nothing_added(b, monkeypatch):
+    b.cfg["notify_chat"] = 9
+    b.cfg["notified"] = ["h"]
+    sent, syncs = [], []
+    b.send = lambda chat, text: sent.append(text)
+    monkeypatch.setattr(bot.syncer, "run_sync", lambda *a, **k: syncs.append(1) or "0 jogo(s) novo(s) no Steam")
+    b.qbt.torrents = lambda *a, **k: [{"hash": "h", "name": "Hercules", "state": "stalledUP"}]
+    b.notify_finished(); b.notify_finished()
+    assert syncs == [1] and sent == []          # 1 tentativa por hora, sem mensagem se nada entrou
+    b.cfg["last_retry"] = 0
+    monkeypatch.setattr(bot.syncer, "run_sync", lambda *a, **k: "1 jogo(s) novo(s) no Steam: Hercules")
+    b.notify_finished()
+    assert "Hercules" in sent[0]
