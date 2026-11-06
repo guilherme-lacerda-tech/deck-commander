@@ -35,6 +35,56 @@ def backup_sources(paths) -> dict[str, Path]:
     return out
 
 
+def _library(paths, apply: bool) -> int:
+    from datetime import datetime, timezone
+    from . import library, vdf
+    from .lock import OperationLock
+    home = Path.home()
+    roots = [home / "Emulation/roms"] + [Path(p) for p in sorted(glob.glob("/run/media/*/*/Emulation/roms"))]
+    games, notes = library.scan(roots)
+    scs = sorted(glob.glob(str(home / ".steam/steam/userdata/*/config/shortcuts.vdf")))
+    if len(scs) != 1:
+        print(f"esperado 1 usuário Steam, achei {len(scs)}: {scs}"); return 1
+    sc_path = Path(scs[0])
+    launcher = library.launcher_path(home)
+    pl = library.plan(vdf.read_shortcuts(sc_path), games, launcher)
+    for n in notes:
+        print("nota:", n)
+    print(f"jogos encontrados: {len(games)} | novos atalhos: {len(pl.add)} | já existem: {len(pl.already)}"
+          f" | conflito de nome (não tocados): {pl.name_conflicts or 'nenhum'}")
+    for row in pl.add:
+        print(f"  + [{row['tags']['0']}] {row['AppName']}  ->  {row['LaunchOptions']}")
+    if not apply:
+        print("(dry-run; use --apply)"); return 0
+
+    s = _store(paths)
+    op = s.enqueue("library-add", {"count": len(pl.add)})
+    s.claim_next()
+    try:
+        with OperationLock(paths.lock, op, "library-add", is_running=s.is_running):
+            res = backup.create_snapshot({"shortcuts": sc_path}, paths.backups, paths.quarantine, kind="steam")
+            if not res.ok:
+                raise RuntimeError(f"backup falhou: {res.error}")
+            print("backup:", res.path)
+            library.write_launcher(home, Path(__file__).resolve().parents[1])
+            library.write_map(paths.data / "launch-map.json", games)
+            emu = paths.config / "emulators.json"
+            if not emu.exists():
+                emu.write_text(json.dumps(library.DEFAULT_EMULATORS, indent=1), "utf-8")
+            n = library.write_shortcuts(sc_path, pl.add)
+            now = datetime.now(timezone.utc).isoformat()
+            with s.tx(critical=True) as c:
+                for row in pl.add:
+                    c.execute("INSERT OR IGNORE INTO provenance(appid, source, created_at, operation_id)"
+                              " VALUES(?,?,?,?)", (str(row["appid"] & 0xFFFFFFFF), "dc", now, op))
+        s.finish(op, True, result={"added": n, "backup": str(res.path)})
+        print(f"ok: {n} atalhos adicionados (op {op}). Reinicie o Steam para ver.")
+        return 0
+    except Exception as e:
+        s.finish(op, False, error=str(e))
+        print(f"FALHOU: {e}"); return 1
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="dc")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -48,6 +98,7 @@ def main(argv=None) -> int:
     q = sub.add_parser("quarantine"); q.add_argument("action", choices=["list", "clear"]); q.add_argument("id", nargs="?")
     p = sub.add_parser("power"); p.add_argument("--sysfs", default="/sys/class/power_supply")
     e = sub.add_parser("extract"); e.add_argument("archive"); e.add_argument("dest")
+    lb = sub.add_parser("library"); lb.add_argument("--apply", action="store_true")
     sub.add_parser("inventory")
     sub.add_parser("contracts")
     a = ap.parse_args(argv)
@@ -59,6 +110,8 @@ def main(argv=None) -> int:
         print(m.read_text("utf-8"))
         print(f"(salvo em {j} e {m})")
         return 0
+    if a.cmd == "library":
+        return _library(paths, a.apply)
     if a.cmd == "contracts":
         from . import contracts
         problems = contracts.validate(Path(__file__).resolve().parents[1] / "modules")
