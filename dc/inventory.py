@@ -168,8 +168,8 @@ def collect(home: Path, paths: Paths, sysroot: Path = Path("/")) -> dict:
     roms = []
     # interno + cartões SD (no Deck do usuário os jogos de Switch ficam no SD "LX512")
     roots = [h / "Emulation/roms"] + [Path(p) for p in sorted(glob.glob(str(sysroot / "run/media/*/*/Emulation/roms")))]
-    for root in roots:
-      for f in sorted(root.rglob("*")) if root.exists() else []:
+    files = [(root, f) for root in roots if root.exists() for f in sorted(root.rglob("*"))]
+    for root, f in files:
         if f.is_file() and f.suffix.lower() in ROM_EXTS:
             origin, ref = prov.get(str(f), ("unknown", None))
             item = {"path": str(f), "console": f.relative_to(root).parts[0],
@@ -211,8 +211,8 @@ def to_markdown(inv: dict) -> str:
     return "\n".join(out) + "\n"
 
 
-def run(home: Path, paths: Paths) -> tuple[Path, Path, dict]:
-    inv = collect(home, paths)
+def run(home: Path, paths: Paths, sysroot: Path = Path("/")) -> tuple[Path, Path, dict]:
+    inv = collect(home, paths, sysroot)
     paths.state.mkdir(parents=True, exist_ok=True)
     j, m = paths.state / "inventory.json", paths.state / "inventory.md"
     j.write_text(json.dumps(inv, indent=1, ensure_ascii=False), "utf-8")

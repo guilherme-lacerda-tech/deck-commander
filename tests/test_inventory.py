@@ -38,7 +38,7 @@ def test_inventory_no_side_effects_and_provenance(tmp_path):
                   (str(home / "Emulation/roms/psx/Game A.chd"), 1, 0, "torrent", "op123"))
     s.close()
     before_home, before_db = tree_hash(home), paths.db.read_bytes()
-    j, m, inv = inventory.run(home, paths)
+    j, m, inv = inventory.run(home, paths, sysroot=tmp_path)
     assert tree_hash(home) == before_home and paths.db.read_bytes() == before_db
     roms = {r["path"].rsplit("/", 1)[-1].rsplit("\\", 1)[-1]: r for r in inv["roms"]}
     assert set(roms) == {"Game A.chd", "Game B.chd"}
@@ -52,7 +52,7 @@ def test_inventory_no_side_effects_and_provenance(tmp_path):
 
 def test_missing_decky_and_emudeck_warn_without_failing(tmp_path):
     home = tmp_path / "vazio"; home.mkdir()
-    inv = inventory.collect(home, get_paths(tmp_path / "dc"))
+    inv = inventory.collect(home, get_paths(tmp_path / "dc"), sysroot=tmp_path)
     w = " ".join(inv["warnings"])
     assert "Decky" in w and "EmuDeck" in w and inv["roms"] == []
 
@@ -65,6 +65,6 @@ def test_bios_found_where_emulators_point(tmp_path):
     (home / "Downloads/ps2-bios").mkdir(parents=True)
     (home / "Downloads/ps2-bios/scph39001.bin").write_bytes(b"\0" * 4 * 1024 * 1024)
     (p2 / "inis/PCSX2.ini").write_text("[Folders]\nBios = ../../../../../Downloads/ps2-bios\n")
-    inv = inventory.collect(home, get_paths(tmp_path / "dc"))
+    inv = inventory.collect(home, get_paths(tmp_path / "dc"), sysroot=tmp_path)
     assert inv["bios"]["required_ok"]["ps2"] is True
     assert inv["bios"]["found"]["ps2"] == ["pcsx2:scph39001.bin"]
