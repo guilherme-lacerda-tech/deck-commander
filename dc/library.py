@@ -31,7 +31,7 @@ CONSOLES = {
 
 # {rom} é substituído pelo caminho. Editável em ~/.config/deck-commander/emulators.json
 DEFAULT_EMULATORS = {
-    "psx": ["/home/deck/Downloads/DuckStation-x64.AppImage", "-fullscreen", "-batch", "--", "{rom}"],
+    "psx": ["/home/deck/Applications/DuckStation-x64.AppImage", "-fullscreen", "-batch", "--", "{rom}"],
     "ps2": ["/usr/bin/flatpak", "run", "net.pcsx2.PCSX2", "-fullscreen", "-batch", "--", "{rom}"],
     "switch": ["/home/deck/Downloads/publish/Ryujinx", "--fullscreen", "{rom}"],
 }
