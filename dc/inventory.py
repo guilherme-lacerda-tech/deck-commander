@@ -31,11 +31,31 @@ EMULATORS = {
 FLATPAKS = {"pcsx2": "net.pcsx2.PCSX2", "dolphin": "org.DolphinEmu.dolphin-emu",
             "retroarch": "org.libretro.RetroArch", "ppsspp": "org.ppsspp.PPSSPP",
             "duckstation": "org.duckstation.DuckStation"}
-# PS1/PS2 obrigatórias no MVP (M3.3). Nomes usuais: PS1 scph5501.bin / scph1001.bin;
-# PS2 SCPH-70012.bin / ps2-0230a-20080220.bin. Só checa presença pelo nome — nunca baixa.
-import re as _re
-BIOS_REQUIRED = {"ps1": _re.compile(r"^scph\d{4}[a-z]?\.bin$"),
-                 "ps2": _re.compile(r"^(scph-\d{5}.*|ps2-.*)\.bin$")}
+# PS1/PS2 obrigatórias no MVP (M3.3). Detecção por TAMANHO (nomes variam: no Deck do usuário a
+# BIOS de PS2 é "scph39001.bin", sem hífen). PS1 = 512 KiB; PS2 = 4 MiB. Nunca baixa nada.
+BIOS_SIZES = {"ps1": {512 * 1024}, "ps2": {4 * 1024 * 1024}}
+
+
+def _ini_value(path: Path, key: str) -> str | None:
+    for ln in (_rd(path) or "").splitlines():
+        k, sep, v = ln.partition("=")
+        if sep and k.strip() == key:
+            return v.strip()
+    return None
+
+
+def bios_dirs(h: Path) -> dict[str, Path]:
+    """Pastas de BIOS: padrão do projeto + as que cada emulador realmente usa."""
+    dirs = {"emulation": h / "Emulation/bios"}
+    ds_ini = h / ".local/share/duckstation/settings.ini"
+    sd = _ini_value(ds_ini, "SearchDirectory")
+    if sd:
+        dirs["duckstation"] = (ds_ini.parent / sd).resolve() if not sd.startswith("/") else Path(sd)
+    p2 = h / ".var/app/net.pcsx2.PCSX2/config/PCSX2"
+    b = _ini_value(p2 / "inis/PCSX2.ini", "Bios")
+    if b:
+        dirs["pcsx2"] = (p2 / b).resolve() if not b.startswith("/") else Path(b)
+    return dirs
 
 
 def _rd(p) -> str | None:
@@ -110,11 +130,25 @@ def collect(home: Path, paths: Paths, sysroot: Path = Path("/")) -> dict:
         if installed and not cfg:
             warnings.append(f"{name}: instalado mas sem config — abra o emulador uma vez")
 
-    bios = sorted(Path(p).name.lower() for p in glob.glob(str(h / "Emulation/bios/*")))
-    bios_status = {c: any(rx.match(b) for b in bios) for c, rx in BIOS_REQUIRED.items()}
+    found: dict[str, list[str]] = {"ps1": [], "ps2": []}
+    dirs = bios_dirs(h)
+    for label, d in dirs.items():
+        if "/run/user/" in str(d) and "/doc/" in str(d):
+            warnings.append(f"{label}: BIOS apontada para pasta temporária do portal Flatpak ({d}) — "
+                            "pode sumir; recomendável copiar para ~/Emulation/bios")
+        if not d.is_dir():
+            continue
+        for f in d.iterdir():
+            if f.is_file() and f.suffix.lower() == ".bin":
+                for console, sizes in BIOS_SIZES.items():
+                    if f.stat().st_size in sizes:
+                        found[console].append(f"{label}:{f.name}")
+    bios_status = {c: bool(v) for c, v in found.items()}
+    bios = [x for v in found.values() for x in v]
     for c, ok in bios_status.items():
         if not ok:
-            warnings.append(f"BIOS de {c.upper()} ausente em ~/Emulation/bios (obrigatória no MVP; nunca baixada automaticamente)")
+            warnings.append(f"BIOS de {c.upper()} não encontrada em {', '.join(str(d) for d in dirs.values())} "
+                            "(obrigatória no MVP; nunca baixada automaticamente)")
 
     steam = []
     for sc in sorted(glob.glob(str(h / ".steam/steam/userdata/*/config/shortcuts.vdf"))):
@@ -143,7 +177,8 @@ def collect(home: Path, paths: Paths, sysroot: Path = Path("/")) -> dict:
             roms.append(item)
 
     return {"generated_at": datetime.now(timezone.utc).isoformat(), "hardware": hw, "software": software,
-            "emulators": emus, "bios": {"files": len(bios), "required_ok": bios_status},
+            "emulators": emus, "bios": {"files": len(bios), "found": found, "required_ok": bios_status,
+                                        "dirs": {k: str(v) for k, v in dirs.items()}},
             "steam": steam, "roms": roms, "warnings": warnings}
 
 
