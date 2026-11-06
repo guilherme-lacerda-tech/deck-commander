@@ -265,7 +265,7 @@ def setup(paths: Paths, modules: list[str], dev: bool = False, downloads: bool =
         if downloads:
             install_flatpaks(log)
             install_cores(log)
-        else:
+        elif not all((emulators.RA_CORES / c).exists() for c in emulators.RA_CORE_FILES):
             log.append("PENDENTE: cores do RetroArch (rode ./setup-deck.sh --all para baixar)")
         flatpak_overrides(log)
         for l in emulators.configure(apply=True):
@@ -275,7 +275,7 @@ def setup(paths: Paths, modules: list[str], dev: bool = False, downloads: bool =
     if "M4" in wanted:
         if downloads:
             install_qbittorrent(log)
-        else:
+        elif not QBT_BIN.exists():
             log.append("PENDENTE: qbittorrent-nox (rode ./setup-deck.sh --all para baixar)")
     if dev:
         venv = H / ".local/share/deck-commander/venv"
