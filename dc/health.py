@@ -248,7 +248,11 @@ def diagnose(paths: Paths, store: Store, repair: bool = False) -> list[Finding]:
     # 1 serviço parado (só os que deveriam estar ativos e não estamos em safe-mode)
     if not ops.in_safe_mode(paths):
         for u in ops.dc_units(ops.unit_dir()):
-            if u.endswith(".service") and ("bot" in u or "power" in u):
+            if u.endswith(".service") and ("bot" in u or "power" in u or "qbittorrent" in u):
+                if "bot" in u and not (paths.secrets / "telegram").exists():
+                    continue  # desligado de propósito: ainda sem token
+                if "qbittorrent" in u and not (H / ".local/bin/qbittorrent-nox").exists():
+                    continue  # ainda não instalado
                 en = subprocess.run(["systemctl", "--user", "is-enabled", u], capture_output=True, text=True).stdout.strip()
                 act = subprocess.run(["systemctl", "--user", "is-active", u], capture_output=True, text=True).stdout.strip()
                 if en == "enabled" and act != "active":
@@ -343,7 +347,8 @@ def status_text(paths: Paths, store: Store, qbt=None) -> str:
     L.append(f"• último backup: {snaps[0].name[:15] if snaps else 'nenhum'}")
     du = shutil.disk_usage(H)
     L.append(f"• espaço livre: {du.free // 10**9} GB interno"
-             + "".join(f", {shutil.disk_usage(m).free // 10**9} GB {Path(m).name}" for m in glob.glob("/run/media/*/*")))
+             + "".join(f", {shutil.disk_usage(m).free // 10**9} GB {Path(m).name}" for m in glob.glob("/run/media/*/*")
+                     if os.path.ismount(m)))
     late = [q for q in quarantine.list_entries(paths.quarantine) if q.overdue]
     L.append(f"• quarentena: {len(quarantine.list_entries(paths.quarantine))} item(s)" + (f", {len(late)} com revisão VENCIDA" if late else ""))
     pend = store.list(("awaiting_approval", "interrupted", "failed"), limit=5)
