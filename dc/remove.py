@@ -160,7 +160,35 @@ def apply(paths: Paths, store: Store, rp: RemovePlan, qbt=None) -> list[str]:
     return out
 
 
-def find(launch_map: dict, query: str) -> list[str]:
+def effective_map(paths: Paths) -> dict:
+    """launch-map com `removed: True` também nos jogos que você tirou pelo próprio Steam (o plugin anota)."""
+    lm = _load(paths.data / "launch-map.json", {})
+    for gid, v in _load(plugin_bridge.done_path(paths), {}).items():
+        if v.get("removed") and gid in lm:
+            lm[gid] = {**lm[gid], "removed": True}
+    return lm
+
+
+def removed_games(paths: Paths) -> dict:
+    """Jogos removidos cujos arquivos ainda estão no lugar (podem voltar com /devolver)."""
+    return {g: e for g, e in effective_map(paths).items() if e.get("removed") and Path(e.get("rom", "")).exists()}
+
+
+def bring_back(paths: Paths, game_id: str) -> str:
+    """Desfaz a remoção de um jogo cujos arquivos ainda existem: o próximo /sync cria o atalho de novo."""
+    lm_p = paths.data / "launch-map.json"
+    lm = _load(lm_p, {})
+    if game_id not in lm or not Path(lm[game_id].get("rom", "")).exists():
+        return "Os arquivos desse jogo não estão mais no lugar (se foi pelo /remover, estão na quarentena)."
+    lm[game_id].pop("removed", None)
+    _save(lm_p, lm)
+    done = _load(plugin_bridge.done_path(paths), {})
+    if done.pop(game_id, None) is not None:
+        _save(plugin_bridge.done_path(paths), done)
+    return lm[game_id].get("title", game_id)
+
+
+def find(launch_map: dict, query: str, include_removed: bool = False) -> list[str]:
     """game_ids cujo título tem todas as palavras digitadas (sem acento/caixa, em qualquer ordem).
     Se o texto for exatamente o nome de um deles, só esse volta."""
     from .library import slug
@@ -170,7 +198,7 @@ def find(launch_map: dict, query: str) -> list[str]:
     if q in launch_map:
         return [q]
     words = q.split("-")
-    hits = [g for g, e in launch_map.items() if not e.get("removed")
+    hits = [g for g, e in launch_map.items() if (include_removed or not e.get("removed"))
             and all(w in slug(e.get("title", "")).split("-") or w in slug(e.get("title", "")) for w in words)]
     exact = [g for g in hits if slug(launch_map[g].get("title", "")) == q]
     return exact or hits

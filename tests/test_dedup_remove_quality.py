@@ -60,11 +60,13 @@ class Q:
     def torrents(self, *a, **k):
         return self.ts
 
-    def add(self, magnet, cat, path):
+    def add(self, magnet, cat, path, extra_tags=""):
         self.added.append(magnet)
+        self.tags = extra_tags
 
-    def add_file(self, data, name, cat, path):
+    def add_file(self, data, name, cat, path, extra_tags=""):
         self.added.append(name)
+        self.tags = extra_tags
 
     def delete(self, h, delete_files=False):
         self.deleted.append((h, delete_files))
@@ -86,6 +88,7 @@ def test_bot_holds_duplicate_magnet_until_baixar(b):
     r = b.handle(1, 1, "/add ps2 magnet:?xt=urn:btih:abc&dn=Okami+(USA)")
     assert "Parece repetido" in r and b.qbt.added == []
     assert "mesmo assim" in b.handle(1, 1, "/baixar") and b.qbt.added
+    assert b.qbt.tags == "dc-dup-ok"  # o /sync vai aceitar esta cópia sem barrar como duplicata
     assert "Nada guardado" in b.handle(1, 1, "/baixar")
     assert "Adicionado" in b.handle(1, 1, "/add ps2 magnet:?xt=urn:btih:def&dn=Rez")
 

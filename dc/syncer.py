@@ -147,7 +147,8 @@ def run_sync(paths: Paths, store: Store, qbt: Qbt | None, confirm_many: bool = F
                 item = content.ingest(Path(t["content_path"]), forced or t.get("category") or None,
                                       Path(cfg["roms_root"]), paths.quarantine, paths.state / "work",
                                       confirm_many=confirm_many)
-                dup = _duplicate_of(paths, item) if item.status == "added" else None
+                wanted = "dc-dup-ok" in (t.get("tags") or "")  # o usuário confirmou com /baixar
+                dup = _duplicate_of(paths, item) if item.status == "added" and not wanted else None
                 if dup:
                     folder = Path(item.files[0])
                     while folder.parent.name != item.console and folder.parent != folder:

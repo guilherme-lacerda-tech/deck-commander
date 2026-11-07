@@ -312,8 +312,8 @@ def diagnose(paths: Paths, store: Store, repair: bool = False) -> list[Finding]:
     except Exception as e:  # noqa: BLE001
         f.append(Finding("controles", "alert", False, f"não consegui verificar: {e}"))
     try:
-        from . import dedup
-        lm = json.loads((paths.data / "launch-map.json").read_text("utf-8"))
+        from . import dedup, remove
+        lm = remove.effective_map(paths)
         dups = dedup.library_dups(lm)
         f.append(Finding("duplicatas", "ask", not dups,
                          "; ".join(" = ".join(lm[g]["title"] for g in grp) for grp in dups[:5]) or "ok",

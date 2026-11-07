@@ -140,9 +140,10 @@ def ingest(content: Path, console: Optional[str], roms_root: Path, quarantine_ro
         if len(games) > 3 and not confirm_many:
             return SyncItem(name, console, "ask_many", files=[g.name for g in games],
                             note=f"{len(games)} jogos no mesmo download — confirme com /sync tudo")
-        dest = roms_root / console / title
-        if dest.exists():
-            dest = roms_root / console / f"{title} (novo)"
+        dest, n = roms_root / console / title, 1
+        while dest.exists():  # nunca mistura com uma pasta que já existe
+            dest = roms_root / console / (f"{title} (novo)" if n == 1 else f"{title} (novo {n})")
+            n += 1
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(staging), str(dest))
         moved = [str(dest / g.relative_to(staging)) for g in games]

@@ -14,6 +14,8 @@
 - Dolphin (GameCube/Wii) mapeado no controle do Deck quando ainda estava no teclado.
 - Qualidade por jogo devolve o arquivo do emulador byte a byte igual (conferido no Deck nos 6 consoles).
 - `dc x … --apply/--force/--confirm` voltaram a funcionar no terminal; `/remover` limpa também o banco.
+- `/baixar` agora vale até o fim (o /sync aceita a cópia confirmada); terceira cópia com o mesmo nome vira
+  "(novo 2)" em vez de entrar dentro de outra pasta; `/devolver` traz de volta jogo tirado pelo Steam.
 - Busca de jogo por palavras (`/qualidade shadow dub 2x`); `/duplicados` diz se a cópia está no SD ou na memória.
 - Serviços com `Restart=always`. Ferramentas de teste no aparelho: `tools/e2e_local.py`, `tools/quality_check.py`,
   `tools/bot_dryrun.py`.

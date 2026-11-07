@@ -61,7 +61,7 @@ O instalador é idempotente (pode rodar de novo para atualizar) e mostra o que f
 
 Baixou repetido? O bot avisa **antes** de baixar (responda `/baixar` se quiser mesmo assim). Para limpar o que já
 está repetido: `/duplicados` e `/remover <nº>` (pede confirmação; os arquivos ficam 30 dias na quarentena).
-Removeu um jogo pelo próprio Steam? Ele não volta sozinho.
+Removeu um jogo pelo próprio Steam? Ele não volta sozinho (`/devolver <nome>` traz de volta).
 
 Jogo pesado ou com gráfico estranho? `/qualidade <jogo> nativo|2x|3x` muda a resolução só daquele jogo —
 veja [docs/QUALIDADE-E-CONTROLES.md](docs/QUALIDADE-E-CONTROLES.md).

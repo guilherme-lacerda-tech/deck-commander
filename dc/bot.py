@@ -54,6 +54,7 @@ Aviso aqui quando o download terminar.
 /qualidade <jogo> nativo|2x|3x|padrão — resolução só daquele jogo · /qualidade lista
 /controles — situação dos controles em cada emulador
 /baixar — baixa mesmo assim um download que parecia repetido
+/devolver <nome> — traz de volta um jogo que você tirou pelo Steam
 /bateria sim|nao — baixar também fora da tomada (padrão: só na tomada)
 /status · /queue · /disk · /diagnostico
 /pause · /resume — downloads
@@ -154,6 +155,8 @@ class Bot:
             return self._release_held()
         if cmd == "/duplicados":
             return self._duplicates()
+        if cmd == "/devolver":
+            return self._bring_back(args)
         if cmd == "/remover":
             return self._remove(args)
         if cmd == "/qualidade":
@@ -315,10 +318,27 @@ class Bot:
 
     # -- duplicatas / remoção / qualidade ---------------------------------------
     def _map(self) -> dict:
+        from . import remove
         try:
-            return json.loads((self.paths.data / "launch-map.json").read_text("utf-8"))
+            return remove.effective_map(self.paths)
         except (OSError, ValueError):
             return {}
+
+    def _bring_back(self, args) -> str:
+        from . import remove
+        gone = remove.removed_games(self.paths)
+        if not args:
+            if not gone:
+                return "Nenhum jogo removido que ainda tenha os arquivos no lugar."
+            return "Removidos (arquivos ainda no Deck):\n" + "\n".join(f"• {e['title']}" for e in gone.values()) + \
+                "\n\nPara trazer de volta: /devolver <nome>"
+        hits = remove.find(gone, " ".join(args), include_removed=True)
+        if len(hits) != 1:
+            return ("Achei mais de um:\n" + "\n".join(f"• {gone[g]['title']}" for g in hits[:10])) if hits else \
+                "Não achei esse jogo entre os removidos (/devolver mostra a lista)."
+        title = remove.bring_back(self.paths, hits[0])
+        res = syncer.run_sync(self.paths, self.store, self.qbt, explicit=self.cfg.get("explicit"))
+        return f"↩️ {title} voltando para a biblioteca.\n{res}"
 
     def _already(self, name, console):
         if not name:
@@ -337,10 +357,11 @@ class Bot:
             return "Nada guardado para baixar (vale por 1 hora depois do aviso)."
         dest = str(Path(syncer._cfg(self.paths)["downloads_root"]) / h["cat"])
         try:
+            from .qbt import DUP_OK_TAG
             if h.get("magnet"):
-                self.qbt.add(h["magnet"], h["cat"], dest)
+                self.qbt.add(h["magnet"], h["cat"], dest, extra_tags=DUP_OK_TAG)
             else:
-                self.qbt.add_file(Path(h["file"]).read_bytes(), h["fname"], h["cat"], dest)
+                self.qbt.add_file(Path(h["file"]).read_bytes(), h["fname"], h["cat"], dest, extra_tags=DUP_OK_TAG)
                 Path(h["file"]).unlink(missing_ok=True)
         except (QbtError, OSError) as e:
             return f"❌ {e}"

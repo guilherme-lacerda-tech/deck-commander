@@ -42,21 +42,21 @@ class Qbt:
             self._v5 = int(self.version().lstrip("v").split(".")[0]) >= 5
         return self._v5
 
-    def add(self, magnet: str, category: str, save_path: str) -> None:
+    def add(self, magnet: str, category: str, save_path: str, extra_tags: str = "") -> None:
         if not magnet.startswith("magnet:?"):
             raise QbtError("link inválido: envie um magnet:?")
         out = self._req("torrents/add", {"urls": magnet, "category": category, "savepath": save_path,
-                                         "tags": "deck-commander"}).decode()
+                                         "tags": ",".join(filter(None, ["deck-commander", extra_tags]))}).decode()
         if "Fails" in out:
             raise QbtError("o qBittorrent recusou o magnet")
 
-    def add_file(self, data: bytes, filename: str, category: str, save_path: str) -> None:
+    def add_file(self, data: bytes, filename: str, category: str, save_path: str, extra_tags: str = "") -> None:
         """Envia um arquivo .torrent (multipart/form-data)."""
         if not data.startswith(b"d"):
             raise QbtError("isso não parece um arquivo .torrent")
         boundary = "----deckcommander" + str(abs(hash(data)) % 10**12)
         parts = []
-        for k, v in (("category", category), ("savepath", save_path), ("tags", "deck-commander")):
+        for k, v in (("category", category), ("savepath", save_path), ("tags", ",".join(filter(None, ["deck-commander", extra_tags])))):
             parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode())
         parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="torrents"; filename="{filename}"\r\n'
                      f"Content-Type: application/x-bittorrent\r\n\r\n".encode() + data + b"\r\n")
@@ -106,4 +106,5 @@ class Qbt:
         self._req("torrents/delete", {"hashes": h, "deleteFiles": "true" if delete_files else "false"})
 
 
+DUP_OK_TAG = "dc-dup-ok"  # baixado com /baixar: o usuário quer esta cópia mesmo sendo o mesmo jogo
 DONE_STATES = {"uploading", "stalledUP", "pausedUP", "stoppedUP", "queuedUP", "forcedUP", "checkingUP"}
