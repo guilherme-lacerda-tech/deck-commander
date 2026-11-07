@@ -316,7 +316,8 @@ class Bot:
                     size = remove.plan(self.paths, g, syncer.rom_roots()).size
                 except (KeyError, OSError):
                     size = 0
-                lines.append(f"  {len(entries)}. {lm[g]['title']} — {size / 1e9:.1f} GB · pasta {Path(lm[g]['rom']).parent.name}")
+                where = "cartão SD" if str(lm[g]["rom"]).startswith("/run/media/") else "memória interna"
+                lines.append(f"  {len(entries)}. {lm[g]['title']} — {size / 1e9:.1f} GB · {where}")
         st = syncer._state(self.paths)
         try:
             live = {t["hash"]: t for t in self.qbt.torrents()}

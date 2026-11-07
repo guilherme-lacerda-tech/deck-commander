@@ -41,3 +41,14 @@ def test_cli_new_commands_run(tmp_path, monkeypatch, capsys):
     assert "ps2-okami-usa" not in json.loads((paths.data / "launch-map.json").read_text())
     assert cli.main(["x", "configure"]) == 0  # dry-run sem --apply continua aceito
 
+
+def test_find_by_words_and_exact_title():
+    from dc.remove import find
+    lm = {"a": {"title": "Shadow of the Colossus (Dub-e-Leg)"}, "b": {"title": "Shadow of the Colossus"},
+          "c": {"title": "God of War II"}, "d": {"title": "Velho", "removed": True}}
+    assert sorted(find(lm, "shadow")) == ["a", "b"]
+    assert find(lm, "shadow colossus dub") == ["a"]
+    assert find(lm, "Shadow of the Colossus") == ["b"]  # nome exato desempata
+    assert find(lm, "colossus shadow leg") == ["a"]
+    assert find(lm, "velho") == [] and find(lm, "") == [] and find(lm, "c") == ["c"]
+

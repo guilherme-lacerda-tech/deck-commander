@@ -156,7 +156,16 @@ def apply(paths: Paths, store: Store, rp: RemovePlan, qbt=None) -> list[str]:
 
 
 def find(launch_map: dict, query: str) -> list[str]:
-    """game_ids cujo título contém o texto (sem acento/caixa)."""
+    """game_ids cujo título tem todas as palavras digitadas (sem acento/caixa, em qualquer ordem).
+    Se o texto for exatamente o nome de um deles, só esse volta."""
     from .library import slug
     q = slug(query)
-    return [g for g, e in launch_map.items() if q and (q in slug(e.get("title", "")) or q == g)]
+    if not q:
+        return []
+    if q in launch_map:
+        return [q]
+    words = q.split("-")
+    hits = [g for g, e in launch_map.items() if not e.get("removed")
+            and all(w in slug(e.get("title", "")).split("-") or w in slug(e.get("title", "")) for w in words)]
+    exact = [g for g in hits if slug(launch_map[g].get("title", "")) == q]
+    return exact or hits
