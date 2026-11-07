@@ -114,7 +114,12 @@ def test_remove_plan_then_apply_moves_to_quarantine(tmp_path, monkeypatch):
     assert rp.move == d and rp.torrents == ["HASH"] and rp.appids == [3000000001] and "30 dias" in rp.describe()
     assert d.exists()  # plano não faz nada
     q = Q()
-    out = remove.apply(paths, Store(paths.db), rp, q)
+    store = Store(paths.db)
+    with store.tx() as c:
+        for p in (d / "Okami.iso", tmp_path / "roms/ps2/Okami2/x.iso"):  # o segundo é de outro jogo e fica
+            c.execute("INSERT INTO files(path,size,mtime,origin) VALUES(?,?,?,?)", (str(p), 1, 0, "torrent"))
+    out = remove.apply(paths, store, rp, q)
+    assert [r[0] for r in store.conn.execute("SELECT path FROM files")] == [str(tmp_path / "roms/ps2/Okami2/x.iso")]
     assert not d.exists() and q.deleted == [("HASH", True)]
     assert "ps2-okami" not in json.loads((paths.data / "launch-map.json").read_text())
     assert json.loads((paths.data / "plugin-done.json").read_text())["ps2-okami"]["removed"] is True

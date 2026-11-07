@@ -135,6 +135,10 @@ def apply(paths: Paths, store: Store, rp: RemovePlan, qbt=None) -> list[str]:
     _save(lm_p, lm)
     with store.tx() as c:
         c.execute("DELETE FROM provenance WHERE operation_id=?", (f"plugin:{rp.game_id}",))
+        if rp.move:  # registro dos arquivos sai junto (senão o diagnóstico acusa "arquivo sumido")
+            prefix = str(rp.move) + os.sep
+            c.execute("DELETE FROM files WHERE path=? OR substr(path, 1, ?)=?", (str(rp.move), len(prefix), prefix))
+        c.execute("DELETE FROM files WHERE game_id=?", (rp.game_id,))
     # 3) arquivos -> quarentena
     if rp.move and rp.move.exists():
         qroot = _quarantine_root(rp.move, paths.quarantine)
