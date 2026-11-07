@@ -26,6 +26,14 @@ def _log(paths: Paths, name: str, msg: str) -> None:
         f.write(f"{datetime.now(timezone.utc).isoformat()} {msg}\n")
 
 
+def seeding_limits(paths: Paths) -> dict:
+    """Depois de baixar, compartilha até a razão 1.0 ou 60 min (o que vier primeiro) e para.
+    Ajustável em deck.json: seed_ratio, seed_minutes (-1 = sem limite)."""
+    from . import syncer
+    c = syncer._cfg(paths)
+    return {"ratio": float(c.get("seed_ratio", 1.0)), "minutes": int(c.get("seed_minutes", 60))}
+
+
 def power_loop(paths: Paths, interval: float = 30) -> None:
     """Pausa SÓ os torrents que ele mesmo pausou (não retoma o que o usuário pausou)."""
     cfgp = paths.config / "power.json"
@@ -33,21 +41,51 @@ def power_loop(paths: Paths, interval: float = 30) -> None:
     pol = PowerPolicy(min_battery_pct=cfg.get("min_battery_pct", 30), allow_on_battery=cfg.get("allow_on_battery", False),
                       debounce_s=cfg.get("debounce_s", 60), state="RUN")
     q, mine_p = Qbt(), paths.state / "paused-by-dc.json"
+    state_p = paths.state / "power-state.json"
     store = Store(paths.db)
+    cfg_mtime, seed_at, last_written = 0.0, 0.0, None
+    ACTIVE = ("downloading", "stalledDL", "metaDL", "queuedDL", "forcedDL")
     while True:
-        state, why, changed = pol.update(read_power())
-        if changed:
+        # power.json mudou (ex.: /bateria pelo bot): vale na hora, sem reiniciar o serviço
+        try:
+            mt = cfgp.stat().st_mtime if cfgp.exists() else 0.0
+            if mt != cfg_mtime:
+                cfg_mtime = mt
+                cfg = json.loads(cfgp.read_text("utf-8")) if cfgp.exists() else {}
+                pol.allow_on_battery = bool(cfg.get("allow_on_battery", False))
+                pol.min_battery_pct = int(cfg.get("min_battery_pct", 30))
+        except (OSError, ValueError) as e:
+            _log(paths, "power", f"power.json ilegível: {e}")
+        # limite de seeding (protege o pacote de dados do celular); reaplica 1x/h caso o qBittorrent reinicie
+        if time.time() - seed_at > 3600:
             try:
-                if state == "PAUSE":
-                    act = [t["hash"] for t in q.torrents() if t["state"] in ("downloading", "stalledDL", "metaDL", "queuedDL")]
-                    q.pause(act); mine_p.write_text(json.dumps(act))
+                q.set_seeding_limits(**seeding_limits(paths))
+                seed_at = time.time()
+            except QbtError:
+                pass
+        reading = read_power()
+        state, why, changed = pol.update(reading)
+        if (state, why) != last_written:
+            last_written = (state, why)
+            try:
+                state_p.write_text(json.dumps({"state": state, "why": why, "battery": reading.battery_pct,
+                                               "ac": reading.ac_online}, ensure_ascii=False), "utf-8")
+            except OSError:
+                pass
+        try:
+            if state == "RUN" and mine_p.exists():  # inclui pausa que sobrou de antes de um reinício
+                mine = json.loads(mine_p.read_text()) if mine_p.exists() else []
+                q.resume(mine); mine_p.unlink(missing_ok=True)
+                _log(paths, "power", f"RUN retomados {len(mine)}: {why}")
+            elif state == "PAUSE":
+                # inclui downloads novos que chegaram durante a pausa (antes eles baixavam na bateria)
+                mine = json.loads(mine_p.read_text()) if mine_p.exists() else []
+                act = [t["hash"] for t in q.torrents() if t["state"] in ACTIVE and t["hash"] not in mine]
+                if act or changed:
+                    q.pause(act); mine_p.write_text(json.dumps(sorted(set(mine) | set(act))))
                     _log(paths, "power", f"PAUSE {len(act)} torrent(s): {why}")
-                else:
-                    mine = json.loads(mine_p.read_text()) if mine_p.exists() else []
-                    q.resume(mine); mine_p.unlink(missing_ok=True)
-                    _log(paths, "power", f"RUN retomados {len(mine)}: {why}")
-            except QbtError as e:
-                _log(paths, "power", f"qBittorrent indisponível: {e}")
+        except (QbtError, OSError, ValueError) as e:
+            _log(paths, "power", f"qBittorrent indisponível: {e}")
         # plugin do Decky: registra AppIDs criados ao vivo e atualiza as abas
         try:
             from . import plugin_bridge, syncer, tabs, vdf

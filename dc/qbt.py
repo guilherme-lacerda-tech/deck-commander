@@ -75,6 +75,15 @@ class Qbt:
         if "Fails" in out:
             raise QbtError("o qBittorrent recusou o arquivo .torrent")
 
+    def set_seeding_limits(self, ratio: float, minutes: int) -> None:
+        """Ao atingir o limite o torrent é PARADO (continua na lista; o /sync usa normalmente)."""
+        prefs = {"max_ratio_enabled": ratio >= 0, "max_ratio": ratio,
+                 "max_seeding_time_enabled": minutes >= 0, "max_seeding_time": minutes, "max_ratio_act": 0}
+        self._req("app/setPreferences", {"json": json.dumps(prefs)})
+
+    def preferences(self) -> dict:
+        return json.loads(self._req("app/preferences"))
+
     def torrents(self, category: Optional[str] = None, tag: str = "deck-commander") -> list[dict]:
         q = {"tag": tag}
         if category:

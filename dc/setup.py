@@ -31,7 +31,7 @@ Description=Deck Commander — qBittorrent (WebUI só em 127.0.0.1:8790)
 ConditionPathExists={QBT_BIN}
 [Service]
 ExecStart={QBT_BIN} --profile={QBT_PROFILE} --confirm-legal-notice
-Restart=on-failure
+Restart=always
 RestartSec=30
 [Install]
 WantedBy=default.target
@@ -43,7 +43,7 @@ ConditionPathExists=%h/.config/deck-commander/secrets/telegram
 [Service]
 WorkingDirectory={REPO}
 ExecStart={PY} -c "from dc.bot import main; main()"
-Restart=on-failure
+Restart=always
 RestartSec=30
 [Install]
 WantedBy=default.target
@@ -53,7 +53,7 @@ Description=Deck Commander — monitor de energia e fila
 [Service]
 WorkingDirectory={REPO}
 ExecStart={PY} -m dc.services power
-Restart=on-failure
+Restart=always
 RestartSec=30
 [Install]
 WantedBy=default.target

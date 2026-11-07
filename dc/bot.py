@@ -54,6 +54,7 @@ Aviso aqui quando o download terminar.
 /qualidade <jogo> nativo|2x|3x|padrão — resolução só daquele jogo · /qualidade lista
 /controles — situação dos controles em cada emulador
 /baixar — baixa mesmo assim um download que parecia repetido
+/bateria sim|nao — baixar também fora da tomada (padrão: só na tomada)
 /status · /queue · /disk · /diagnostico
 /pause · /resume — downloads
 /quarantine list | review <id> | clear <id>
@@ -136,7 +137,7 @@ class Bot:
                 self.qbt.add(magnet, cat, str(Path(syncer._cfg(P)["downloads_root"]) / cat))
             except QbtError as e:
                 return f"❌ {e} (sem internet? o /sync continua funcionando com o que já baixou)"
-            return f"Adicionado ({cat}). Use /sync quando terminar."
+            return f"Adicionado ({cat}). Aviso quando terminar." + self._power_note()
         if cmd == "/sync":
             return syncer.run_sync(P, S, self.qbt, confirm_many=bool(args and args[0] == "tudo"),
                                    explicit=self.cfg.get("explicit"))
@@ -147,6 +148,8 @@ class Bot:
                 return "Não achei esse download pendente."
             self.cfg.setdefault("explicit", {})[h] = args[1]; self.save_cfg()
             return f"Ok, {st['pending'][h]} = {args[1]}. Rode /sync."
+        if cmd == "/bateria":
+            return self._battery(args)
         if cmd == "/baixar":
             return self._release_held()
         if cmd == "/duplicados":
@@ -262,7 +265,8 @@ class Bot:
             self.log(f"{uid}: torrent {name} ({cat})")
             label = {"switch": "Switch", "ps2": "PS2", "psx": "PS1"}.get(cat, cat)
             return (f"⬇️ Baixando {name[:-8]} ({label}). Aviso aqui quando terminar."
-                    if console else f"⬇️ Baixando {name[:-8]}. Não sei o console ainda — o /sync vai perguntar.")
+                    if console else f"⬇️ Baixando {name[:-8]}. Não sei o console ainda — o /sync vai perguntar.") \
+                + self._power_note()
         c = parse_console(text)
         if c == "switch2":
             return "Switch 2 ainda não é suportado no Deck (o Lichii é experimental)."
@@ -270,6 +274,44 @@ class Bot:
             pend[str(uid)] = {"console": c, "at": time.time()}; self.save_cfg()
             return f"Ok, próximo .torrent ou magnet = {c}. Pode encaminhar."
         return None  # conversa comum: ignora
+
+    # -- energia ------------------------------------------------------------------
+    def _power_state(self) -> dict:
+        try:
+            return json.loads((self.paths.state / "power-state.json").read_text("utf-8"))
+        except (OSError, ValueError):
+            return {}
+
+    def _power_note(self) -> str:
+        st = self._power_state()
+        if st.get("state") != "PAUSE":
+            return ""
+        return (f"\n🔌 Por enquanto o download fica pausado: {st.get('why', 'energia')}. "
+                "Ele começa sozinho quando o Deck for para a tomada (ou mande /bateria sim).")
+
+    def _battery(self, args) -> str:
+        p = self.paths.config / "power.json"
+        try:
+            cfg = json.loads(p.read_text("utf-8")) if p.exists() else {}
+        except (OSError, ValueError):
+            cfg = {}
+        if args and args[0].lower() in ("sim", "s", "on", "liga"):
+            cfg["allow_on_battery"] = True
+        elif args and args[0].lower() in ("nao", "não", "n", "off", "desliga"):
+            cfg["allow_on_battery"] = False
+        else:
+            st = self._power_state()
+            bat = f"{st['battery']}%" if st.get("battery") is not None else "?"
+            return (f"Bateria: {bat} · downloads: {'pausados' if st.get('state') == 'PAUSE' else 'rodando'}"
+                    f" ({st.get('why', '?')})\nFora da tomada: {'baixa' if cfg.get('allow_on_battery') else 'não baixa'}"
+                    f" (abaixo de {cfg.get('min_battery_pct', 30)}% sempre pausa). Mude com /bateria sim ou /bateria nao")
+        p.parent.mkdir(parents=True, exist_ok=True)
+        tmp = p.with_name("power.json.tmp")
+        tmp.write_text(json.dumps(cfg, indent=1), "utf-8")
+        tmp.replace(p)
+        return ("✅ Agora baixa também na bateria (pausa abaixo de "
+                f"{cfg.get('min_battery_pct', 30)}%). Vale em até 1 min." if cfg["allow_on_battery"]
+                else "✅ Agora só baixa na tomada. Vale em até 1 min.")
 
     # -- duplicatas / remoção / qualidade ---------------------------------------
     def _map(self) -> dict:
@@ -302,7 +344,7 @@ class Bot:
                 Path(h["file"]).unlink(missing_ok=True)
         except (QbtError, OSError) as e:
             return f"❌ {e}"
-        return f"⬇️ Baixando {h.get('name') or 'download'} mesmo assim. Aviso quando terminar."
+        return f"⬇️ Baixando {h.get('name') or 'download'} mesmo assim. Aviso quando terminar." + self._power_note()
 
     def _duplicates(self) -> str:
         from . import dedup, remove
