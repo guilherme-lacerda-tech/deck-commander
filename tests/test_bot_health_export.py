@@ -133,7 +133,7 @@ def test_forwarded_torrent_after_console_text(b, monkeypatch):
     r = b.handle_message(msg(document={"file_id": "F", "file_name": "Castlevania - Belmonts Curse.torrent"}))
     assert "Baixando Castlevania - Belmonts Curse (Switch)" in r and got["cat"] == "switch"
     assert b.cfg["pending_console"] == {}  # usado uma vez
-    r = b.handle_message(msg(document={"file_id": "F", "file_name": "Jogo.torrent"}, caption="ps2"))
+    r = b.handle_message(msg(document={"file_id": "F", "file_name": "Okami.torrent"}, caption="ps2"))
     assert got["cat"] == "ps2"
     assert "não é suportado" in b.handle_message(msg(document={"file_id": "F", "file_name": "DK.torrent"}, caption="switch 2"))
     assert "só sei usar" in b.handle_message(msg(document={"file_id": "F", "file_name": "foto.jpg"}))

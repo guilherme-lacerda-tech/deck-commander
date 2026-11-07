@@ -140,7 +140,15 @@ def plan(existing: list[dict], games: list[Game], launcher: Path) -> Plan:
         if sc["appid"] & 0xFFFFFFFF in ids or g.game_id in dc_ids:
             already.append(g.title)
         elif g.title.casefold() in names:
-            conflicts.append(g.title)  # atalho de outra origem com o mesmo nome: não duplica, não toca
+            other = names[g.title.casefold()]
+            if "unifideck" in (other.get("exe") or other.get("Exe") or "").lower():
+                # jogo de loja (Epic/GOG) com o mesmo nome: entra com o console no nome, sem tocar no outro
+                from dataclasses import replace
+                alt = shortcut_for(replace(g, title=f"{g.title} ({CONSOLES[g.console]['label']})"), launcher)
+                if alt["appid"] & 0xFFFFFFFF not in ids and alt["AppName"].casefold() not in names:
+                    add.append(alt)
+                    continue
+            conflicts.append(g.title)  # atalho manual com o mesmo nome: não duplica, não toca (avisado no /sync)
         else:
             add.append(sc)
     return Plan(add, already, conflicts)
@@ -174,7 +182,8 @@ def write_map(map_path: Path, games: list[Game]) -> None:
     if map_path.exists():
         data = json.loads(map_path.read_text("utf-8"))
     for g in games:
-        data[g.game_id] = {"title": g.title, "console": g.console, "rom": g.path}
+        keep = {k: v for k, v in data.get(g.game_id, {}).items() if k == "removed"}  # removido pelo usuário fica removido
+        data[g.game_id] = {"title": g.title, "console": g.console, "rom": g.path, **keep}
     map_path.parent.mkdir(parents=True, exist_ok=True)
     tmp = map_path.with_name(map_path.name + ".tmp")
     tmp.write_text(json.dumps(data, indent=1, ensure_ascii=False), "utf-8")

@@ -50,6 +50,10 @@ Aviso aqui quando o download terminar.
 /sync — leva downloads concluídos para a biblioteca  (/sync tudo confirma pacotes grandes)
 /console <id> <console> — responde quando o /sync perguntar
 /reiniciar — reinicia o Steam para mostrar jogos novos
+/duplicados — jogos repetidos · /remover <nº ou nome> — tira um jogo (pede confirmação)
+/qualidade <jogo> nativo|2x|3x|padrão — resolução só daquele jogo · /qualidade lista
+/controles — situação dos controles em cada emulador
+/baixar — baixa mesmo assim um download que parecia repetido
 /status · /queue · /disk · /diagnostico
 /pause · /resume — downloads
 /quarantine list | review <id> | clear <id>
@@ -122,6 +126,12 @@ class Bot:
             if ops.in_safe_mode(P):
                 return "Safe-mode ativo."
             cat = console or "auto"
+            from . import dedup
+            dup = self._already(dedup.magnet_name(magnet), console)
+            if dup:
+                self.cfg["held"] = {"magnet": magnet, "cat": cat, "name": dedup.magnet_name(magnet), "at": time.time()}
+                self.save_cfg()
+                return f"⚠️ Parece repetido: {dup}.\nNão baixei. Se quer mesmo assim (outra versão/idioma), mande /baixar"
             try:
                 self.qbt.add(magnet, cat, str(Path(syncer._cfg(P)["downloads_root"]) / cat))
             except QbtError as e:
@@ -137,6 +147,18 @@ class Bot:
                 return "Não achei esse download pendente."
             self.cfg.setdefault("explicit", {})[h] = args[1]; self.save_cfg()
             return f"Ok, {st['pending'][h]} = {args[1]}. Rode /sync."
+        if cmd == "/baixar":
+            return self._release_held()
+        if cmd == "/duplicados":
+            return self._duplicates()
+        if cmd == "/remover":
+            return self._remove(args)
+        if cmd == "/qualidade":
+            return self._quality(args)
+        if cmd == "/controles":
+            from . import controls
+            return "\n".join(("✅ " if c.ok else "⚠️ ") + f"{c.emulator}: {c.detail}" for c in controls.check()) + \
+                "\n(o mapeamento vale para todos os jogos do emulador; ajuste por jogo: Steam → Controle no atalho)"
         if cmd == "/reiniciar":
             if ops.game_running():
                 return "Tem jogo aberto — feche antes."
@@ -224,6 +246,14 @@ class Bot:
                                         timeout=60) as r:
                 data = r.read()
             cat = console or "auto"
+            from . import dedup
+            dup = self._already(dedup.torrent_name(data) or name, console)
+            if dup:
+                held = self.paths.state / "held.torrent"
+                held.write_bytes(data)
+                self.cfg["held"] = {"file": str(held), "fname": name, "cat": cat, "name": name, "at": time.time()}
+                pend.pop(str(uid), None); self.save_cfg()
+                return f"⚠️ Parece repetido: {dup}.\nNão baixei. Se quer mesmo assim (outra versão/idioma), mande /baixar"
             try:
                 self.qbt.add_file(data, name, cat, str(Path(syncer._cfg(self.paths)["downloads_root"]) / cat))
             except QbtError as e:
@@ -240,6 +270,130 @@ class Bot:
             pend[str(uid)] = {"console": c, "at": time.time()}; self.save_cfg()
             return f"Ok, próximo .torrent ou magnet = {c}. Pode encaminhar."
         return None  # conversa comum: ignora
+
+    # -- duplicatas / remoção / qualidade ---------------------------------------
+    def _map(self) -> dict:
+        try:
+            return json.loads((self.paths.data / "launch-map.json").read_text("utf-8"))
+        except (OSError, ValueError):
+            return {}
+
+    def _already(self, name, console):
+        if not name:
+            return None
+        from . import dedup
+        try:
+            ts = self.qbt.torrents()
+        except QbtError:
+            ts = []
+        return dedup.find_existing(name, console, self._map(), ts)
+
+    def _release_held(self) -> str:
+        h = self.cfg.pop("held", None)
+        self.save_cfg()
+        if not h or time.time() - h.get("at", 0) > 3600:
+            return "Nada guardado para baixar (vale por 1 hora depois do aviso)."
+        dest = str(Path(syncer._cfg(self.paths)["downloads_root"]) / h["cat"])
+        try:
+            if h.get("magnet"):
+                self.qbt.add(h["magnet"], h["cat"], dest)
+            else:
+                self.qbt.add_file(Path(h["file"]).read_bytes(), h["fname"], h["cat"], dest)
+                Path(h["file"]).unlink(missing_ok=True)
+        except (QbtError, OSError) as e:
+            return f"❌ {e}"
+        return f"⬇️ Baixando {h.get('name') or 'download'} mesmo assim. Aviso quando terminar."
+
+    def _duplicates(self) -> str:
+        from . import dedup, remove
+        lm = self._map()
+        entries, lines = [], []
+        for grp in dedup.library_dups(lm):
+            lines.append("Mesmo jogo:")
+            for g in grp:
+                entries.append({"gid": g})
+                try:
+                    size = remove.plan(self.paths, g, syncer.rom_roots()).size
+                except (KeyError, OSError):
+                    size = 0
+                lines.append(f"  {len(entries)}. {lm[g]['title']} — {size / 1e9:.1f} GB · pasta {Path(lm[g]['rom']).parent.name}")
+        st = syncer._state(self.paths)
+        try:
+            live = {t["hash"]: t for t in self.qbt.torrents()}
+        except QbtError:
+            live = {}
+        extra = [(h, v) for h, v in st.get("ingested", {}).items()
+                 if v.get("duplicate_of") and h in live and not v.get("removed")]
+        if extra:
+            lines.append("Downloads repetidos que ainda ocupam espaço:")
+            for h, v in extra:
+                entries.append({"hash": h, "name": v["name"]})
+                lines.append(f"  {len(entries)}. {v['name']} — {live[h].get('size', 0) / 1e9:.1f} GB (cópia de «{v['duplicate_of']}»)")
+        self.cfg["listing"] = entries
+        self.save_cfg()
+        if not entries:
+            return "Nenhum jogo repetido 👍"
+        return "\n".join(lines) + "\n\nPara tirar um: /remover <nº>  (mostra o que vai acontecer e pede confirmação)"
+
+    def _remove(self, args) -> str:
+        from . import remove
+        if not args:
+            return "Uso: /remover <nº do /duplicados ou nome do jogo>"
+        confirm = args[-1].lower() in ("confirmar", "sim")
+        q = args[:-1] if confirm else args
+        lm = self._map()
+        listing = self.cfg.get("listing") or []
+        if len(q) == 1 and q[0].isdigit() and 0 < int(q[0]) <= len(listing):
+            e = listing[int(q[0]) - 1]
+            if "hash" in e:
+                if not confirm:
+                    return f"Apagar o download repetido «{e['name']}» (o jogo original fica)?\nConfirme: /remover {q[0]} confirmar"
+                try:
+                    self.qbt.delete(e["hash"], delete_files=True)
+                except QbtError as ex:
+                    return f"❌ {ex}"
+                st = syncer._state(self.paths)
+                st.get("ingested", {}).get(e["hash"], {})["removed"] = True
+                syncer._save_state(self.paths, st)
+                return "🗑️ Download repetido removido. A cópia na quarentena some de vez com /quarantine clear <id>."
+            hits = [e["gid"]]
+        else:
+            hits = remove.find(lm, " ".join(q))
+        if not hits:
+            return "Não achei esse jogo. Veja os números em /duplicados."
+        if len(hits) > 1:
+            return "Achei mais de um, seja mais específico:\n" + "\n".join(
+                f"• {lm[g]['title']} ({lm[g]['console']})" for g in hits[:10])
+        if ops.game_running():
+            return "Feche o jogo antes de remover."
+        try:
+            rp = remove.plan(self.paths, hits[0], syncer.rom_roots())
+        except KeyError as ex:
+            return str(ex)
+        if not confirm:
+            return rp.describe() + f"\n\nConfirme: /remover {' '.join(q)} confirmar"
+        out = remove.apply(self.paths, self.store, rp, self.qbt)
+        self.cfg.pop("listing", None)
+        self.save_cfg()
+        return "🗑️ Removido: " + rp.title + "\n" + "\n".join("• " + x for x in out)
+
+    def _quality(self, args) -> str:
+        from . import quality, remove
+        lm = self._map()
+        if not args or args[0] == "lista":
+            ls = quality.listing(self.paths, lm)
+            return ("Jogos com qualidade própria:\n" + "\n".join(ls)) if ls else \
+                "Nenhum jogo com qualidade própria — todos usam o padrão do console.\nUso: /qualidade <jogo> nativo|2x|3x|padrão"
+        if len(args) < 2:
+            return "Uso: /qualidade <jogo> nativo|2x|3x|padrão"
+        hits = remove.find(lm, " ".join(args[:-1]))
+        if len(hits) != 1:
+            return ("Achei mais de um:\n" + "\n".join(f"• {lm[g]['title']}" for g in hits[:10])) if hits else "Não achei esse jogo."
+        g = hits[0]
+        try:
+            return f"{lm[g]['title']}: " + quality.set_override(self.paths, g, lm[g]["console"], args[-1].lower())
+        except ValueError as ex:
+            return str(ex)
 
     def _console_for(self, uid: int, found):
         if found:

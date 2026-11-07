@@ -34,9 +34,9 @@ Sem o plugin instalado, o Deck Commander grava `shortcuts.vdf` (com backup) e pe
 | M0 backup/restore/quarentena/safe-mode | `dc/backup.py`, `dc/quarantine.py`, `dc/ops.py` |
 | M18/M19 lock, Operation Store, índice | `dc/lock.py`, `dc/store.py`, `dc/worker.py`, `dc/ops.py` |
 | M27 contratos | `dc/contracts.py`, `modules/*/contract.toml` |
-| M2 biblioteca (lançador fixo + mapa), abas, plugin | `dc/library.py`, `dc/launch.py`, `dc/tabs.py`, `dc/plugin_bridge.py`, `dc/steam.py`, `decky-plugin/` |
+| M2 biblioteca (lançador fixo + mapa), abas, plugin | `dc/library.py`, `dc/launch.py`, `dc/tabs.py`, `dc/plugin_bridge.py`, `dc/steam.py`, `dc/dedup.py`, `dc/remove.py`, `decky-plugin/` |
 | M2.5 capas | `dc/artwork.py` |
-| M3 emuladores, perfis, detecção | `dc/emulators.py`, `dc/adapters/` |
+| M3 emuladores, perfis, detecção, qualidade por jogo, controles | `dc/emulators.py`, `dc/adapters/`, `dc/quality.py`, `dc/controls.py` |
 | M4 Telegram, torrents, /sync, energia | `dc/bot.py`, `dc/qbt.py`, `dc/content.py`, `dc/syncer.py`, `dc/safe_extract.py`, `dc/power.py` |
 | M5 traduções IPS/BPS/UPS | `dc/patches.py` |
 | M6/M7/M20/M21/M10.1 | `dc/health.py` |

@@ -108,6 +108,8 @@ def ingest(content: Path, console: Optional[str], roms_root: Path, quarantine_ro
             if f.suffix.lower() in ARCHIVES:
                 try:
                     out = safe_extract.extract_any(f, staging / f.stem)
+                except safe_extract.NoSpace as e:
+                    return SyncItem(name, console, "no_space", note=f"{e} — libere espaço (/disk); tento de novo sozinho")
                 except safe_extract.UnsafeArchive as e:
                     q = quarantine(f, quarantine_root, f"arquivo suspeito no /sync: {e}")
                     return SyncItem(name, console, "quarantined", note=f"{e} (em {q.name})")

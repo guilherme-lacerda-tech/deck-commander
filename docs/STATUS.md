@@ -1,4 +1,4 @@
-# Estado do projeto (v0.3.0)
+# Estado do projeto (v0.4.0)
 
 Validado num Steam Deck LCD (SteamOS 3.9.5). 113 testes automatizados (CI no GitHub + timer semanal no Deck).
 
@@ -9,8 +9,8 @@ Validado num Steam Deck LCD (SteamOS 3.9.5). 113 testes automatizados (CI no Git
 | M18+M19 Operation Store | ✅ | lock com reentrância segura (validado com reboot real), aprovação 1 h, `db verify` |
 | M27 Contratos | ✅ | 21 contratos, validação no CI |
 | M1 Plugins | ✅ parcial | dono por função documentado, `plugins.lock`; instalar plugins do Decky é manual (não há CLI oficial) |
-| M2 Biblioteca | ✅ | lançador fixo + mapa, plugin ao vivo, autocorreção, coleções/abas por console e por loja, capas |
-| M3 Qualidade | ✅ parcial | 10 consoles; perfis com read-back (DuckStation, PCSX2, Dolphin, PPSSPP, RetroArch); respeita ajuste manual. Shader/aspect ratio por emulador ainda não mapeados |
+| M2 Biblioteca | ✅ | lançador fixo + mapa, plugin ao vivo, autocorreção que respeita remoção, coleções/abas por console e por loja, capas, duplicatas (antes de baixar, no /sync e /duplicados + /remover) |
+| M3 Qualidade | ✅ parcial | 10 consoles; perfis com read-back; respeita ajuste manual; **resolução por jogo** (/qualidade); verificação de controles. Shader/aspect ratio por emulador e mapeamento automático do Dolphin ainda não |
 | M4 Telegram/torrent | ✅ | console por texto, .torrent/magnet, /sync automático com nova tentativa, .zip/.7z/.rar seguros, multidisco, energia com histerese |
 | M5 Traduções | ✅ parcial | IPS/BPS/UPS nativos com CRC; XDelta e instaladores .exe são detectados e recusados |
 | M6 Saves | ✅ | 4 tipos, backup diário, import que nunca sobrescreve em conflito |

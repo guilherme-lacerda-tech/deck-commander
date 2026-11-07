@@ -58,6 +58,10 @@ class IniDoc:
                 self.lines[-1] += "\n"
             self.lines += [f"[{section}]\n", f"{key} = {value}\n"]
 
+    def delete(self, section: str, key: str) -> None:
+        i = self._find(section, key)
+        if i is not None:
+            del self.lines[i]
 
     def set(self, section: str, key: str, value: str) -> None:
         i = self._find(section, key)

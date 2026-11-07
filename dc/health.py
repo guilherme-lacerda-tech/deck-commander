@@ -304,6 +304,22 @@ def diagnose(paths: Paths, store: Store, repair: bool = False) -> list[Finding]:
     f.append(Finding("db", "ask", not div, json.dumps(div) if div else "ok", "dc db index (usuário decide)" if div else ""))
     f.append(Finding("steam-sem-db", "ask", not rep["shortcut_untracked"],
                      f"{rep['shortcut_untracked'][:5]}" if rep["shortcut_untracked"] else "ok"))
+    # 11 controles sem mapeamento / 12 jogos duplicados
+    try:
+        from . import controls
+        bad_c = [c for c in controls.check() if not c.ok]
+        f.append(Finding("controles", "alert", not bad_c, "; ".join(f"{c.emulator}: {c.detail}" for c in bad_c) or "ok"))
+    except Exception as e:  # noqa: BLE001
+        f.append(Finding("controles", "alert", False, f"não consegui verificar: {e}"))
+    try:
+        from . import dedup
+        lm = json.loads((paths.data / "launch-map.json").read_text("utf-8"))
+        dups = dedup.library_dups(lm)
+        f.append(Finding("duplicatas", "ask", not dups,
+                         "; ".join(" = ".join(lm[g]["title"] for g in grp) for grp in dups[:5]) or "ok",
+                         "/duplicados mostra e /remover limpa (com confirmação)" if dups else ""))
+    except (OSError, ValueError):
+        pass
     # 9 Decky sumiu
     decky = (H / "homebrew/services/PluginLoader").exists()
     f.append(Finding("decky", "alert", decky, "ok" if decky else "Decky Loader sumiu (update do SteamOS?) — reinstalar manualmente"))

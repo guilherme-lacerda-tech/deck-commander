@@ -92,9 +92,9 @@ class Qbt:
         if hashes:
             self._req("torrents/start" if self.v5 else "torrents/resume", {"hashes": "|".join(hashes)})
 
-    def delete(self, h: str) -> None:
-        """Remove só o torrent da lista (os arquivos ficam)."""
-        self._req("torrents/delete", {"hashes": h, "deleteFiles": "false"})
+    def delete(self, h: str, delete_files: bool = False) -> None:
+        """Remove o torrent da lista. Arquivos só são apagados com delete_files=True (pedido explícito)."""
+        self._req("torrents/delete", {"hashes": h, "deleteFiles": "true" if delete_files else "false"})
 
 
 DONE_STATES = {"uploading", "stalledUP", "pausedUP", "stoppedUP", "queuedUP", "forcedUP", "checkingUP"}

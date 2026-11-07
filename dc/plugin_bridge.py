@@ -100,6 +100,11 @@ def collect(paths: Paths, store: Store) -> list[str]:
     return errors
 
 
+def known(paths: Paths) -> list[str]:
+    """game_ids que o plugin já criou ou que foram removidos de propósito."""
+    return [g for g, v in _load(done_path(paths), {}).items() if v.get("appid") or v.get("removed")]
+
+
 def pending(paths: Paths) -> list[str]:
     done = _load(done_path(paths), {})
     return [x["game_id"] for x in _load(queue_path(paths), []) if x["game_id"] not in done]

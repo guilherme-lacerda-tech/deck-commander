@@ -18,7 +18,11 @@ Tudo roda a partir de `~/deck-commander` (Konsole no modo Desktop, ou SSH).
 | `python3 -m dc artwork` | baixa capas do SteamGridDB (não sobrescreve as suas) |
 | `python3 -m dc x configure [--apply]` | perfil equilibrado em Dolphin/PPSSPP/RetroArch (respeita ajustes manuais) |
 | `python3 -m dc x profile <ps1\|ps2> <economico\|equilibrado\|desempenho> [--apply] [--force]` | perfil de qualidade no DuckStation/PCSX2 (recusa sobrescrever ajuste manual sem --force) |
-| `python3 -m dc x dedup` | lista cópias idênticas de ROMs (só sugere, nunca apaga) |
+| `python3 -m dc x dedup` | lista cópias idênticas de ROMs byte a byte (só sugere, nunca apaga) |
+| `python3 -m dc x duplicados` | jogos repetidos na biblioteca (mesmo jogo em outra versão/região/arquivo) |
+| `python3 -m dc x remover <game_id ou nome> [--confirm]` | tira um jogo: atalho, mapa, arquivos → quarentena, download (sem `--confirm` só mostra o plano) |
+| `python3 -m dc x qualidade [<jogo> nativo\|2x\|3x\|4x\|padrão]` | resolução só daquele jogo (sem argumentos lista os ajustes) |
+| `python3 -m dc x controles [labels\|positional]` | situação dos controles; troca o layout de botões do Switch (labels = A=A) |
 | `python3 -m dc x tabs` | regera as abas do TabMaster |
 | `python3 -m dc x patch <rom> <patch>` | aplica tradução IPS/BPS/UPS numa cópia "(patch)" |
 | `python3 -m dc x steam-restart` | reinicia o Steam (recusa se houver jogo aberto; só necessário sem o plugin) |

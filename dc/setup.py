@@ -270,6 +270,9 @@ def setup(paths: Paths, modules: list[str], dev: bool = False, downloads: bool =
         flatpak_overrides(log)
         for l in emulators.configure(apply=True):
             log.append("config " + l)
+        from . import controls, syncer
+        for l in controls.switch_layout(syncer._cfg(paths).get("switch_buttons", "labels")):
+            log.append("controle " + l)
     if "M2" in wanted:
         setup_plugin(log)
     if "M4" in wanted:

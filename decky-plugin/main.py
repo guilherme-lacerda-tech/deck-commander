@@ -18,6 +18,7 @@ BASE = os.path.join(HOME, ".local/share/deck-commander")
 QUEUE = os.path.join(BASE, "plugin-queue.json")
 DONE = os.path.join(BASE, "plugin-done.json")
 ITEMS = os.path.join(BASE, "plugin-items.json")  # escrito pelo Deck Commander e pelo plugin
+REMOVE = os.path.join(BASE, "plugin-remove.json")  # pedidos de remoção (/remover no bot)
 
 
 def _load(path, default):
@@ -42,7 +43,7 @@ class Plugin:
 
     async def get_done(self):
         items = _load(ITEMS, {})
-        return {k: {**v, "item": items.get(k)} for k, v in _load(DONE, {}).items()}
+        return {k: {**v, "item": items.get(k)} for k, v in _load(DONE, {}).items() if not v.get("removed")}
 
     async def remember_item(self, game_id, item):
         """Guarda o item para a autocorreção poder recriar o atalho se ele sumir."""
@@ -57,6 +58,23 @@ class Plugin:
         _save(DONE, done)
         if not error:
             _save(QUEUE, [q for q in _load(QUEUE, []) if q.get("game_id") != game_id])
+        return True
+
+    async def get_removals(self):
+        return _load(REMOVE, [])
+
+    async def removal_done(self, game_id, appid):
+        _save(REMOVE, [r for r in _load(REMOVE, []) if not (r.get("game_id") == game_id and r.get("appid") == appid)])
+        return await self.mark_removed(game_id)
+
+    async def mark_removed(self, game_id):
+        """Atalho removido (pelo /remover ou pelo usuário no Steam): a autocorreção não recria."""
+        done = _load(DONE, {})
+        done[game_id] = {"appid": 0, "error": "", "removed": True}
+        _save(DONE, done)
+        items = _load(ITEMS, {})
+        if items.pop(game_id, None) is not None:
+            _save(ITEMS, items)
         return True
 
     async def read_art(self, path):
@@ -82,6 +100,7 @@ class Plugin:
         done = _load(DONE, {})
         return {"pending": len(await self.get_pending()),
                 "added": sum(1 for v in done.values() if v.get("appid")),
+                "removed": sum(1 for v in done.values() if v.get("removed")),
                 "errors": [k for k, v in done.items() if v.get("error")][-5:]}
 
     async def _main(self):

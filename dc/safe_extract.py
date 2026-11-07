@@ -23,6 +23,10 @@ class UnsafeArchive(ValueError):
     pass
 
 
+class NoSpace(OSError):
+    """Falta espaço em disco. NÃO é arquivo suspeito: nada vai para a quarentena; tenta de novo depois."""
+
+
 class ExtractionCancelled(RuntimeError):
     pass
 
@@ -106,7 +110,7 @@ def extract(archive: Path, dest: Path, limits: Limits = Limits(),
     dest.parent.mkdir(parents=True, exist_ok=True)
     free = shutil.disk_usage(dest.parent).free
     if free < declared * limits.free_space_margin:
-        raise UnsafeArchive(f"espaço insuficiente: precisa {declared} B, livre {free} B")
+        raise NoSpace(f"espaço insuficiente: precisa {declared / 1e9:.1f} GB, livre {free / 1e9:.1f} GB")
 
     tmp = dest.parent / f".dc-extract-{uuid.uuid4().hex[:8]}"
     tmp.mkdir()
@@ -207,7 +211,7 @@ def extract_external(archive: Path, dest: Path, limits: Limits = Limits()) -> li
     dest.parent.mkdir(parents=True, exist_ok=True)
     free = shutil.disk_usage(dest.parent).free
     if free < declared * limits.free_space_margin:
-        raise UnsafeArchive(f"espaço insuficiente: precisa {declared} B, livre {free} B")
+        raise NoSpace(f"espaço insuficiente: precisa {declared / 1e9:.1f} GB, livre {free / 1e9:.1f} GB")
     tmp = dest.parent / f".dc-extract-{uuid.uuid4().hex[:8]}"
     tmp.mkdir()
     try:

@@ -59,7 +59,14 @@ O instalador é idempotente (pode rodar de novo para atualizar) e mostra o que f
 2. Encaminhe o arquivo `.torrent` ou cole o link magnet.
 3. Pronto. Quando o download terminar, o bot avisa e o jogo aparece na aba do console, com capa.
 
-Outros comandos: `/status` · `/queue` · `/pause` · `/resume` · `/disk` · `/diagnostico` · `/sos` · `/help`.
+Baixou repetido? O bot avisa **antes** de baixar (responda `/baixar` se quiser mesmo assim). Para limpar o que já
+está repetido: `/duplicados` e `/remover <nº>` (pede confirmação; os arquivos ficam 30 dias na quarentena).
+Removeu um jogo pelo próprio Steam? Ele não volta sozinho.
+
+Jogo pesado ou com gráfico estranho? `/qualidade <jogo> nativo|2x|3x` muda a resolução só daquele jogo —
+veja [docs/QUALIDADE-E-CONTROLES.md](docs/QUALIDADE-E-CONTROLES.md).
+
+Outros comandos: `/status` · `/queue` · `/pause` · `/resume` · `/disk` · `/diagnostico` · `/controles` · `/sos` · `/help`.
 
 **Pelo terminal:** veja [docs/COMANDOS.md](docs/COMANDOS.md).
 

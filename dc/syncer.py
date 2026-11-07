@@ -17,9 +17,11 @@ from . import backup, content, library, ops, vdf
 from .lock import OperationLock
 from .paths import Paths
 from .qbt import DONE_STATES, Qbt
+from .quarantine import quarantine
 from .store import Store
 
 TIMEOUT_S = 300
+LAST_CONFLICTS: list[str] = []  # jogos não adicionados por já existir atalho manual com o mesmo nome
 
 
 def _cfg(paths: Paths) -> dict:
@@ -63,6 +65,7 @@ def add_to_steam(paths: Paths, store: Store, op: str) -> list[str]:
     sc = shortcuts_path()
     launcher = library.launcher_path(Path.home())
     pl = library.plan(vdf.read_shortcuts(sc), games, launcher)
+    LAST_CONFLICTS[:] = pl.name_conflicts
     if not pl.add:
         library.write_map(paths.data / "launch-map.json", games)
         return []
@@ -70,7 +73,8 @@ def add_to_steam(paths: Paths, store: Store, op: str) -> list[str]:
     if plugin_bridge.installed():  # ao vivo: o plugin cria o atalho e aplica as capas (sem reiniciar)
         library.write_launcher(Path.home(), Path(__file__).resolve().parents[1])
         library.write_map(paths.data / "launch-map.json", games)
-        busy = set(plugin_bridge.pending(paths))
+        # na fila, já criado (ainda não gravado em disco pelo Steam) ou removido pelo usuário: não reenvia
+        busy = set(plugin_bridge.pending(paths)) | set(plugin_bridge.known(paths))
         rows = [r for r in pl.add if r["LaunchOptions"] not in busy]
         plugin_bridge.enqueue(paths, rows)
         return [r["AppName"] for r in rows]
@@ -95,6 +99,24 @@ def add_to_steam(paths: Paths, store: Store, op: str) -> list[str]:
     return [r["AppName"] for r in pl.add]
 
 
+def _duplicate_of(paths: Paths, item) -> str | None:
+    """O jogo recém-chegado já existe na biblioteca (mesma identidade)? Devolve o título existente."""
+    from . import dedup
+    lm_p = paths.data / "launch-map.json"
+    try:
+        lm = json.loads(lm_p.read_text("utf-8"))
+    except (OSError, ValueError):
+        return None
+    for f in item.files:
+        k = dedup.match_key(library.clean_title(Path(f).stem), item.console, f)
+        for gid, e in lm.items():
+            if e.get("removed") or e.get("rom") in item.files:
+                continue
+            if dedup.same_game(k, dedup.match_key(e.get("title", gid), e.get("console"), e.get("rom", "")))                     and Path(e.get("rom", "")).exists():
+                return e.get("title", gid)
+    return None
+
+
 def run_sync(paths: Paths, store: Store, qbt: Qbt | None, confirm_many: bool = False,
              explicit: dict | None = None) -> str:
     cfg = _cfg(paths)
@@ -109,19 +131,33 @@ def run_sync(paths: Paths, store: Store, qbt: Qbt | None, confirm_many: bool = F
     op = store.enqueue("sync", {"confirm_many": confirm_many})
     store.claim_next()
     t0 = time.monotonic()
-    lines, added_files = [], 0
+    lines, added_files, arrived = [], 0, set()
     try:
         with OperationLock(paths.lock, op, "sync", is_running=store.is_running):
             torrents = qbt.torrents() if qbt else []
-            for t in torrents:
-                if t["hash"] in st["ingested"] or t.get("state") not in DONE_STATES:
-                    continue
+            todo = [t for t in torrents if t["hash"] not in st["ingested"] and t.get("state") in DONE_STATES]
+            for n, t in enumerate(todo):
                 if time.monotonic() - t0 > TIMEOUT_S:
-                    raise TimeoutError("/sync passou de 5 minutos")
+                    if n == 0:  # nada andou em 5 min: aí sim é travamento
+                        raise TimeoutError("/sync passou de 5 minutos")
+                    lines.append(f"⏳ {len(todo) - n} download(s) ficam para a próxima rodada (extração demorada).")
+                    break
                 forced = (explicit or {}).get(t["hash"])
                 item = content.ingest(Path(t["content_path"]), forced or t.get("category") or None,
                                       Path(cfg["roms_root"]), paths.quarantine, paths.state / "work",
                                       confirm_many=confirm_many)
+                dup = _duplicate_of(paths, item) if item.status == "added" else None
+                if dup:
+                    folder = Path(item.files[0])
+                    while folder.parent.name != item.console and folder.parent != folder:
+                        folder = folder.parent
+                    q = quarantine(folder if folder.parent.name == item.console else Path(item.files[0]),
+                                   paths.quarantine, f"duplicata de «{dup}» (download {t['name']})")
+                    st["ingested"][t["hash"]] = {"name": t["name"], "duplicate_of": dup, "quarantine": str(q)}
+                    lines.append(f"♻️ {t['name']}: você já tem «{dup}» — não criei outro atalho. "
+                                 f"A cópia nova ficou na quarentena ({q.name}); /duplicados mostra como limpar.")
+                    _save_state(paths, st)
+                    continue
                 if item.status == "added":
                     st["ingested"][t["hash"]] = {"name": t["name"], "files": item.files}
                     with store.tx() as c:
@@ -130,6 +166,7 @@ def run_sync(paths: Paths, store: Store, qbt: Qbt | None, confirm_many: bool = F
                             c.execute("INSERT OR REPLACE INTO files(path,size,mtime,origin,origin_ref,integrity)"
                                       " VALUES(?,?,?,?,?,?)", (f, s.st_size, s.st_mtime, "torrent", t["hash"], item.integrity))
                     added_files += len(item.files)
+                    arrived |= {library.clean_title(Path(f).stem).casefold() for f in item.files}
                     lines.append(f"✅ {t['name']} → {item.console}" + (f" ({item.note})" if item.note else "")
                                  + " · não verificado (sem referência de hash)")
                 elif item.status == "ask_console":
@@ -142,12 +179,17 @@ def run_sync(paths: Paths, store: Store, qbt: Qbt | None, confirm_many: bool = F
                     lines.append(f"⛔ {t['name']}: quarentena — {item.note}")
                 else:
                     lines.append(f"⚠️ {t['name']}: {item.note}")
+                _save_state(paths, st)  # cada download concluído fica registrado na hora (nunca entra 2x)
             new = add_to_steam(paths, store, op)
         st["timeouts"] = 0
         st["last_sync"] = datetime.now(timezone.utc).isoformat()
         _save_state(paths, st)
         store.finish(op, True, result={"files": added_files, "shortcuts": len(new)})
         head = f"{len(new)} jogo(s) novo(s) no Steam" + (": " + ", ".join(new[:10]) if new else "")
+        fresh = [c for c in LAST_CONFLICTS if c.casefold() in arrived]
+        for c in fresh:
+            lines.append(f"⚠️ «{c}» não ganhou atalho: já existe um atalho seu com esse nome no Steam "
+                         "(feito à mão?). Apague o antigo no Steam e mande /sync.")
         from . import plugin_bridge
         if new and plugin_bridge.installed():
             tail = "\n✨ Aparecem na biblioteca em ~10 segundos, já com capa (sem reiniciar)."

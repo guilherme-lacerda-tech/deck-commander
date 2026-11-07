@@ -165,6 +165,46 @@ def _extra(paths, args) -> int:
             for f in v:
                 print("   ", f)
         print(f"{len(dups)} grupo(s) de duplicatas. Nada foi apagado.")
+    elif c == "duplicados":
+        from . import dedup
+        lm = json.loads((paths.data / "launch-map.json").read_text("utf-8"))
+        for grp in dedup.library_dups(lm):
+            print("mesmo jogo:")
+            for g in grp:
+                print(f"    {g}  ->  {lm[g]['rom']}")
+        print("Para remover um:  python3 -m dc x remover <game_id>   (mostra o plano; --confirm executa)")
+    elif c == "remover" and r:
+        from . import remove
+        from .qbt import Qbt
+        lm = json.loads((paths.data / "launch-map.json").read_text("utf-8"))
+        hits = [r[0]] if r[0] in lm else remove.find(lm, " ".join(x for x in r if x != "--confirm"))
+        if len(hits) != 1:
+            print("seja mais específico:" if hits else "não achei esse jogo", *hits, sep="
+  "); return 1
+        rp = remove.plan(paths, hits[0], syncer.rom_roots())
+        print(rp.describe())
+        if "--confirm" not in r:
+            print("(nada foi feito; repita com --confirm)"); return 0
+        print("
+".join(remove.apply(paths, _store(paths), rp, Qbt())))
+    elif c == "qualidade":
+        from . import quality, remove
+        lm = json.loads((paths.data / "launch-map.json").read_text("utf-8"))
+        if not r:
+            print("
+".join(quality.listing(paths, lm)) or "nenhum jogo com qualidade própria"); return 0
+        hits = remove.find(lm, " ".join(r[:-1]))
+        if len(hits) != 1:
+            print("seja mais específico:" if hits else "não achei esse jogo", *hits, sep="
+  "); return 1
+        print(lm[hits[0]]["title"] + ": " + quality.set_override(paths, hits[0], lm[hits[0]]["console"], r[-1]))
+    elif c == "controles":
+        from . import controls
+        if r and r[0] in ("labels", "positional"):
+            print("
+".join(controls.switch_layout(r[0])) or "já estava assim")
+        for x in controls.check():
+            print(("ok  " if x.ok else "!!  ") + f"{x.emulator}: {x.detail}")
     elif c == "telegram-pair":
         from .bot import pair_code
         print("Código de pareamento (mande  /start CODIGO  para o seu bot):", pair_code(paths))

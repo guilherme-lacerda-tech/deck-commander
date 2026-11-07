@@ -2,7 +2,8 @@
 // Cria atalhos ao vivo com a API interna do Steam (a mesma do "Adicionar jogo não-Steam"), aplica as
 // capas, mantém as coleções por console/loja (o TabMaster acompanha coleções ao vivo) e se autocorrige:
 // se um atalho que ele criou sumir (ex.: reinício antes de o Steam gravar), ele recria sozinho.
-// Nunca remove nem altera atalhos que não foram criados por ele.
+// Se VOCÊ remover um atalho dele pelo Steam (estava lá nesta sessão e sumiu), isso é respeitado: não volta.
+// Só remove atalhos criados por ele, e só quando pedido (/remover no bot).
 const manifest = {"name":"Deck Commander"};
 const conn = window.__DECKY_SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED_deckyLoaderAPIInit;
 if (!conn) {
@@ -31,6 +32,7 @@ let timer = null;
 let loadedAt = Date.now();
 let lastLog = [];
 const addedThisSession = new Set(); // trava contra duplicação: nunca cria o mesmo jogo 2x na sessão
+const seenThisSession = new Set();  // AppIDs vistos existindo nesta sessão (sumiu depois = remoção do usuário)
 
 function note(msg) {
     lastLog = [new Date().toLocaleTimeString() + " " + msg, ...lastLog].slice(0, 8);
@@ -76,8 +78,9 @@ async function processQueue() {
     for (const it of items) {
         if (addedThisSession.has(it.game_id)) continue;
         try {
-            const appid = await addOne(it);
+                const appid = await addOne(it);
             addedThisSession.add(it.game_id);
+            seenThisSession.add(appid);
             await call("report", it.game_id, appid, "");
             await remember(it);
             note("adicionado: " + it.name);
@@ -99,15 +102,39 @@ async function reconcile() {
     let done;
     try { done = (await call("get_done")) || {}; } catch (e) { return; } // backend antigo: sem autocorreção
     for (const [gid, v] of Object.entries(done)) {
-        if (!v.appid || !v.item || exists(v.appid)) continue;
+        if (!v.appid || !v.item) continue;
+        if (exists(v.appid)) { seenThisSession.add(v.appid); continue; }
+        if (seenThisSession.has(v.appid)) { // existia há pouco e sumiu: o usuário removeu pelo Steam
+            try { await call("mark_removed", gid); note("removido por você: " + v.item.name); } catch (e) { /* backend antigo */ }
+            continue;
+        }
         try {
             if (addedThisSession.has("re:" + gid)) continue;
             addedThisSession.add("re:" + gid);
             const appid = await addOne(v.item);
+            seenThisSession.add(appid);
             await call("report", gid, appid, "");
             note("recriado: " + v.item.name);
         } catch (e) {
             note("falha ao recriar " + gid + ": " + e);
+        }
+    }
+}
+
+// Remoções pedidas pelo /remover (só atalhos criados pelo Deck Commander: exe = dc-launch).
+async function processRemovals() {
+    let list;
+    try { list = (await call("get_removals")) || []; } catch (e) { return; } // backend antigo
+    for (const r of list) {
+        const ov = appStore.GetAppOverviewByAppID(r.appid);
+        try {
+            if (ov) SteamClient.Apps.RemoveShortcut(r.appid);
+            seenThisSession.delete(r.appid);
+            await call("removal_done", r.game_id, r.appid);
+            note("removido: " + (ov ? ov.display_name : r.game_id));
+            if (ov) toaster.toast({ title: "Deck Commander", body: ov.display_name + " removido da biblioteca" });
+        } catch (e) {
+            note("falha ao remover " + r.game_id + ": " + e);
         }
     }
 }
@@ -138,7 +165,7 @@ async function syncCollections() {
 async function cycle(force) {
     if (busy || (!force && !steamReady())) return;
     busy = true;
-    for (const [label, fn] of [["fila", processQueue], ["autocorreção", reconcile], ["coleções", syncCollections]]) {
+    for (const [label, fn] of [["remoções", processRemovals], ["fila", processQueue], ["autocorreção", reconcile], ["coleções", syncCollections]]) {
         try {
             await fn();
         } catch (e) {

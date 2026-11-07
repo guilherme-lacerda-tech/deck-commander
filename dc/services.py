@@ -63,7 +63,16 @@ def power_loop(paths: Paths, interval: float = 30) -> None:
         except Exception as e:  # noqa: BLE001
             _log(paths, "worker", f"plugin: {e}")
         # fila: roda operações pendentes (ex.: /sync enfileirado durante jogo) quando o jogo fecha
-        if not ops.game_running() and not ops.in_safe_mode(paths):
+        running = ops.game_running()
+        if not running:  # qualidade por jogo: devolve o valor global se o jogo foi fechado à força
+            try:
+                from . import quality
+                msg = quality.restore(paths)
+                if msg:
+                    _log(paths, "worker", f"qualidade: {msg}")
+            except Exception as e:  # noqa: BLE001
+                _log(paths, "worker", f"qualidade: {e}")
+        if not running and not ops.in_safe_mode(paths):
             from . import syncer
             for op in store.list(("pending",)):
                 if op.type == "sync":
