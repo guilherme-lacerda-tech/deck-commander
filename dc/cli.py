@@ -179,30 +179,25 @@ def _extra(paths, args) -> int:
         lm = json.loads((paths.data / "launch-map.json").read_text("utf-8"))
         hits = [r[0]] if r[0] in lm else remove.find(lm, " ".join(x for x in r if x != "--confirm"))
         if len(hits) != 1:
-            print("seja mais específico:" if hits else "não achei esse jogo", *hits, sep="
-  "); return 1
+            print("seja mais específico:" if hits else "não achei esse jogo", *hits, sep="\n  "); return 1
         rp = remove.plan(paths, hits[0], syncer.rom_roots())
         print(rp.describe())
         if "--confirm" not in r:
             print("(nada foi feito; repita com --confirm)"); return 0
-        print("
-".join(remove.apply(paths, _store(paths), rp, Qbt())))
+        print("\n".join(remove.apply(paths, _store(paths), rp, Qbt())))
     elif c == "qualidade":
         from . import quality, remove
         lm = json.loads((paths.data / "launch-map.json").read_text("utf-8"))
         if not r:
-            print("
-".join(quality.listing(paths, lm)) or "nenhum jogo com qualidade própria"); return 0
+            print("\n".join(quality.listing(paths, lm)) or "nenhum jogo com qualidade própria"); return 0
         hits = remove.find(lm, " ".join(r[:-1]))
         if len(hits) != 1:
-            print("seja mais específico:" if hits else "não achei esse jogo", *hits, sep="
-  "); return 1
+            print("seja mais específico:" if hits else "não achei esse jogo", *hits, sep="\n  "); return 1
         print(lm[hits[0]]["title"] + ": " + quality.set_override(paths, hits[0], lm[hits[0]]["console"], r[-1]))
     elif c == "controles":
         from . import controls
         if r and r[0] in ("labels", "positional"):
-            print("
-".join(controls.switch_layout(r[0])) or "já estava assim")
+            print("\n".join(controls.switch_layout(r[0])) or "já estava assim")
         for x in controls.check():
             print(("ok  " if x.ok else "!!  ") + f"{x.emulator}: {x.detail}")
     elif c == "telegram-pair":

@@ -112,7 +112,8 @@ def _duplicate_of(paths: Paths, item) -> str | None:
         for gid, e in lm.items():
             if e.get("removed") or e.get("rom") in item.files:
                 continue
-            if dedup.same_game(k, dedup.match_key(e.get("title", gid), e.get("console"), e.get("rom", "")))                     and Path(e.get("rom", "")).exists():
+            if dedup.same_game(k, dedup.match_key(e.get("title", gid), e.get("console"), e.get("rom", ""))) \
+                    and Path(e.get("rom", "")).exists():
                 return e.get("title", gid)
     return None
 
