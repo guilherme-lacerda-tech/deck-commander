@@ -106,3 +106,65 @@ def switch_layout(mode: str = "labels", home: Path = H) -> list[str]:
             os.replace(tmp, p)
             log.append(f"{p}: botões do Switch por {'rótulo (A=A)' if mode == 'labels' else 'posição'}")
     return log
+
+
+# Dolphin: nomes de entrada SDL conferidos no binário do Dolphin 2609 (Button S/E/W/N, Pad N…, Left X+…,
+# Trigger L+…). No modo jogo o Steam Input entrega o "Steam Virtual Gamepad" (nome visto pelo SDL,
+# confirmado no Ryujinx do Deck de teste).
+DOLPHIN_DEVICE = "SDL/0/Steam Virtual Gamepad"
+_GC = {
+    "Buttons/A": "`Button S`", "Buttons/B": "`Button W`", "Buttons/X": "`Button E`", "Buttons/Y": "`Button N`",
+    "Buttons/Z": "`Shoulder R`", "Buttons/Start": "Start",
+    "Main Stick/Up": "`Left Y-`", "Main Stick/Down": "`Left Y+`", "Main Stick/Left": "`Left X-`", "Main Stick/Right": "`Left X+`",
+    "C-Stick/Up": "`Right Y-`", "C-Stick/Down": "`Right Y+`", "C-Stick/Left": "`Right X-`", "C-Stick/Right": "`Right X+`",
+    "Triggers/L": "`Trigger L+`", "Triggers/R": "`Trigger R+`", "Triggers/L-Analog": "`Trigger L+`", "Triggers/R-Analog": "`Trigger R+`",
+    "D-Pad/Up": "`Pad N`", "D-Pad/Down": "`Pad S`", "D-Pad/Left": "`Pad W`", "D-Pad/Right": "`Pad E`",
+}
+_WII = {  # Wii Remote + Nunchuk (o formato da maioria dos jogos); apontar = analógico direito
+    "Buttons/A": "`Button S`", "Buttons/B": "`Trigger R+`", "Buttons/1": "`Button W`", "Buttons/2": "`Button N`",
+    "Buttons/-": "Back", "Buttons/+": "Start", "Buttons/Home": "`Thumb R`",
+    "D-Pad/Up": "`Pad N`", "D-Pad/Down": "`Pad S`", "D-Pad/Left": "`Pad W`", "D-Pad/Right": "`Pad E`",
+    "IR/Up": "`Right Y-`", "IR/Down": "`Right Y+`", "IR/Left": "`Right X-`", "IR/Right": "`Right X+`",
+    "Shake/X": "`Button E`", "Shake/Y": "`Button E`", "Shake/Z": "`Button E`",
+    "Extension": "Nunchuk",
+    "Nunchuk/Buttons/C": "`Shoulder L`", "Nunchuk/Buttons/Z": "`Trigger L+`",
+    "Nunchuk/Stick/Up": "`Left Y-`", "Nunchuk/Stick/Down": "`Left Y+`",
+    "Nunchuk/Stick/Left": "`Left X-`", "Nunchuk/Stick/Right": "`Left X+`",
+    "Source": "1",
+}
+
+
+def _dolphin_dir(home: Path) -> Path:
+    return home / ".var/app/org.DolphinEmu.dolphin-emu/config/dolphin-emu"
+
+
+def dolphin_defaults(home: Path = H) -> list[str]:
+    """Mapeia o controle do Deck no Dolphin (GameCube porta 1 e Wii Remote 1) SÓ se ainda estiver no
+    padrão de fábrica (teclado/mouse). Mapeamento feito por você nunca é tocado. Guarda .dc-orig."""
+    log = []
+    d = _dolphin_dir(home)
+    if not d.exists():
+        return log
+    for fname, section, keys in (("GCPadNew.ini", "GCPad1", _GC), ("WiimoteNew.ini", "Wiimote1", _WII)):
+        p = d / fname
+        text = p.read_text("utf-8", "replace") if p.exists() else ""
+        if _ini_has(p, section, r"Device\s*=\s*(SDL|evdev)/"):
+            continue  # já tem controle: respeita
+        # remove só a seção do jogador 1 e reescreve; as outras seções ficam como estavam
+        out, skip = [], False
+        for ln in text.splitlines():
+            m = re.match(r"\s*\[(.+?)\]", ln)
+            if m:
+                skip = m.group(1) == section
+            if not skip:
+                out.append(ln)
+        block = [f"[{section}]", f"Device = {DOLPHIN_DEVICE}"] + [f"{k} = {v}" for k, v in keys.items()]
+        if p.exists():
+            orig = p.with_name(p.name + ".dc-orig")
+            if not orig.exists():
+                orig.write_bytes(p.read_bytes())
+        tmp = p.with_name(p.name + ".dc-tmp")
+        tmp.write_text("\n".join(block + out) + "\n", "utf-8")
+        os.replace(tmp, p)
+        log.append(f"{fname}: controle do Deck mapeado no jogador 1 (original em {fname}.dc-orig)")
+    return log

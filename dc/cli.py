@@ -196,7 +196,9 @@ def _extra(paths, args) -> int:
         print(lm[hits[0]]["title"] + ": " + quality.set_override(paths, hits[0], lm[hits[0]]["console"], r[-1]))
     elif c == "controles":
         from . import controls
-        if r and r[0] in ("labels", "positional"):
+        if r and r[0] == "dolphin":
+            print("\n".join(controls.dolphin_defaults()) or "Dolphin já tinha controle mapeado (não mexi)")
+        elif r and r[0] in ("labels", "positional"):
             print("\n".join(controls.switch_layout(r[0])) or "já estava assim")
         for x in controls.check():
             print(("ok  " if x.ok else "!!  ") + f"{x.emulator}: {x.detail}")

@@ -273,6 +273,8 @@ def setup(paths: Paths, modules: list[str], dev: bool = False, downloads: bool =
         from . import controls, syncer
         for l in controls.switch_layout(syncer._cfg(paths).get("switch_buttons", "labels")):
             log.append("controle " + l)
+        for l in controls.dolphin_defaults():
+            log.append("controle " + l)
     if "M2" in wanted:
         setup_plugin(log)
     if "M4" in wanted:
