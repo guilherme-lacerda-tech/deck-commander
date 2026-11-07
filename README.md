@@ -66,7 +66,10 @@ Removeu um jogo pelo próprio Steam? Ele não volta sozinho.
 Jogo pesado ou com gráfico estranho? `/qualidade <jogo> nativo|2x|3x` muda a resolução só daquele jogo —
 veja [docs/QUALIDADE-E-CONTROLES.md](docs/QUALIDADE-E-CONTROLES.md).
 
-Outros comandos: `/status` · `/queue` · `/pause` · `/resume` · `/disk` · `/diagnostico` · `/controles` · `/sos` · `/help`.
+Na bateria os downloads esperam a tomada (o bot avisa); `/bateria sim` libera. Depois de baixar, o compartilhamento
+(seeding) para em razão 1.0 ou 60 min, para não gastar o pacote de dados.
+
+Outros comandos: `/status` · `/queue` · `/pause` · `/resume` · `/disk` · `/diagnostico` · `/controles` · `/bateria` · `/sos` · `/help`.
 
 **Pelo terminal:** veja [docs/COMANDOS.md](docs/COMANDOS.md).
 

@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.4.2 — 2026-11-07 (revisão para uso longe do PC)
+- **Safe-mode nunca derruba o bot** (antes, entrar em safe-mode desligava o próprio bot e o `/sos off` ficava
+  impossível de longe) e o `/sos off` religa exatamente o que desligou — antes o qBittorrent ficava parado.
+  O bot avisa quando o safe-mode liga sozinho. Teste semanal só conta falha real (pytest ausente não conta).
+- Jogo que não abre mostra o **motivo na tela** (cartão SD fora, jogo removido, emulador ausente).
+- Plugin: jogo removido e baixado de novo na mesma sessão volta a aparecer (antes ficava escondido até reiniciar).
+- Atualizar o plugin não exige mais reiniciar: o instalador pede ao Decky para recarregá-lo.
+- Energia: download novo também pausa na bateria (antes baixava), o bot avisa, `/bateria sim|nao`;
+  pausa que sobrou de antes de um reinício é retomada no carregador.
+- Seeding limitado (razão 1.0 ou 60 min) para não gastar o pacote de dados do celular.
+- Decky fora do ar (update do SteamOS): o `/sync` percebe e usa o caminho sem plugin (+ `/reiniciar`).
+- Dolphin (GameCube/Wii) mapeado no controle do Deck quando ainda estava no teclado.
+- Qualidade por jogo devolve o arquivo do emulador byte a byte igual (conferido no Deck nos 6 consoles).
+- `dc x … --apply/--force/--confirm` voltaram a funcionar no terminal; `/remover` limpa também o banco.
+- Busca de jogo por palavras (`/qualidade shadow dub 2x`); `/duplicados` diz se a cópia está no SD ou na memória.
+- Serviços com `Restart=always`. Ferramentas de teste no aparelho: `tools/e2e_local.py`, `tools/quality_check.py`,
+  `tools/bot_dryrun.py`.
+
 ## 0.4.0 — 2026-11-06
 - **Duplicatas**: o bot confere antes de baixar (biblioteca e downloads em andamento; Switch pelo Title ID,
   demais pelo nome sem região/versão) e só baixa repetido com `/baixar`. O `/sync` não cria segundo atalho

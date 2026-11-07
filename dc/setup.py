@@ -208,7 +208,24 @@ def setup_plugin(log: list[str]) -> None:
             except PermissionError:
                 log.append(f"PLUGIN: sem permissão para atualizar {dst} — reinstale pelo ZIP {PLUGIN_ZIP}")
                 return
-    log.append("plugin já instalado" + (f"; atualizado ({', '.join(changed)}) — vale no próximo reinício" if changed else ", em dia"))
+    if not changed:
+        log.append("plugin já instalado, em dia")
+        return
+    log.append(f"plugin atualizado ({', '.join(changed)}); " + (
+        "recarregado agora, sem reiniciar" if reload_plugin() else "vale no próximo reinício"))
+
+
+def reload_plugin() -> bool:
+    """Pede ao Decky para recarregar o plugin (frontend e backend) — mesma coisa que reiniciar, sem reiniciar.
+    Usa o canal do próprio Decky dentro do Steam; se o Steam/Decky não estiver aberto, devolve False."""
+    import sys
+    expr = 'window.DeckyBackend.call("loader/reload_plugin", "Deck Commander").then(() => "recarregado")'
+    try:
+        r = subprocess.run([sys.executable, str(REPO / "tools/cef_eval.py"), expr], capture_output=True,
+                           text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return "recarregado" in r.stdout
 
 
 def write_plugins_lock(paths: Paths, log: list[str]) -> None:

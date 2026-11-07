@@ -1,6 +1,6 @@
-# Estado do projeto (v0.4.0)
+# Estado do projeto (v0.4.2)
 
-Validado num Steam Deck LCD (SteamOS 3.9.5). 113 testes automatizados (CI no GitHub + timer semanal no Deck).
+Validado num Steam Deck LCD (SteamOS 3.9.5). 180+ testes automatizados (CI no GitHub + timer semanal no Deck) e teste de ponta a ponta no próprio aparelho (`tools/e2e_local.py`: download → biblioteca ao vivo → duplicata → remoção).
 
 | Módulo (spec v5.1) | Estado | Observação |
 |---|---|---|
@@ -16,7 +16,7 @@ Validado num Steam Deck LCD (SteamOS 3.9.5). 113 testes automatizados (CI no Git
 | M6 Saves | ✅ | 4 tipos, backup diário, import que nunca sobrescreve em conflito |
 | M7 Disco | ✅ | top 10 + sugestões (nunca apaga) |
 | M20/M21 | ✅ | sensores com estado próprio; diagnóstico auto/ask/alert com limite de 3 tentativas |
-| M10 Status/testes | ✅ parcial | /status, painel local, testes semanais + relatório HTML. Benchmark (exige MangoHud e cenário fixo) e E2E automatizado: pendentes |
+| M10 Status/testes | ✅ parcial | /status, painel local, testes semanais + relatório HTML. E2E no aparelho (`tools/e2e_local.py`). Benchmark (exige MangoHud e cenário fixo): pendente |
 | M11/M12/M15/M16/M17 | ✅ | versão, updates (só avisa), instalador por módulo, uninstall com confirmação, recuperação, export sem segredos |
 | M8 Proton Pulse | ⛔ | plugin opcional não instalado no Deck de teste |
 | M9 Fork do Panel | ⛔ | depende do repositório oficial do Panel de Control |
