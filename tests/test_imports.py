@@ -35,3 +35,9 @@ def test_cli_new_commands_run(tmp_path, monkeypatch, capsys):
     assert cli.main(["x", "remover", "ps2-okami-usa"]) == 0  # sem --confirm: só o plano
     assert "nada foi feito" in capsys.readouterr().out
     assert cli.main(["x", "controles"]) == 0
+    # opções com "--" passam para os subcomandos (antes o argparse recusava)
+    (tmp_path / "b.iso").write_bytes(b"x")
+    assert cli.main(["x", "remover", "ps2-okami-usa", "--confirm"]) == 0
+    assert "ps2-okami-usa" not in json.loads((paths.data / "launch-map.json").read_text())
+    assert cli.main(["x", "configure"]) == 0  # dry-run sem --apply continua aceito
+

@@ -227,7 +227,7 @@ def main(argv=None) -> int:
     e = sub.add_parser("extract"); e.add_argument("archive"); e.add_argument("dest")
     lb = sub.add_parser("library"); lb.add_argument("--apply", action="store_true")
     sk = sub.add_parser("secret"); sk.add_argument("name", choices=["steamgriddb", "telegram"])
-    x = sub.add_parser("x", help="comandos do projeto: veja docs/COMANDOS.md"); x.add_argument("args", nargs="*")
+    x = sub.add_parser("x", help="comandos do projeto: veja docs/COMANDOS.md"); x.add_argument("args", nargs=argparse.REMAINDER)
     sub.add_parser("artwork")
     sub.add_parser("inventory")
     sub.add_parser("contracts")
