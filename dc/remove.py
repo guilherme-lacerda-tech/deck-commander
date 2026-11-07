@@ -125,7 +125,8 @@ def apply(paths: Paths, store: Store, rp: RemovePlan, qbt=None) -> list[str]:
         rq = _load(rq_p, [])
         rq += [{"game_id": rp.game_id, "appid": a} for a in rp.appids]
         _save(rq_p, rq)
-        out.append("atalho: o plugin remove do Steam em ~10 s")
+        out.append("atalho: o plugin remove do Steam em ~10 s" if plugin_bridge.loader_running() else
+                   "atalho: o Decky não está rodando; o plugin remove assim que ele voltar")
     else:
         out.append("atalho: remova no Steam (Gerenciar → Remover atalho não-Steam) — ele já não abre nada")
     # 2) mapa

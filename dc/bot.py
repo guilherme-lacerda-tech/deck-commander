@@ -496,6 +496,21 @@ class Bot:
         if result.split(" ", 1)[0] not in ("0", "Feche", "Safe-mode", "Jogo"):
             self.send(chat, "🔁 Nova tentativa automática:\n" + result)
 
+    def notify_safe_mode(self) -> None:
+        """Safe-mode ligado sozinho (testes, /sync travando): avisa uma vez, com o motivo e a saída."""
+        chat = self.cfg.get("notify_chat")
+        flag = ops.safe_mode_flag(self.paths)
+        cur = flag.read_text("utf-8").strip() if flag.exists() else ""
+        if not chat or cur == self.cfg.get("safe_notified", ""):
+            return
+        self.cfg["safe_notified"] = cur
+        self.save_cfg()
+        if cur:
+            reason = cur.split(" ", 1)[1] if " " in cur else cur
+            self.send(chat, f"🛑 O Deck Commander entrou em modo de segurança: {reason}.\n"
+                            "Downloads e automações pararam; nada foi apagado. O bot continua aqui.\n"
+                            "Para voltar ao normal: /sos off  (veja antes com /diagnostico)")
+
     def run(self) -> None:
         offset = self.cfg.get("offset", 0)
         self.log("bot iniciado")
@@ -518,6 +533,10 @@ class Bot:
                         self.send(m["chat"]["id"], reply)
                     except Exception as e:  # noqa: BLE001
                         self.log(f"falha ao responder: {e}")
+            try:
+                self.notify_safe_mode()
+            except Exception as e:  # noqa: BLE001
+                self.log(f"aviso de safe-mode: {e}")
             try:
                 self.notify_finished()
             except Exception as e:  # noqa: BLE001

@@ -70,7 +70,7 @@ def add_to_steam(paths: Paths, store: Store, op: str) -> list[str]:
         library.write_map(paths.data / "launch-map.json", games)
         return []
     from . import plugin_bridge
-    if plugin_bridge.installed():  # ao vivo: o plugin cria o atalho e aplica as capas (sem reiniciar)
+    if plugin_bridge.active():  # ao vivo: o plugin cria o atalho e aplica as capas (sem reiniciar)
         library.write_launcher(Path.home(), Path(__file__).resolve().parents[1])
         library.write_map(paths.data / "launch-map.json", games)
         # na fila, já criado (ainda não gravado em disco pelo Steam) ou removido pelo usuário: não reenvia
@@ -192,7 +192,7 @@ def run_sync(paths: Paths, store: Store, qbt: Qbt | None, confirm_many: bool = F
             lines.append(f"⚠️ «{c}» não ganhou atalho: já existe um atalho seu com esse nome no Steam "
                          "(feito à mão?). Apague o antigo no Steam e mande /sync.")
         from . import plugin_bridge
-        if new and plugin_bridge.installed():
+        if new and plugin_bridge.active():
             tail = "\n✨ Aparecem na biblioteca em ~10 segundos, já com capa (sem reiniciar)."
         else:
             tail = "\n👉 Toque em /reiniciar para aparecer no Steam (fecha e abre o Steam, ~20 s)." if new else ""

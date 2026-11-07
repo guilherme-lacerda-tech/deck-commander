@@ -29,6 +29,21 @@ def installed(home: Path = H) -> bool:
     return False
 
 
+def loader_running() -> bool:
+    """O Decky Loader está rodando? (Um update do SteamOS pode removê-lo; aí o plugin não age.)"""
+    import subprocess
+    try:
+        return subprocess.run(["pgrep", "-f", "homebrew/services/PluginLoader"], capture_output=True,
+                              timeout=5).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def active(home: Path = H) -> bool:
+    """Plugin instalado E Decky rodando: só assim os atalhos entram ao vivo."""
+    return installed(home) and loader_running()
+
+
 def _load(p: Path, default):
     try:
         return json.loads(p.read_text("utf-8"))

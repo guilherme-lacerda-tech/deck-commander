@@ -43,26 +43,49 @@ def in_safe_mode(paths: Paths) -> bool:
     return safe_mode_flag(paths).exists()
 
 
+def _safe_units_path(paths: Paths) -> Path:
+    return paths.state / "safe-mode-units.json"
+
+
+def _keeps_running(unit: str) -> bool:
+    """O bot é o controle remoto: nunca é desligado pelo safe-mode (senão /sos off seria impossível
+    longe do Deck). Ele mesmo recusa /add, /sync etc. enquanto o safe-mode estiver ativo."""
+    return "-bot." in unit
+
+
 def safe_mode_on(paths: Paths, reason: str, store: Store | None = None) -> list[str]:
-    done = []
-    for u in dc_units(unit_dir()):
-        _systemctl("disable", "--now", u)
-        done.append(f"desativado {u}")
+    import json
     paths.state.mkdir(parents=True, exist_ok=True)
+    units = [u for u in dc_units(unit_dir()) if not _keeps_running(u)
+             and _systemctl("is-enabled", u).stdout.strip() == "enabled"]
+    # registra ANTES de desligar: quem chamou pode ser um dos serviços que vai parar
     safe_mode_flag(paths).write_text(f"{_now()} {reason}\n", "utf-8")
+    _safe_units_path(paths).write_text(json.dumps(units), "utf-8")
+    done = []
     if store is not None:  # restauração das configs fica aguardando aprovação (F4)
         op = store.enqueue("safe-mode-restore", {"reason": reason}, requires_approval=True)
         done.append(f"restauração de configs aguardando aprovação: dc op approve {op}")
+    me = f"{UNIT_PREFIX}power.service"  # o monitor pode ser quem chamou: desliga por último
+    for u in sorted(units, key=lambda x: x == me):
+        _systemctl("disable", "--now", u)
+        done.append(f"desativado {u}")
+    done.append("bot continua ligado (use /sos off para voltar)")
     return done
 
 
 def safe_mode_off(paths: Paths) -> list[str]:
-    safe_mode_flag(paths).unlink(missing_ok=True)
+    import json
+    try:
+        units = json.loads(_safe_units_path(paths).read_text("utf-8"))
+    except (OSError, ValueError):  # safe-mode antigo/sem registro: religa o essencial
+        units = [u for u in dc_units(unit_dir()) if u.endswith(".timer")
+                 or any(k in u for k in ("-power.", "-qbittorrent."))]
     done = []
-    for u in dc_units(unit_dir()):
-        if u.endswith(".timer") or "bot" in u or "power" in u:
-            _systemctl("enable", "--now", u)
-            done.append(f"reativado {u}")
+    for u in units:
+        _systemctl("enable", "--now", u)
+        done.append(f"reativado {u}")
+    safe_mode_flag(paths).unlink(missing_ok=True)
+    _safe_units_path(paths).unlink(missing_ok=True)
     return done
 
 

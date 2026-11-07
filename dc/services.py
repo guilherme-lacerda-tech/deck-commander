@@ -126,8 +126,10 @@ def run_tests(paths: Paths, repo: Path) -> dict:
     r = subprocess.run([py, "-m", "pytest", "-q", "-p", "no:cacheprovider", str(repo / "tests")],
                        capture_output=True, text=True, cwd=repo)
     summary = (r.stdout.strip().splitlines() or ["?"])[-1]
+    # returncode 1 = algum teste falhou de verdade. 2-5 = problema para RODAR os testes (pytest ausente,
+    # coleta interrompida...): é registrado, mas não conta para o safe-mode (não é defeito do DC).
     rep = {"at": datetime.now(timezone.utc).isoformat(), "ok": r.returncode == 0, "summary": summary,
-           "seconds": round(time.time() - t0, 1)}
+           "seconds": round(time.time() - t0, 1), "infra": r.returncode not in (0, 1)}
     hist_p = paths.state / "tests-history.json"
     hist = json.loads(hist_p.read_text("utf-8")) if hist_p.exists() else []
     hist = (hist + [rep])[-50:]
@@ -139,7 +141,8 @@ def run_tests(paths: Paths, repo: Path) -> dict:
         f"<!doctype html><meta charset=utf-8><title>Testes automatizados</title><h1>Testes automatizados</h1>"
         f"<table border=1 cellpadding=4><tr><th>quando</th><th>ok</th><th>resultado</th></tr>{rows}</table>"
         f"<pre>{html.escape(r.stdout[-5000:])}</pre>", "utf-8")
-    if len(hist) >= 2 and not hist[-1]["ok"] and not hist[-2]["ok"]:
+    real = [h for h in hist if not h.get("infra")]
+    if not rep["infra"] and len(real) >= 2 and not real[-1]["ok"] and not real[-2]["ok"]:
         ops.safe_mode_on(paths, "testes críticos falharam 2x seguidas", Store(paths.db))
         rep["safe_mode"] = True
     return rep

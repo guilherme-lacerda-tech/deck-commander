@@ -100,6 +100,40 @@ def test_bot_bateria_and_power_note(tmp_path, monkeypatch):
     assert "pausado" not in b.handle(1, 1, "/add ps2 magnet:?xt=urn:btih:def&dn=Ico")
 
 
+def test_bot_warns_once_when_safe_mode_turns_on(tmp_path, monkeypatch):
+    from dc import bot, ops
+    paths = get_paths(tmp_path).ensure()
+    b = bot.Bot(paths, "T")
+    sent = []
+    b.send = lambda chat, text: sent.append(text)
+    b.cfg["notify_chat"] = 9
+    b.notify_safe_mode()
+    assert sent == []
+    ops.safe_mode_flag(paths).write_text("2026-11-07T03:00:00 testes críticos falharam 2x seguidas\n")
+    b.notify_safe_mode(); b.notify_safe_mode()
+    assert len(sent) == 1 and "testes críticos" in sent[0] and "/sos off" in sent[0]
+    ops.safe_mode_flag(paths).unlink()
+    b.notify_safe_mode()
+    assert len(sent) == 1  # saiu do safe-mode: sem mensagem nova
+
+
+def test_weekly_tests_safe_mode_only_on_real_failures(tmp_path, monkeypatch):
+    paths = get_paths(tmp_path).ensure()
+    calls = []
+    monkeypatch.setattr(services.ops, "safe_mode_on", lambda *a, **k: calls.append(a[1]))
+    codes = iter([4, 4, 1, 4, 1])  # 4 = pytest não conseguiu rodar; 1 = teste falhou
+
+    class R:
+        def __init__(self, c):
+            self.returncode, self.stdout = c, "x failed" if c == 1 else "ERROR: usage"
+    monkeypatch.setattr(services.subprocess, "run", lambda *a, **k: R(next(codes)))
+    for _ in range(4):
+        services.run_tests(paths, tmp_path)
+    assert calls == []  # problemas de infraestrutura não contam; só 1 falha real até aqui
+    services.run_tests(paths, tmp_path)
+    assert len(calls) == 1  # 2 falhas reais seguidas (ignorando as de infraestrutura)
+
+
 def test_user_paused_torrent_is_never_resumed(tmp_path, monkeypatch):
     paths = get_paths(tmp_path).ensure()
     q = FakeQ()

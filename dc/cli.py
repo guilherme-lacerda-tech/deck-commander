@@ -58,7 +58,7 @@ def _library(paths, apply: bool) -> int:
         s.finish(op, True, result={"added": len(new)})
     except Exception as e:  # noqa: BLE001
         s.finish(op, False, error=str(e)); print(f"FALHOU: {e}"); return 1
-    if plugin_bridge.installed():
+    if plugin_bridge.active():
         print(f"ok: {len(new)} jogo(s) na fila do plugin — aparecem na biblioteca em ~10 s, sem reiniciar.")
     else:
         print(f"ok: {len(new)} atalho(s) gravados. Reinicie o Steam para ver (ou instale o plugin do Decky).")
