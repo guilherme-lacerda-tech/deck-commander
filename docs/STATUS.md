@@ -28,6 +28,13 @@ Validado num Steam Deck LCD (SteamOS 3.9.5). 180+ testes automatizados (CI no Gi
 - **Unifideck** grava `shortcuts.vdf` diretamente; se ele regravar o arquivo enquanto o Steam tiver
   atalhos ainda não salvos, a autocorreção do plugin recria os do Deck Commander.
 - Testado só no modelo LCD. O OLED usa a mesma lógica de energia (por tipo, não por nome), mas não foi validado em hardware.
+- **Deck dormindo não faz nada**: com a tela apagada (suspenso) não baixa nem responde ao bot. O Telegram guarda as
+  mensagens por até 24 h e o bot responde quando o Deck acorda.
+- **Dolphin (GameCube/Wii)**: o mapeamento automático usa nomes de botão conferidos no binário do Dolphin 2609 e o
+  nome do controle visto no Deck ("Steam Virtual Gamepad"), mas ainda não foi jogado. O original fica em `*.dc-orig`.
+- **Sem o Decky** (ex.: removido por um update do SteamOS) os jogos novos entram pelo caminho antigo
+  (`shortcuts.vdf` + `/reiniciar`), que não foi revalidado na v0.4.
+- Coleções guardam o número de atalhos removidos (o Steam ignora; não aparecem nas abas).
 
 ## Próximos passos sugeridos
 1. Publicar o plugin na loja do Decky (evita o modo desenvolvedor).
