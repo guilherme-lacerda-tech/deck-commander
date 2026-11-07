@@ -112,12 +112,19 @@ def _write(fmt: str, f: Path, sec, key, value: Optional[str]) -> None:
             doc.ensure_section(sec, key, value)
         data = doc.dump()
     else:
-        cfg = _load(f, {})
-        if value is None:
-            cfg.pop(key, None)
+        import re
+        raw = f.read_text("utf-8")
+        rx = re.compile(r'("' + re.escape(key) + r'"\s*:\s*)(-?\d+(?:\.\d+)?)')
+        if value is not None and len(rx.findall(raw)) == 1:
+            # troca só o número: o resto do arquivo fica byte a byte igual
+            data = rx.sub(lambda m: m.group(1) + str(int(value)), raw).encode("utf-8")
         else:
-            cfg[key] = int(value)
-        data = (json.dumps(cfg, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+            cfg = json.loads(raw)
+            if value is None:
+                cfg.pop(key, None)
+            else:
+                cfg[key] = int(value)
+            data = (json.dumps(cfg, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
     tmp = f.with_name(f.name + ".dc-tmp")
     tmp.write_bytes(data)
     os.replace(tmp, f)

@@ -134,6 +134,20 @@ def test_weekly_tests_safe_mode_only_on_real_failures(tmp_path, monkeypatch):
     assert len(calls) == 1  # 2 falhas reais seguidas (ignorando as de infraestrutura)
 
 
+def test_quality_json_restore_is_byte_identical(tmp_path, monkeypatch):
+    from dc import quality
+    cfg = tmp_path / "Config.json"
+    original = '{\n    "version": 70,\n    "res_scale": 1,\n    "res_scale_custom": 1.0,\n    "x": [1, 2]\n}'
+    cfg.write_text(original)
+    monkeypatch.setitem(quality.TARGETS, "switch", ("json", [cfg], None, "res_scale"))
+    paths = get_paths(tmp_path / "dc").ensure()
+    quality.set_override(paths, "g", "switch", "2x")
+    quality.apply_for_launch(paths, "g", "switch")
+    assert '"res_scale": 2,' in cfg.read_text() and '"res_scale_custom": 1.0' in cfg.read_text()
+    quality.restore(paths)
+    assert cfg.read_text() == original
+
+
 def test_user_paused_torrent_is_never_resumed(tmp_path, monkeypatch):
     paths = get_paths(tmp_path).ensure()
     q = FakeQ()
