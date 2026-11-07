@@ -34,7 +34,7 @@ Validado num Steam Deck LCD (SteamOS 3.9.5). 180+ testes automatizados (CI no Gi
   nome do controle visto no Deck ("Steam Virtual Gamepad"), mas ainda não foi jogado. O original fica em `*.dc-orig`.
 - **Sem o Decky** (ex.: removido por um update do SteamOS) os jogos novos entram pelo caminho antigo
   (`shortcuts.vdf` + `/reiniciar`), que não foi revalidado na v0.4.
-- Coleções guardam o número de atalhos removidos (o Steam ignora; não aparecem nas abas).
+- As coleções guardam referências a atalhos já removidos (o Steam as ignora; não aparecem nas abas).
 
 ## Próximos passos sugeridos
 1. Publicar o plugin na loja do Decky (evita o modo desenvolvedor).
