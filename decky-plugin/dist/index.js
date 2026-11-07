@@ -31,7 +31,9 @@ let busy = false;
 let timer = null;
 let loadedAt = Date.now();
 let lastLog = [];
-const addedThisSession = new Set(); // trava contra duplicação: nunca cria o mesmo jogo 2x na sessão
+// Trava contra duplicação: game_id -> AppID criado nesta sessão. Só impede criar de novo enquanto aquele
+// atalho AINDA existe (jogo removido e baixado de novo na mesma sessão volta normalmente).
+const addedThisSession = new Map();
 const seenThisSession = new Set();  // AppIDs vistos existindo nesta sessão (sumiu depois = remoção do usuário)
 
 function note(msg) {
@@ -76,10 +78,14 @@ async function addOne(it) {
 async function processQueue() {
     const items = (await call("get_pending")) || [];
     for (const it of items) {
-        if (addedThisSession.has(it.game_id)) continue;
+        const prev = addedThisSession.get(it.game_id);
+        if (prev && exists(prev)) { // já criado (o registro é que não chegou ao backend): só registra de novo
+            try { await call("report", it.game_id, prev, ""); } catch (e) { /* tenta no próximo ciclo */ }
+            continue;
+        }
         try {
-                const appid = await addOne(it);
-            addedThisSession.add(it.game_id);
+            const appid = await addOne(it);
+            addedThisSession.set(it.game_id, appid);
             seenThisSession.add(appid);
             await call("report", it.game_id, appid, "");
             await remember(it);
@@ -109,9 +115,10 @@ async function reconcile() {
             continue;
         }
         try {
-            if (addedThisSession.has("re:" + gid)) continue;
-            addedThisSession.add("re:" + gid);
+            if (addedThisSession.has("re:" + gid)) continue; // recria no máximo 1x por sessão
+            addedThisSession.set("re:" + gid, 0);
             const appid = await addOne(v.item);
+            addedThisSession.set(gid, appid);
             seenThisSession.add(appid);
             await call("report", gid, appid, "");
             note("recriado: " + v.item.name);
