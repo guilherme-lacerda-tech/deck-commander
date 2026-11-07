@@ -55,3 +55,38 @@ def test_plugin_backend(tmp_path, monkeypatch):
     assert run(p.read_art(str(base / "art.png")))["ext"] == "png"
     outside = tmp_path / "segredo.png"; outside.write_bytes(b"x")
     assert run(p.read_art(str(outside))) is None  # nunca lê fora da pasta do DC
+
+
+def test_plugin_backend_removal_and_launch_error(tmp_path, monkeypatch):
+    spec = importlib.util.spec_from_file_location("dcplugin2", Path(__file__).resolve().parents[1] / "decky-plugin/main.py")
+    m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+    base = tmp_path / "base"; base.mkdir()
+    for k, f in (("BASE", ""), ("QUEUE", "q.json"), ("DONE", "d.json"), ("ITEMS", "i.json"), ("REMOVE", "r.json")):
+        monkeypatch.setattr(m, k, str(base / f) if f else str(base))
+    p = m.Plugin(); run = asyncio.run
+    run(p.report("a", 123, "")); run(p.remember_item("a", {"game_id": "a"}))
+    (base / "r.json").write_text(json.dumps([{"game_id": "a", "appid": 123}]))
+    assert run(p.get_removals()) == [{"game_id": "a", "appid": 123}]
+    run(p.removal_done("a", 123))
+    assert run(p.get_removals()) == [] and run(p.get_done()) == {}  # removido some da autocorreção
+    assert run(p.get_status())["removed"] == 1
+    assert run(p.get_launch_error()) is None
+    (base / "launch-error.json").write_text(json.dumps({"message": "cartão SD?"}))
+    assert run(p.get_launch_error()) == "cartão SD?" and run(p.get_launch_error()) is None  # mostra 1 vez
+
+
+def test_launch_failure_leaves_message_for_plugin(tmp_path, monkeypatch):
+    import pytest
+    from dc import launch
+    monkeypatch.setenv("DC_ROOT", str(tmp_path))
+    from dc.paths import get_paths
+    paths = get_paths().ensure()
+    (paths.data / "launch-map.json").write_text(json.dumps(
+        {"ps2-x": {"title": "Jogo X", "console": "ps2", "rom": "/run/media/deck/SD/Emulation/roms/ps2/x.iso"}}))
+    with pytest.raises(SystemExit):
+        launch.main(["ps2-x"])
+    msg = json.loads((paths.data / "launch-error.json").read_text())["message"]
+    assert "Jogo X" in msg and "cartão SD" in msg
+    with pytest.raises(SystemExit):
+        launch.main(["sumiu"])
+    assert "removido" in json.loads((paths.data / "launch-error.json").read_text())["message"]

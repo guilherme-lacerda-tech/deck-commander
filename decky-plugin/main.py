@@ -96,6 +96,18 @@ class Plugin:
             _save(path, ids)
         return True
 
+    async def get_launch_error(self):
+        """Aviso deixado pelo dc-launch quando um jogo não abre (ex.: cartão SD fora). Lido uma vez."""
+        path = os.path.join(BASE, "launch-error.json")
+        err = _load(path, None)
+        if err is None:
+            return None
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+        return err.get("message")
+
     async def get_status(self):
         done = _load(DONE, {})
         return {"pending": len(await self.get_pending()),

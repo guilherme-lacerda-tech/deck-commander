@@ -128,6 +128,16 @@ async function reconcile() {
     }
 }
 
+// Jogo que não abriu (o Steam não mostra o motivo): o dc-launch deixa a explicação e ela vira aviso na tela.
+async function showLaunchError() {
+    let msg;
+    try { msg = await call("get_launch_error"); } catch (e) { return; } // backend antigo
+    if (msg) {
+        toaster.toast({ title: "Deck Commander — o jogo não abriu", body: msg, duration: 8000 });
+        note("não abriu: " + msg);
+    }
+}
+
 // Remoções pedidas pelo /remover (só atalhos criados pelo Deck Commander: exe = dc-launch).
 async function processRemovals() {
     let list;
@@ -172,7 +182,7 @@ async function syncCollections() {
 async function cycle(force) {
     if (busy || (!force && !steamReady())) return;
     busy = true;
-    for (const [label, fn] of [["remoções", processRemovals], ["fila", processQueue], ["autocorreção", reconcile], ["coleções", syncCollections]]) {
+    for (const [label, fn] of [["avisos", showLaunchError], ["remoções", processRemovals], ["fila", processQueue], ["autocorreção", reconcile], ["coleções", syncCollections]]) {
         try {
             await fn();
         } catch (e) {

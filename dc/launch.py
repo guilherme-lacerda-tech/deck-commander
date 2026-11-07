@@ -20,6 +20,16 @@ def main(argv: list[str]) -> None:
         with open(log, "a", encoding="utf-8") as f:
             f.write(f"{datetime.now(timezone.utc).isoformat()} {msg}\n")
 
+    def fail(msg: str, user_msg: str) -> None:
+        """Registra e deixa o aviso para o plugin mostrar na tela do Deck (o Steam não mostra nada)."""
+        say(msg)
+        try:
+            (paths.data / "launch-error.json").write_text(json.dumps(
+                {"at": datetime.now(timezone.utc).isoformat(), "message": user_msg}, ensure_ascii=False), "utf-8")
+        except OSError:
+            pass
+        sys.exit(1)
+
     if not argv:
         say("erro: sem game_id"); sys.exit(2)
     game_id = argv[0]
@@ -29,9 +39,14 @@ def main(argv: list[str]) -> None:
         emulators = json.loads(emu_cfg.read_text("utf-8")) if emu_cfg.exists() else {}
         cmd = build_command(game_id, launch_map, emulators)
     except Exception as e:  # noqa: BLE001
-        say(f"erro ao resolver {game_id}: {e}"); sys.exit(1)
+        fail(f"erro ao resolver {game_id}: {e}", "Esse jogo foi removido ou não está mais na biblioteca.")
+    title = launch_map[game_id].get("title", game_id)
     if not Path(cmd[-1]).exists():
-        say(f"erro: ROM não encontrada {cmd[-1]} (cartão SD fora?)"); sys.exit(1)
+        sd = cmd[-1].startswith("/run/media/")
+        fail(f"erro: ROM não encontrada {cmd[-1]} (cartão SD fora?)",
+             f"{title}: arquivo do jogo não encontrado" + (" — o cartão SD está colocado?" if sd else "."))
+    if not Path(cmd[0]).exists():
+        fail(f"erro: emulador não encontrado {cmd[0]}", f"{title}: emulador não encontrado ({Path(cmd[0]).name}).")
     from . import quality
     try:
         msg = quality.restore(paths)  # sobra de um jogo anterior fechado à força
