@@ -90,6 +90,49 @@ class SyncItem:
     integrity: str = "unverified"
 
 
+_VOLUME = re.compile(r"\.(r\d{2,3}|s\d{2})$|\.part(?!0*1\.rar$)\d+\.rar$", re.I)
+
+
+def _extra_volume(f: Path, files: list[Path]) -> bool:
+    """Volume de continuação de RAR dividido (só pula se o primeiro volume estiver junto)."""
+    if not _VOLUME.search(f.name):
+        return False
+    if f.suffix.lower() == ".rar":  # nome.part2.rar -> precisa do nome.part1.rar
+        base = re.sub(r"\.part\d+\.rar$", "", f.name, flags=re.I)
+        return any(re.fullmatch(re.escape(base) + r"\.part0*1\.rar", g.name, re.I) for g in files)
+    return any(g.name.lower() == f.stem.lower() + ".rar" and g.parent == f.parent for g in files)
+
+
+def _mds_tracks(mds: Path) -> int:
+    """Quantas faixas a imagem do Alcohol tem (0 = não deu para ler)."""
+    try:
+        b = mds.read_bytes()
+        if not b.startswith(b"MEDIA DESCRIPTOR"):
+            return 0
+        off = int.from_bytes(b[0x50:0x54], "little")
+        total, extra = b[off + 10], b[off + 11]
+        return total - extra
+    except (OSError, IndexError):
+        return 0
+
+
+def mdf_to_cue(mdf: Path) -> Optional[Path]:
+    """CD de PS1 em .mdf (setores de 2352 bytes) com uma faixa só = o mesmo que .bin; escreve o .cue ao lado.
+    Com várias faixas (áudio CD) deixa como está: o DuckStation abre o .mds direto."""
+    if mdf.stat().st_size % 2352:
+        return None
+    mds = mdf.with_suffix(".mds")
+    if mds.exists() and _mds_tracks(mds) not in (0, 1):
+        return None
+    bin_ = mdf.with_suffix(".bin")
+    mdf.rename(bin_)
+    if mds.exists():
+        mds.unlink()
+    cue = bin_.with_suffix(".cue")
+    cue.write_text(f'FILE "{bin_.name}" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n', "utf-8")
+    return cue
+
+
 def ingest(content: Path, console: Optional[str], roms_root: Path, quarantine_root: Path,
            work: Path, confirm_many: bool = False) -> SyncItem:
     """Leva um download concluído (arquivo ou pasta) para roms_root/<console>/<pasta>/."""
@@ -110,6 +153,8 @@ def ingest(content: Path, console: Optional[str], roms_root: Path, quarantine_ro
         src_files = [content] if content.is_file() else sorted(f for f in content.rglob("*") if f.is_file())
         collected: list[Path] = []
         for f in src_files:
+            if _extra_volume(f, src_files):
+                continue  # .r00/.r01…/.partN.rar: o 7-Zip lê junto com o primeiro volume (.rar)
             if f.suffix.lower() in ARCHIVES:
                 try:
                     out = safe_extract.extract_any(f, staging / f.stem)
@@ -134,6 +179,12 @@ def ingest(content: Path, console: Optional[str], roms_root: Path, quarantine_ro
                     iso = f.with_suffix(".iso")
                     f.rename(iso)
                     collected[i] = iso
+        if console == "psx":  # imagem .mdf/.mds de CD: vira .bin + .cue (o DuckStation e o tradutor abrem)
+            for i, f in enumerate(collected):
+                if f.suffix.lower() == ".mdf":
+                    cue = mdf_to_cue(f)
+                    if cue:
+                        collected[i] = cue
         games = playable(collected, console)
         if not games:
             return SyncItem(name, console, "skipped", note="nenhum arquivo jogável para " + console)

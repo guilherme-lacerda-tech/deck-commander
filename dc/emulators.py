@@ -21,7 +21,7 @@ FLATPAK = "/usr/bin/flatpak"
 
 # console -> rótulo, extensões (ordem = preferência), comando ({rom}), BIOS obrigatória?
 CONSOLES = {
-    "psx":    {"label": "PlayStation", "exts": [".m3u", ".chd", ".pbp", ".cue"],
+    "psx":    {"label": "PlayStation", "exts": [".m3u", ".chd", ".pbp", ".cue", ".mds"],  # .mds: imagem do Alcohol (DuckStation lê)
                "cmd": [str(H / "Applications/DuckStation-x64.AppImage"), "-fullscreen", "-batch", "--", "{rom}"]},
     "ps2":    {"label": "PlayStation 2", "exts": [".chd", ".iso", ".cso"],
                "cmd": [FLATPAK, "run", "net.pcsx2.PCSX2", "-fullscreen", "-batch", "--", "{rom}"]},
