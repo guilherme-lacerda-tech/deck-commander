@@ -348,3 +348,22 @@ def test_transient_error_keeps_fast_provider_and_quotes_survive(tmp_path):
     res = ia.translate(paths, cfg, items, "flaky", chain=chain)
     assert slow.calls == 0 and res.provider_used == "index_translate"  # não abandonou o rápido
     assert res.translated["0"] == 'PT "Hello 0!"'  # as aspas do diálogo continuam
+
+
+def test_ensure_update_selected_fixes_ryujinx(tmp_path, monkeypatch):
+    import json as _j
+    from dc.traducao import converter, extract
+    ryu = tmp_path / "Ryujinx"
+    monkeypatch.setattr(switch, "RYU_DIRS", [ryu])
+    tid = "0100DCA0064A6000"
+    (ryu / "mods/contents" / tid.lower() / switch.MOD_NAME).mkdir(parents=True)
+    (ryu / "games" / tid.lower()).mkdir(parents=True)
+    upd = tmp_path / "LM3 [0100DCA0064A6800][v327680].nsp"
+    upd.write_bytes(b"x")
+    monkeypatch.setattr(converter, "collect", lambda roots, t: None)
+    monkeypatch.setattr(extract, "latest_update", lambda tf: upd)
+    msg = switch.ensure_update_selected(tid, [tmp_path])
+    assert msg and upd.name in msg
+    data = _j.loads((ryu / "games" / tid.lower() / "updates.json").read_text())
+    assert data["selected"] == str(upd) and str(upd) in data["paths"]
+    assert switch.ensure_update_selected(tid, [tmp_path]) is None  # já certo: não mexe

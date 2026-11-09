@@ -52,6 +52,12 @@ def main(argv: list[str]) -> None:
             from .dedup import base_title_id
             from .traducao import trinity_game
             tid = base_title_id(Path(cmd[-1]).name)
+            if tid:  # mod de tradução feito para a atualização mais nova: o Ryujinx precisa abrir essa versão
+                from . import syncer
+                from .traducao import switch as sw
+                umsg = sw.ensure_update_selected(tid, syncer.rom_roots())
+                if umsg:
+                    say(umsg)
             gmsg = tid and trinity_game.guard_version(tid, paths.data / "traducao" / "mods-desligados")
             if gmsg:
                 say(gmsg)

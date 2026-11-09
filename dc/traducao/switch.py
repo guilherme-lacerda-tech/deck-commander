@@ -402,3 +402,33 @@ def uninstall_mod(title_id: str) -> bool:
         shutil.rmtree(dst)
         return True
     return False
+
+
+def ensure_update_selected(title_id: str, roots: list[Path]) -> Optional[str]:
+    """O mod de tradução é feito a partir da atualização mais nova do jogo. Se o Ryujinx estiver abrindo outra
+    versão (ex.: nenhuma atualização escolhida), os textos não batem e o jogo sai em inglês ou trava. Antes de
+    abrir, seleciona sozinho a mesma atualização no Ryujinx (games/<tid>/updates.json). Devolve o que fez."""
+    if not mod_target(title_id).exists():
+        return None
+    from . import converter, extract
+    want = extract.latest_update(converter.collect(roots, title_id))
+    if not want:
+        return None
+    for d in RYU_DIRS:
+        f = d / "games" / title_id.lower() / "updates.json"
+        if not f.parent.parent.exists():
+            continue
+        try:
+            data = json.loads(f.read_text("utf-8"))
+        except (OSError, ValueError):
+            data = {"selected": "", "paths": []}
+        if data.get("selected") == str(want):
+            return None
+        data["selected"] = str(want)
+        data["paths"] = sorted(set(data.get("paths") or []) | {str(want)})
+        f.parent.mkdir(parents=True, exist_ok=True)
+        tmp = f.with_name(f.name + ".tmp")
+        tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), "utf-8")
+        os.replace(tmp, f)
+        return f"tradução: selecionei a atualização {want.name} no Ryujinx (o mod foi feito para ela)"
+    return None
