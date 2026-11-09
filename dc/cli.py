@@ -50,7 +50,7 @@ def _library(paths, apply: bool) -> int:
         print("(dry-run; use --apply)"); return 0
     s = _store(paths)
     op = s.enqueue("library-add", {"count": len(pl.add)})
-    s.claim_next()
+    s.claim(op)
     try:
         from .lock import OperationLock
         with OperationLock(paths.lock, op, "library-add", is_running=s.is_running):

@@ -130,7 +130,7 @@ def run_sync(paths: Paths, store: Store, qbt: Qbt | None, confirm_many: bool = F
         return "Feche o jogo primeiro (o /sync não roda durante o jogo). Downloads continuam."
     st = _state(paths)
     op = store.enqueue("sync", {"confirm_many": confirm_many})
-    store.claim_next()
+    store.claim(op)
     t0 = time.monotonic()
     lines, added_files, arrived = [], 0, set()
     try:

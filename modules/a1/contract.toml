@@ -1,0 +1,10 @@
+id = "A1"
+name = "Tradução retrô com IA (Pokémon GBA via Meowth)"
+inputs = ["ROM", "traducao.toml", "glossario.toml", "referencias.toml"]
+outputs = ["ROM traduzida (PT-BR)", "patch BPS"]
+owns = ["roms:ai-translated-copies", "traducao:cache"]
+forbids = ["roms:originals", "secrets:export"]
+depends_on = ["M5", "M18+M19", "M20"]
+optional_depends = ["M4"]
+fail_mode = "falha -> relatório, original intacto; muitas frases com problema -> guardado sem aplicar"
+reversibility = "rollback_full"

@@ -56,6 +56,8 @@ Aviso aqui quando o download terminar.
 /baixar — baixa mesmo assim um download que parecia repetido
 /devolver <nome> — traz de volta um jogo que você tirou pelo Steam
 /bateria sim|nao — baixar também fora da tomada (padrão: só na tomada)
+/traduzir <jogo> — tradução pt-BR com IA (Switch e Pokémon GBA) · /traduzir status | config
+/converter <jogo> [organizar|descompactar] — Switch: update/DLC e NSZ
 /status · /queue · /disk · /diagnostico
 /pause · /resume — downloads
 /quarantine list | review <id> | clear <id>
@@ -157,6 +159,9 @@ class Bot:
             return self._duplicates()
         if cmd == "/devolver":
             return self._bring_back(args)
+        if cmd in ("/traduzir", "/converter"):
+            from .traducao import comandos as trad
+            return (trad.traduzir if cmd == "/traduzir" else trad.converter)(self, args)
         if cmd == "/remover":
             return self._remove(args)
         if cmd == "/qualidade":
@@ -558,6 +563,11 @@ class Bot:
                 self.notify_safe_mode()
             except Exception as e:  # noqa: BLE001
                 self.log(f"aviso de safe-mode: {e}")
+            try:
+                from .traducao import comandos as trad
+                trad.notify(self)
+            except Exception as e:  # noqa: BLE001
+                self.log(f"aviso de tradução: {e}")
             try:
                 self.notify_finished()
             except Exception as e:  # noqa: BLE001

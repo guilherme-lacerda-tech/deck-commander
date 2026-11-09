@@ -249,6 +249,15 @@ class Store:
                       (_iso(self.now()), r["id"]))
         return self.get(r["id"])
 
+    def claim(self, op_id: str) -> Optional[Operation]:
+        """Pega UMA operação específica (a que o chamador acabou de criar), nunca a de outro."""
+        with self.tx(critical=True) as c:
+            cur = c.execute("UPDATE operations SET state='running', started_at=?, attempts=attempts+1"
+                            " WHERE id=? AND state='pending'", (_iso(self.now()), op_id))
+            if cur.rowcount != 1:
+                return None
+        return self.get(op_id)
+
     def finish(self, op_id: str, ok: bool, result: Optional[dict] = None, error: Optional[str] = None) -> None:
         with self.tx(critical=True) as c:
             c.execute("UPDATE operations SET state=?, result=?, error=?, finished_at=? WHERE id=? AND state='running'",

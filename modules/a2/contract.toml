@@ -1,0 +1,10 @@
+id = "A2"
+name = "Tradução de Switch com IA (mod LayeredFS do Ryujinx)"
+inputs = ["RomFS extraído", "traducao.toml", "glossario.toml", "referencias.toml"]
+outputs = ["mod romfs em mods/contents/<titleid>/Deck Commander PT-BR"]
+owns = ["ryujinx:mods/deck-commander"]
+forbids = ["switch:containers", "secrets:export"]
+depends_on = ["A1", "M18+M19"]
+optional_depends = ["M4"]
+fail_mode = "arquivo que não sobrevive a ler+regravar sem mudança é pulado; fonte sem acentos bloqueia"
+reversibility = "rollback_full"

@@ -1,0 +1,429 @@
+"""Motor de tradução com IA (compartilhado por A1 retrô e A2 Switch). Só biblioteca padrão.
+
+- Cadeia de provedores (traducao.toml): Ollama local -> GitHub Models -> Index-Translate -> pago.
+  Todos menos o Ollama falam o formato OpenAI (`/chat/completions`), então um cliente serve para todos.
+- Proteção de códigos: tudo que o jogo interpreta ([rival], {C1}, \\n, tags do Switch...) vira ⟦n⟧
+  antes de ir para a IA e volta depois; se a IA perder ou inventar um ⟦n⟧, a frase é "flagged" e o
+  original é mantido.
+- Glossário (nomes que não se traduzem / traduções fixas) e few-shot (pares de traduções de referência).
+- Cache por frase: retomar uma tradução interrompida não gasta de novo, nem repete trabalho.
+- Uso diário de tokens (limite + alerta em 80%) para provedores pagos/limitados.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import re
+import time
+import tomllib
+import urllib.error
+import urllib.request
+from dataclasses import dataclass, field
+from datetime import date
+from pathlib import Path
+from typing import Callable, Optional
+
+from ..paths import Paths
+
+PH_OPEN, PH_CLOSE = "⟦", "⟧"
+_PH = re.compile(r"⟦(\d+)⟧")
+
+DEFAULT_CFG = {
+    "provider": "ollama",
+    "fallback": ["index_translate", "github_models"],
+    "modelo": "translategemma:4b",
+    "idioma": "pt-BR",
+    "idioma_origem": "en",
+    "few_shot": True,
+    "limite_diario_tokens": 500000,
+    "estimativa_antes_de_iniciar": True,
+    "flagged_threshold": 10,          # % de frases com problema acima do qual NÃO aplica sozinho
+    "permitir_bateria": False,
+    "lote": 20,                       # frases por chamada (modelos "unitários" ignoram)
+    "providers": {
+        "ollama": {"tipo": "ollama", "url": "http://127.0.0.1:11434", "modelo": "translategemma:4b", "gratis": True},
+        "ollama_pc": {"tipo": "ollama", "url": "", "modelo": "translategemma:12b", "gratis": True},
+        "index_translate": {"tipo": "openai", "url": "https://index-translate.bilibili.com/v1",
+                            "modelo": "index-translate", "chave": "", "gratis": True, "lote": 8},
+        "github_models": {"tipo": "openai", "url": "https://models.github.ai/inference",
+                          "modelo": "openai/gpt-4.1-mini", "segredo": "github_pat", "gratis": True},
+        "openai": {"tipo": "openai", "url": "https://api.openai.com/v1", "modelo": "gpt-4.1-mini", "segredo": "ia_api.key"},
+        "anthropic": {"tipo": "openai", "url": "https://api.anthropic.com/v1", "modelo": "claude-haiku-5-5",
+                      "segredo": "ia_api.key"},
+        "gemini": {"tipo": "openai", "url": "https://generativelanguage.googleapis.com/v1beta/openai",
+                   "modelo": "gemini-2.5-flash", "segredo": "ia_api.key"},
+    },
+}
+LANG_NAMES = {"pt-BR": "Brazilian Portuguese", "en": "English", "es": "Spanish", "fr": "French", "de": "German",
+              "it": "Italian", "ja": "Japanese", "zh": "Chinese"}
+
+
+class ProviderError(RuntimeError):
+    pass
+
+
+# ----------------------------------------------------------------------------- configuração
+def load_cfg(paths: Paths) -> dict:
+    cfg = json.loads(json.dumps(DEFAULT_CFG))
+    p = paths.config / "traducao.toml"
+    if p.exists():
+        user = tomllib.loads(p.read_text("utf-8"))
+        provs = user.pop("providers", {})
+        cfg.update(user)
+        for k, v in provs.items():
+            cfg["providers"][k] = {**cfg["providers"].get(k, {}), **v}
+    return cfg
+
+
+def write_default_cfg(paths: Paths) -> Path:
+    p = paths.config / "traducao.toml"
+    if not p.exists():
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(
+            '# Tradução com IA (Deck Commander). Cadeia: provider, depois fallback na ordem.\n'
+            'provider = "ollama"            # IA no próprio Deck (grátis, privada, lenta)\n'
+            'fallback = ["index_translate", "github_models"]\n'
+            'idioma = "pt-BR"\n'
+            'idioma_origem = "en"\n'
+            'few_shot = true\n'
+            'limite_diario_tokens = 500000  # só vale para provedores com limite/pagos\n'
+            'estimativa_antes_de_iniciar = true\n'
+            'flagged_threshold = 10         # % de frases com problema que bloqueia a aplicação automática\n'
+            'permitir_bateria = false       # traduzir só na tomada\n\n'
+            '[providers.ollama]\nmodelo = "translategemma:4b"\n\n'
+            '# IA rodando no seu PC pela rede de casa (mais rápida):\n'
+            '# [providers.ollama_pc]\n# url = "http://192.168.0.10:11434"\n# modelo = "translategemma:12b"\n\n'
+            '[switch]\npreservar_tags = true\npermitir_sem_fonte_ptbr = false\n'
+            'validar_com_referencia = true\nsimilaridade_minima = 0.75\n', "utf-8")
+    return p
+
+
+def secret(paths: Paths, name: str) -> str:
+    p = paths.secrets / name
+    try:
+        return p.read_text("utf-8").strip()
+    except OSError:
+        return ""
+
+
+def mask(s: str) -> str:
+    return (s[:4] + "…" + s[-2:]) if len(s) > 8 else ("…" if s else "(sem chave)")
+
+
+# ----------------------------------------------------------------------------- proteção de códigos
+def protect(text: str, pattern: re.Pattern) -> tuple[str, list[str]]:
+    codes: list[str] = []
+
+    def sub(m):
+        codes.append(m.group(0))
+        return f"{PH_OPEN}{len(codes) - 1}{PH_CLOSE}"
+    return pattern.sub(sub, text), codes
+
+
+def restore(text: str, codes: list[str]) -> str:
+    return _PH.sub(lambda m: codes[int(m.group(1))] if int(m.group(1)) < len(codes) else m.group(0), text)
+
+
+def placeholders_ok(src: str, out: str) -> bool:
+    return sorted(_PH.findall(src)) == sorted(_PH.findall(out))
+
+
+def only_codes(text: str) -> bool:
+    """Frase sem nada traduzível (só códigos, números, pontuação)."""
+    return not re.search(r"[^\W\d_]", _PH.sub("", text))
+
+
+# ----------------------------------------------------------------------------- uso de tokens
+def _usage_path(paths: Paths) -> Path:
+    return paths.data / "traducao" / "uso.json"
+
+
+def tokens_today(paths: Paths) -> int:
+    try:
+        return json.loads(_usage_path(paths).read_text("utf-8")).get(date.today().isoformat(), 0)
+    except (OSError, ValueError):
+        return 0
+
+
+def add_tokens(paths: Paths, n: int) -> None:
+    p = _usage_path(paths)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        d = json.loads(p.read_text("utf-8"))
+    except (OSError, ValueError):
+        d = {}
+    k = date.today().isoformat()
+    d = {k: d.get(k, 0) + n}  # guarda só o dia de hoje
+    p.write_text(json.dumps(d), "utf-8")
+
+
+def estimate_tokens(texts: list[str]) -> int:
+    """Estimativa grosseira: ~1 token a cada 3 caracteres, ida e volta, + instruções por lote."""
+    chars = sum(len(t) for t in texts)
+    return int(chars / 3 * 2.2) + 150 * (len(texts) // 20 + 1)
+
+
+# ----------------------------------------------------------------------------- provedores
+HttpFn = Callable[[str, dict, dict, float], dict]
+
+
+def _http(url: str, body: dict, headers: dict, timeout: float) -> dict:
+    req = urllib.request.Request(url, data=json.dumps(body).encode(), method="POST",
+                                 headers={"Content-Type": "application/json", "User-Agent": "deck-commander", **headers})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        raise ProviderError(f"HTTP {e.code}") from e
+    except (OSError, ValueError) as e:
+        raise ProviderError(str(e)) from e
+
+
+@dataclass
+class Provider:
+    name: str
+    spec: dict
+    key: str = ""
+    http: HttpFn = _http
+
+    @property
+    def free(self) -> bool:
+        return bool(self.spec.get("gratis"))
+
+    @property
+    def model(self) -> str:
+        return self.spec.get("modelo", "")
+
+    @property
+    def single(self) -> bool:
+        """Modelos só de tradução (TranslateGemma) recebem uma frase por vez."""
+        return "translategemma" in self.model.lower() or self.spec.get("unitario", False)
+
+    def chat(self, system: str, user: str, timeout: float = 180) -> tuple[str, int]:
+        if self.spec["tipo"] == "ollama":
+            if not self.spec.get("url"):
+                raise ProviderError("sem endereço configurado")
+            out = self.http(self.spec["url"].rstrip("/") + "/api/chat",
+                            {"model": self.model, "stream": False, "options": {"temperature": 0.2},
+                             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]},
+                            {}, timeout)
+            return out["message"]["content"], int(out.get("prompt_eval_count", 0)) + int(out.get("eval_count", 0))
+        headers = {"Authorization": f"Bearer {self.key or 'deck-commander'}"}
+        out = self.http(self.spec["url"].rstrip("/") + "/chat/completions",
+                        {"model": self.model, "temperature": 0.2,
+                         "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]},
+                        headers, timeout)
+        try:
+            return out["choices"][0]["message"]["content"], int((out.get("usage") or {}).get("total_tokens", 0))
+        except (KeyError, IndexError, TypeError) as e:
+            raise ProviderError(f"resposta inesperada: {str(out)[:120]}") from e
+
+
+def build_chain(paths: Paths, cfg: dict, http: HttpFn = _http) -> list[Provider]:
+    out = []
+    for name in [cfg["provider"], *cfg.get("fallback", [])]:
+        spec = cfg["providers"].get(name)
+        if not spec:
+            continue
+        key = secret(paths, spec["segredo"]) if spec.get("segredo") else spec.get("chave", "")
+        if spec.get("segredo") and not key:
+            continue  # provedor que precisa de chave e você não configurou: pula
+        out.append(Provider(name, spec, key, http))
+    return out
+
+
+# ----------------------------------------------------------------------------- tradução
+@dataclass
+class Item:
+    id: str
+    text: str                 # já com ⟦n⟧ no lugar dos códigos
+    max_len: Optional[int] = None
+
+
+@dataclass
+class Result:
+    translated: dict[str, str] = field(default_factory=dict)   # id -> texto traduzido (com ⟦n⟧)
+    flagged: dict[str, str] = field(default_factory=dict)      # id -> motivo (original mantido)
+    review: dict[str, str] = field(default_factory=dict)       # id -> aviso (tradução aplicada)
+    tokens: int = 0
+    provider_used: str = ""
+    errors: list[str] = field(default_factory=list)
+
+
+def _system_prompt(cfg: dict, glossary: dict, examples: list[tuple[str, str]], batch: bool) -> str:
+    src = LANG_NAMES.get(cfg["idioma_origem"], cfg["idioma_origem"])
+    dst = LANG_NAMES.get(cfg["idioma"], cfg["idioma"])
+    lines = [f"You are a professional video game translator from {src} to {dst}.",
+             "Keep every marker like ⟦0⟧, ⟦1⟧ exactly as is (they are game control codes); do not add new ones.",
+             "Keep it natural for players, short like the original (text boxes are small), same tone.",
+             "Never add explanations or notes."]
+    if glossary:
+        lines.append("Mandatory glossary (source => target; '=' means keep unchanged): " +
+                     "; ".join(f"{k} => {v}" for k, v in list(glossary.items())[:80]))
+    if examples:
+        lines.append("Examples of the expected style:")
+        lines += [f"- {a} => {b}" for a, b in examples[:8]]
+    if batch:
+        lines.append('Input is a JSON object {"id": "text"}. Answer ONLY with a JSON object with the same ids '
+                     'and the translated texts.')
+    else:
+        lines.append("Answer only with the translation.")
+    return "\n".join(lines)
+
+
+def _parse_batch(raw: str) -> dict:
+    m = re.search(r"\{.*\}", raw, re.S)
+    if not m:
+        raise ValueError("sem JSON na resposta")
+    return json.loads(m.group(0))
+
+
+def _cache_path(paths: Paths, job: str) -> Path:
+    return paths.data / "traducao" / "cache" / f"{job}.json"
+
+
+def _h(text: str) -> str:
+    return hashlib.sha1(text.encode("utf-8")).hexdigest()[:16]
+
+
+def translate(paths: Paths, cfg: dict, items: list[Item], job: str, glossary: Optional[dict] = None,
+              examples: Optional[list[tuple[str, str]]] = None, chain: Optional[list[Provider]] = None,
+              progress: Callable[[int, int], None] = lambda done, total: None,
+              should_pause: Callable[[], bool] = lambda: False) -> Result:
+    """Traduz `items`. Nunca levanta exceção por causa de uma frase: o problema vira `flagged`."""
+    glossary = glossary or {}
+    chain = chain if chain is not None else build_chain(paths, cfg)
+    res = Result()
+    if not chain:
+        res.errors.append("nenhum provedor de IA disponível (instale o Ollama ou configure uma chave)")
+        return res
+    cp = _cache_path(paths, job)
+    cp.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        cache = json.loads(cp.read_text("utf-8"))
+    except (OSError, ValueError):
+        cache = {}
+    todo = []
+    for it in items:
+        if only_codes(it.text):
+            res.translated[it.id] = it.text
+        elif _h(it.text) in cache:
+            res.translated[it.id] = cache[_h(it.text)]
+        else:
+            todo.append(it)
+    total, done = len(items), len(items) - len(todo)
+    progress(done, total)
+    limit = int(cfg.get("limite_diario_tokens", 0) or 0)
+    prov_i = 0
+
+    def save_cache():
+        tmp = cp.with_name(cp.name + ".tmp")
+        tmp.write_text(json.dumps(cache, ensure_ascii=False), "utf-8")
+        os.replace(tmp, cp)
+
+    def accept(it: Item, out: str) -> None:
+        out = out.strip().strip('"')
+        if not placeholders_ok(it.text, out):
+            res.flagged[it.id] = "a IA perdeu/inventou códigos do jogo — mantido o original"
+            return
+        if not out:
+            res.flagged[it.id] = "resposta vazia — mantido o original"
+            return
+        if it.max_len and len(out) > it.max_len:
+            res.flagged[it.id] = f"ficou maior que o espaço ({len(out)} > {it.max_len}) — mantido o original"
+            return
+        res.translated[it.id] = out
+        cache[_h(it.text)] = out
+        g = apply_glossary_check(it.text, out, glossary)
+        if g:
+            res.review[it.id] = g  # traduzido, mas vale uma olhada
+
+    i = 0
+    while i < len(todo):
+        while should_pause():
+            time.sleep(30)
+        if prov_i >= len(chain):
+            for it in todo[i:]:
+                res.flagged[it.id] = "nenhum provedor respondeu"
+            res.errors.append("todos os provedores falharam")
+            break
+        prov = chain[prov_i]
+        if not prov.free and limit and tokens_today(paths) >= limit:
+            res.errors.append(f"limite diário de tokens atingido ({limit}) no {prov.name}")
+            prov_i += 1
+            continue
+        size = 1 if prov.single else int(prov.spec.get("lote", cfg.get("lote", 20)))
+        batch = todo[i:i + size]
+        rel_ex = _relevant_examples(examples or [], batch)
+        try:
+            if size == 1:
+                raw, tok = prov.chat(_system_prompt(cfg, _gloss_for(glossary, batch), rel_ex, False), batch[0].text)
+                accept(batch[0], raw)
+            else:
+                raw, tok = prov.chat(_system_prompt(cfg, _gloss_for(glossary, batch), rel_ex, True),
+                                     json.dumps({it.id: it.text for it in batch}, ensure_ascii=False))
+                try:
+                    got = _parse_batch(raw)
+                except (ValueError, json.JSONDecodeError):
+                    got = {}
+                for it in batch:
+                    if it.id in got and isinstance(got[it.id], str):
+                        accept(it, got[it.id])
+                    else:  # a IA pulou esta frase: tenta sozinha
+                        try:
+                            r1, t1 = prov.chat(_system_prompt(cfg, _gloss_for(glossary, [it]), rel_ex, False), it.text)
+                            tok += t1
+                            accept(it, r1)
+                        except ProviderError as e:
+                            res.flagged[it.id] = f"falha na IA: {e}"
+            res.tokens += tok
+            res.provider_used = res.provider_used or prov.name
+            if not prov.free:
+                add_tokens(paths, tok)
+            i += len(batch)
+            done += len(batch)
+            progress(done, total)
+            save_cache()
+        except ProviderError as e:
+            res.errors.append(f"{prov.name}: {e}")
+            prov_i += 1  # próximo da cadeia; a mesma frase é tentada de novo
+    save_cache()
+    return res
+
+
+def _gloss_for(glossary: dict, batch: list[Item]) -> dict:
+    text = " ".join(it.text.lower() for it in batch)
+    return {k: v for k, v in glossary.items() if k.lower() in text}
+
+
+def _relevant_examples(examples: list[tuple[str, str]], batch: list[Item], n: int = 6) -> list[tuple[str, str]]:
+    """Few-shot: os pares de referência que mais compartilham palavras com o lote."""
+    if not examples:
+        return []
+    words = set(re.findall(r"\w{4,}", " ".join(it.text.lower() for it in batch)))
+    scored = sorted(examples, key=lambda p: -len(words & set(re.findall(r"\w{4,}", p[0].lower()))))
+    return scored[:n]
+
+
+def apply_glossary_check(src: str, out: str, glossary: dict) -> Optional[str]:
+    """Glossário obrigatório: termo da origem presente => tradução fixa deve aparecer."""
+    for k, v in glossary.items():
+        want = k if v == "=" else v
+        if k.lower() in src.lower() and want.lower() not in out.lower():
+            return f"glossário: '{k}' deveria virar '{want}'"
+    return None
+
+
+def load_glossary(paths: Paths, name: str = "") -> dict:
+    """glossario.toml: [geral] e [<jogo/franquia>]; "=" mantém o termo (nomes próprios)."""
+    p = paths.config / "glossario.toml"
+    if not p.exists():
+        return {}
+    g = tomllib.loads(p.read_text("utf-8"))
+    out = dict(g.get("geral", {}))
+    if name:
+        for sec, terms in g.items():
+            if sec != "geral" and isinstance(terms, dict) and sec.lower() in name.lower():
+                out.update(terms)
+    return out

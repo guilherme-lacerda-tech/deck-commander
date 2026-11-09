@@ -80,6 +80,36 @@ def apply_ips(src: bytes, patch: bytes) -> bytes:
         out[off:off + len(chunk)] = chunk
 
 
+def _varint(n: int) -> bytes:
+    out = bytearray()
+    while True:
+        x, n = n & 0x7F, n >> 7
+        if n == 0:
+            out.append(0x80 | x)
+            return bytes(out)
+        out.append(x)
+        n -= 1
+
+
+def create_bps(src: bytes, tgt: bytes) -> bytes:
+    """Gera um patch BPS (SourceRead onde é igual, TargetRead onde muda). Simples, sempre válido."""
+    out = bytearray(b"BPS1" + _varint(len(src)) + _varint(len(tgt)) + _varint(0))
+    o, n = 0, len(tgt)
+    while o < n:
+        same = o < len(src) and src[o] == tgt[o]
+        e = o
+        while e < n and ((e < len(src) and src[e] == tgt[e]) == same):
+            e += 1
+        if same:
+            out += _varint(((e - o - 1) << 2) | 0)
+        else:
+            out += _varint(((e - o - 1) << 2) | 1) + tgt[o:e]
+        o = e
+    out += _crc(src).to_bytes(4, "little") + _crc(tgt).to_bytes(4, "little")
+    out += _crc(bytes(out)).to_bytes(4, "little")
+    return bytes(out)
+
+
 def apply_bps(src: bytes, patch: bytes) -> bytes:
     if _crc(patch[:-4]) != int.from_bytes(patch[-4:], "little"):
         raise PatchError("BPS: CRC do patch inválido")

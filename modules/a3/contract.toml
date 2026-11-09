@@ -1,0 +1,10 @@
+id = "A3"
+name = "Conversão de Switch (organizar update/DLC, descompactar NSZ/XCZ)"
+inputs = ["NSP/XCI/NSZ/XCZ"]
+outputs = ["pasta por jogo", "NSP/XCI descompactado"]
+owns = ["roms:switch-layout"]
+forbids = ["roms:delete", "secrets:export"]
+depends_on = ["M0", "M18+M19"]
+optional_depends = ["M4"]
+fail_mode = "falha -> original intacto; comprimido original vai para a quarentena, nunca apagado"
+reversibility = "rollback_full"

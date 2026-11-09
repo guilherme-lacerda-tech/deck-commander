@@ -24,8 +24,31 @@ QBT_BIN = H / ".local/bin/qbittorrent-nox"
 QBT_URL = "https://github.com/userdocs/qbittorrent-nox-static/releases/latest/download/x86_64-qbittorrent-nox"
 QBT_PROFILE = H / ".local/share/deck-commander/qbittorrent"
 PY = "/usr/bin/python3"
+DCS = H / ".local/share/deck-commander"
+OLLAMA_DIR = DCS / "ollama"
+OLLAMA_BIN = OLLAMA_DIR / "bin/ollama"
+OLLAMA_MODELS = DCS / "ollama-models"
+OLLAMA_URLS = ["https://github.com/ollama/ollama/releases/latest/download/ollama-linux-amd64.tgz",
+               "https://github.com/ollama/ollama/releases/latest/download/ollama-linux-amd64.tar.zst"]
+OLLAMA_MODEL = "translategemma:4b"
+MEOWTH_VENV = DCS / "meowth-venv"
+NSZ_VENV = DCS / "nsz-venv"
 
 UNIT_FILES = {
+    "deck-commander-ollama.service": f"""[Unit]
+Description=Deck Commander — IA local de tradução (Ollama, só 127.0.0.1)
+ConditionPathExists={OLLAMA_BIN}
+[Service]
+ExecStart={OLLAMA_BIN} serve
+Environment=OLLAMA_HOST=127.0.0.1:11434
+Environment=OLLAMA_MODELS={OLLAMA_MODELS}
+Environment=OLLAMA_KEEP_ALIVE=5m
+Nice=15
+Restart=always
+RestartSec=30
+[Install]
+WantedBy=default.target
+""",
     "deck-commander-qbittorrent.service": f"""[Unit]
 Description=Deck Commander — qBittorrent (WebUI só em 127.0.0.1:8790)
 ConditionPathExists={QBT_BIN}
@@ -92,7 +115,9 @@ MODULE_UNITS = {  # o que cada módulo liga
     "M4": ["deck-commander-qbittorrent.service", "deck-commander-power.service", "deck-commander-bot.service"],
     "M10": ["deck-commander-tests.timer"],
     "M11": ["deck-commander-updates.timer"],
+    "A1": ["deck-commander-ollama.service"],
 }
+EXTRA_MODULES = ["A1", "A2", "A3"]  # adições opcionais: ./setup-deck.sh --modules A1,A2,A3
 ALL_MODULES = ["M-1", "M0", "M18+M19", "M27", "M1", "M2", "M3", "M4", "M5", "M6", "M7", "M20", "M21",
                "M10", "M11", "M12", "M15", "M16", "M17"]
 
@@ -108,6 +133,47 @@ def download(url: str, dest: Path) -> None:
     with urllib.request.urlopen(req, timeout=120) as r, open(tmp, "wb") as f:
         shutil.copyfileobj(r, f)
     os.replace(tmp, dest)
+
+
+def _venv_pip(venv: Path, package: str, log: list[str]) -> None:
+    if not (venv / "bin/pip").exists():
+        subprocess.run([PY, "-m", "venv", str(venv)], check=True)
+    r = subprocess.run([str(venv / "bin/pip"), "install", "-q", "--upgrade", package], capture_output=True, text=True)
+    log.append(f"{package}: {'instalado em ' + str(venv) if r.returncode == 0 else 'FALHOU ' + r.stderr.strip()[-200:]}")
+
+
+def install_ai(log: list[str]) -> None:
+    """A1/A2: Ollama no próprio Deck (tudo no $HOME) + modelo de tradução + Meowth (extrator GBA)."""
+    if not OLLAMA_BIN.exists():
+        OLLAMA_DIR.mkdir(parents=True, exist_ok=True)
+        for url in OLLAMA_URLS:
+            arc = DCS / Path(url).name
+            try:
+                download(url, arc)
+                flag = "--zstd" if url.endswith(".zst") else "-z"
+                subprocess.run(["tar", flag, "-xf", str(arc), "-C", str(OLLAMA_DIR)], check=True)
+                arc.unlink(missing_ok=True)
+                break
+            except (OSError, subprocess.SubprocessError) as e:
+                arc.unlink(missing_ok=True)
+                log.append(f"Ollama: {Path(url).name} falhou ({e})")
+        log.append("Ollama instalado em " + str(OLLAMA_DIR) if OLLAMA_BIN.exists() else "PENDENTE: Ollama não instalou")
+    if OLLAMA_BIN.exists():
+        OLLAMA_MODELS.mkdir(parents=True, exist_ok=True)
+        _sc("daemon-reload"); _sc("enable", "--now", "deck-commander-ollama.service")
+        env = {**os.environ, "OLLAMA_HOST": "127.0.0.1:11434", "OLLAMA_MODELS": str(OLLAMA_MODELS)}
+        import time
+        for _ in range(30):  # espera o serviço subir
+            if subprocess.run([str(OLLAMA_BIN), "list"], env=env, capture_output=True).returncode == 0:
+                break
+            time.sleep(1)
+        r = subprocess.run([str(OLLAMA_BIN), "pull", OLLAMA_MODEL], env=env, capture_output=True, text=True)
+        log.append(f"modelo {OLLAMA_MODEL}: " + ("pronto" if r.returncode == 0 else "FALHOU " + r.stderr.strip()[-200:]))
+    _venv_pip(MEOWTH_VENV, "meowth", log)
+
+
+def install_nsz(log: list[str]) -> None:
+    _venv_pip(NSZ_VENV, "nsz", log)
 
 
 def install_qbittorrent(log: list[str]) -> None:
@@ -299,6 +365,18 @@ def setup(paths: Paths, modules: list[str], dev: bool = False, downloads: bool =
             install_qbittorrent(log)
         elif not QBT_BIN.exists():
             log.append("PENDENTE: qbittorrent-nox (rode ./setup-deck.sh --all para baixar)")
+    if wanted & {"A1", "A2"}:
+        from .traducao import ia
+        log.append(f"configuração da tradução: {ia.write_default_cfg(paths)}")
+        if downloads:
+            install_ai(log)
+        elif not OLLAMA_BIN.exists():
+            log.append("PENDENTE: Ollama/Meowth (rode ./setup-deck.sh --modules A1,A2,A3)")
+    if "A3" in wanted:
+        if downloads:
+            install_nsz(log)
+        elif not (NSZ_VENV / "bin/nsz").exists():
+            log.append("PENDENTE: nsz (rode ./setup-deck.sh --modules A3)")
     if dev:
         venv = H / ".local/share/deck-commander/venv"
         if not venv.exists():
