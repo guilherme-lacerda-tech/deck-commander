@@ -203,6 +203,76 @@ async function cycle(force) {
     busy = false;
 }
 
+function runningAppId() {
+    // jogo aberto agora (o painel do Deck abre por cima do jogo)
+    try {
+        const r = (window.DFL && window.DFL.Router) || (window.DeckyPluginLoader && window.DeckyPluginLoader.router);
+        const a = r && r.MainRunningApp;
+        if (a && a.appid) return a.appid;
+    } catch (e) { /* sem jogo aberto */ }
+    try {
+        const apps = window.SteamUIStore && window.SteamUIStore.RunningApps;
+        if (apps && apps.length) return apps[0].appid;
+    } catch (e) { /* idem */ }
+    return null;
+}
+
+const NOMES = { bateria: "🔋 Bateria", equilibrado: "⚖️ Equilibrado", qualidade: "✨ Qualidade" };
+const NIVEL = (n) => (n === 1 ? "nativo" : n + "x");
+
+function Btn(props) {
+    return h("button", {
+        className: "DialogButton",
+        style: Object.assign({ margin: "2px", padding: "4px 8px", minWidth: "0", fontSize: "12px",
+            outline: props.on ? "2px solid #1a9fff" : "none" }, props.style || {}),
+        onClick: props.onClick,
+    }, props.children);
+}
+
+function DesempenhoPanel() {
+    const [g, setG] = SP_REACT.useState(null);
+    const [adv, setAdv] = SP_REACT.useState(false);
+    const [msg, setMsg] = SP_REACT.useState("");
+    const load = async () => setG(await call("panel", runningAppId()));
+    SP_REACT.useEffect(() => { load(); }, []);
+    const act = async (fn, ...args) => { setMsg(await call(fn, ...args) || ""); await load(); };
+    const row = (t, s) => h("div", { style: Object.assign({ padding: "3px 0", fontSize: "12px" }, s || {}) }, t);
+    if (!g) return row("carregando…");
+    if (!g.game_id) return row("Abra um jogo (ou jogue um) para ajustar a qualidade dele aqui.");
+    const out = [h("div", { style: { fontWeight: "bold", fontSize: "13px", padding: "4px 0" } }, g.title || g.game_id)];
+    if (!g.supported) {
+        out.push(row("Este console ainda não tem ajuste de qualidade (roda na resolução do emulador)."));
+    } else {
+        out.push(row("Só este jogo (vale ao reabrir o jogo):"));
+        out.push(h("div", null,
+            ...g.presets.map((p) => h(Btn, { key: p, on: g.game_preset === p, onClick: () => act("set_game_preset", g.game_id, p) }, NOMES[p])),
+            h(Btn, { on: !g.override, onClick: () => act("set_game_preset", g.game_id, null) }, "Padrão")));
+        out.push(row("Agora: " + (g.override ? NIVEL(g.override) + " (deste jogo)" :
+            (g.console_level ? NIVEL(g.console_level) + " (padrão do console)" : "padrão do emulador")), { opacity: 0.8 }));
+    }
+    if (g.history && g.history.length) {
+        out.push(row("Últimas partidas:", { marginTop: "6px", fontWeight: "bold" }));
+        g.history.forEach((t) => out.push(row(t, { whiteSpace: "pre-wrap", opacity: 0.9 })));
+    } else {
+        out.push(row("Ainda sem medição: jogue alguns minutos e feche o jogo — o resumo aparece aqui e no Telegram.", { opacity: 0.8 }));
+    }
+    out.push(h(Btn, { style: { marginTop: "6px" }, onClick: () => setAdv(!adv) }, adv ? "Fechar avançado" : "Avançado…"));
+    if (adv) {
+        if (g.supported) {
+            out.push(row("Resolução exata deste jogo:"));
+            out.push(h("div", null, ...g.levels.map((n) => h(Btn, { key: n, on: g.override === n,
+                onClick: () => act("set_game_level", g.game_id, n) }, NIVEL(n)))));
+            out.push(row("Padrão de TODOS os jogos deste console:"));
+            out.push(h("div", null, ...g.presets.map((p) => h(Btn, { key: p, on: g.console_preset === p,
+                onClick: () => act("set_console_preset", g.console, p) }, NOMES[p]))));
+        }
+        out.push(h(Btn, { on: g.measure, onClick: () => act("set_measure", !g.measure) },
+            g.measure ? "Medir desempenho: ligado" : "Medir desempenho: desligado"));
+    }
+    if (msg) out.push(row(msg, { color: "#8bc34a" }));
+    return h("div", null, ...out);
+}
+
 function Panel() {
     const [st, setSt] = SP_REACT.useState(null);
     const refresh = async () => setSt(await call("get_status"));
@@ -217,7 +287,10 @@ function Panel() {
             style: { marginTop: "8px" },
             onClick: async () => { await cycle(true); await refresh(); },
         }, "Verificar agora"),
-        ...lastLog.map(row));
+        ...lastLog.map(row),
+        h("div", { style: { borderTop: "1px solid #ffffff30", marginTop: "10px", paddingTop: "6px" } },
+            h("div", { style: { fontWeight: "bold", fontSize: "14px" } }, "Desempenho e qualidade"),
+            h(DesempenhoPanel, null)));
 }
 
 var index = definePlugin(() => {

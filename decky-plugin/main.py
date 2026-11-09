@@ -115,6 +115,68 @@ class Plugin:
                 "removed": sum(1 for v in done.values() if v.get("removed")),
                 "errors": [k for k, v in done.items() if v.get("error")][-5:]}
 
+    # ---- Painel de desempenho e qualidade -------------------------------------------------------------
+    def _dc(self):
+        """Carrega o código do Deck Commander (mesmo usuário; ~/deck-commander)."""
+        import sys
+        os.environ["HOME"] = HOME  # o código do DC acha as configs dos emuladores a partir do HOME
+        repo = os.path.join(HOME, "deck-commander")
+        if repo not in sys.path:
+            sys.path.insert(0, repo)
+        from dc import perf, quality, tuning
+        from dc.paths import get_paths
+        return perf, quality, tuning, get_paths()
+
+    def _game(self, appid=None, game_id=None):
+        lm = _load(os.path.join(BASE, "launch-map.json"), {})
+        if game_id is None and appid:
+            done = _load(DONE, {})
+            want = int(appid) & 0xFFFFFFFF
+            game_id = next((g for g, v in done.items() if (int(v.get("appid") or 0) & 0xFFFFFFFF) == want), None)
+        if game_id is None:  # nenhum jogo aberto: o último medido
+            game_id = _load(os.path.join(BASE, "perf-last.json"), {}).get("game_id")
+        return game_id, lm.get(game_id or "", {})
+
+    async def panel(self, appid=None):
+        perf, quality, tuning, paths = self._dc()
+        game_id, g = self._game(appid)
+        console = g.get("console")
+        out = {"game_id": game_id, "title": g.get("title"), "console": console, "measure": perf.enabled(paths),
+               "presets": list(tuning.NAMES), "supported": bool(console and tuning.supported(console))}
+        if not game_id:
+            return out
+        over = quality.get_override(paths, game_id)
+        cl = tuning.console_level(console) if out["supported"] else None
+        out.update(override=over, game_preset=tuning.preset_of(console, over) if over else None,
+                   console_level=cl, console_preset=tuning.preset_of(console, cl),
+                   levels=[1, 2, 3, 4, 5][:quality.MAX.get(console, 4)],
+                   history=[perf.describe(dict(h, title=g.get("title"))) for h in perf.history(paths.state, game_id)[-3:]][::-1])
+        return out
+
+    async def set_game_preset(self, game_id, preset=None):
+        perf, quality, tuning, paths = self._dc()
+        _, g = self._game(game_id=game_id)
+        return tuning.apply_game(paths, game_id, g.get("console"), preset)
+
+    async def set_game_level(self, game_id, level=None):
+        perf, quality, tuning, paths = self._dc()
+        _, g = self._game(game_id=game_id)
+        return quality.set_override(paths, game_id, g.get("console"),
+                                    None if level is None else quality.LABEL[int(level)])
+
+    async def set_console_preset(self, console, preset):
+        perf, quality, tuning, paths = self._dc()
+        return tuning.apply_console(console, preset)
+
+    async def set_measure(self, on):
+        perf, quality, tuning, paths = self._dc()
+        f = paths.config / "desempenho.json"
+        cfg = _load(str(f), {})
+        cfg["medir"] = bool(on)
+        f.parent.mkdir(parents=True, exist_ok=True)
+        _save(str(f), cfg)
+        return "medição ligada" if on else "medição desligada"
+
     async def _main(self):
         os.makedirs(BASE, exist_ok=True)
 

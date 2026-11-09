@@ -33,6 +33,7 @@ TARGETS = {
     "gc": ("ini", [H / ".var/app/org.DolphinEmu.dolphin-emu/config/dolphin-emu/GFX.ini"], "Settings", "InternalResolution"),
     "wii": ("ini", [H / ".var/app/org.DolphinEmu.dolphin-emu/config/dolphin-emu/GFX.ini"], "Settings", "InternalResolution"),
     "psp": ("ini", [H / ".var/app/org.ppsspp.PPSSPP/config/ppsspp/PSP/SYSTEM/ppsspp.ini"], "Graphics", "InternalResolution"),
+    "n3ds": ("ini", [H / ".var/app/org.azahar_emu.Azahar/config/azahar-emu/qt-config.ini"], "Renderer", "resolution_factor"),
     "switch": ("json", [H / ".config/Ryujinx/Config.json",
                         H / ".var/app/io.github.ryubing.Ryujinx/config/Ryujinx/Config.json"], None, "res_scale"),
 }
