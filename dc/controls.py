@@ -85,6 +85,21 @@ def check(home: Path = H) -> list[Check]:
         t = melonds_path(home)
         ok = t.exists() and "[Instance0.Joystick]" in t.read_text("utf-8", "replace")
         out.append(Check("melonDS (DS)", ok, "controle mapeado (A=A)" if ok else "sem controle mapeado"))
+    for name, app, auto in (("xemu (Xbox)", "app.xemu.xemu", True), ("Flycast (Dreamcast)", "org.flycast.Flycast", True)):
+        if (home / ".var/app" / app).exists():
+            out.append(Check(name, True, "reconhece o controle sozinho"))
+    # Estes gravam o controle pelo identificador do aparelho: precisa ser feito UMA vez com o controle ligado
+    once = {"Azahar (3DS)": ("org.azahar_emu.Azahar", "config/azahar-emu/qt-config.ini", "engine:sdl"),
+            "Cemu (Wii U)": ("info.cemu.Cemu", "config/Cemu/controllerProfiles/controller0.xml", "SDLController"),
+            "RPCS3 (PS3)": ("net.rpcs3.RPCS3", "config/rpcs3/input_configs/global/Default.yml", "Handler: SDL")}
+    for name, (app, rel, marker) in once.items():
+        base = home / ".var/app" / app
+        if not base.exists():
+            continue
+        f = base / rel
+        ok = f.exists() and marker in f.read_text("utf-8", "replace")
+        out.append(Check(name, ok, "controle configurado" if ok else
+                         "configurar o controle UMA vez: modo desktop → abrir o emulador → Controles → escolher o controle"))
     return out
 
 
