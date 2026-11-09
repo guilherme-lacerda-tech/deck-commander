@@ -65,13 +65,26 @@ def main(argv: list[str]) -> None:
         rec = quality.apply_for_launch(paths, game_id, launch_map[game_id]["console"])
     except Exception as e:  # noqa: BLE001 — ajuste de qualidade nunca impede o jogo de abrir
         say(f"qualidade: ignorado ({e})"); rec = None
+    from . import perf
+    console = launch_map[game_id]["console"]
+    measure = perf.enabled(paths)
+    log_dir = None
+    if measure:
+        try:
+            cmd, log_dir = perf.wrap_command(cmd)
+        except Exception as e:  # noqa: BLE001 — medição nunca impede o jogo de abrir
+            say(f"desempenho: medição desligada ({e})"); measure = False
     say(f"lançando {game_id}: {cmd}")
-    if not rec:
+    if not rec and not measure:
         os.execvp(cmd[0], cmd)
-    say(f"qualidade deste jogo: {rec['key']} {rec['old']} -> {rec['new']} (volta ao fechar)")
+    if rec:
+        say(f"qualidade deste jogo: {rec['key']} {rec['old']} -> {rec['new']} (volta ao fechar)")
     import signal
     import subprocess
+    import time
+    t0 = time.time()
     child = subprocess.Popen(cmd)
+    sampler = perf.Sampler().start() if measure else None
 
     def _stop(signum, _frame):  # "Sair do jogo" do Steam: fecha o emulador e ainda devolve a qualidade
         child.send_signal(signum)
@@ -83,11 +96,19 @@ def main(argv: list[str]) -> None:
 
     signal.signal(signal.SIGTERM, _stop)
     signal.signal(signal.SIGHUP, _stop)
+    code = 1
     try:
         code = child.wait()
     finally:
-        try:
-            say(f"qualidade: {quality.restore(paths)}")
-        except Exception as e:  # noqa: BLE001
-            say(f"qualidade: devolução falhou ({e}); o serviço tenta de novo")
+        if sampler:
+            try:
+                res = perf.finish_session(paths, game_id, console, title, log_dir, t0, sampler, rec)
+                say(f"desempenho: {res}")
+            except Exception as e:  # noqa: BLE001
+                say(f"desempenho: não registrado ({e})")
+        if rec:
+            try:
+                say(f"qualidade: {quality.restore(paths)}")
+            except Exception as e:  # noqa: BLE001
+                say(f"qualidade: devolução falhou ({e}); o serviço tenta de novo")
     sys.exit(code)
