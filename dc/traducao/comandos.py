@@ -120,6 +120,8 @@ def _lista(bot) -> str:
         label = f"{g['title']} ({g['console']})"
         if st:
             pt.append(f"• {label} — {dict(oficial='oficial', mod='tradução DC', traduzido='traduzido/dublado')[st]}")
+        elif idi.get(gid, {}).get("formato") == "fechado":
+            cant.append(f"• {label} — textos em formato próprio do jogo")
         elif g["console"] == "switch" or g["console"] == "gba":
             can.append(f"• {label}")
         else:
@@ -128,7 +130,7 @@ def _lista(bot) -> str:
     if can:
         out += ["", f"Pode tentar /traduzir ({len(can)}):", *can]
     if cant:
-        out += ["", f"Sem tradução automática ({len(cant)}) — PS1/PS2/etc. não têm extrator de texto confiável:", *cant]
+        out += ["", f"Sem tradução automática ({len(cant)}) — PS1/PS2 e formatos próprios não têm extrator confiável:", *cant]
     return "\n".join(out)
 
 

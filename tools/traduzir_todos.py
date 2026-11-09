@@ -22,6 +22,7 @@ b.cfg_path = tmp
 b.cfg = json.loads(tmp.read_text("utf-8"))
 b.cfg.pop("notify_chat", None)
 b.send = lambda chat, text: None
+b.limited = lambda uid: False  # teste: sem o limite anti-spam de 20 comandos/minuto
 uid = b.cfg["allowed"][0]
 started = []
 run.spawn = lambda p, op: started.append(op)

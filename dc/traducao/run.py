@@ -278,6 +278,7 @@ def _dispatch(paths, store, job, cfg, progress, should_pause) -> tuple[dict, str
                         f"ou extraia os arquivos: Ryujinx → botão direito no jogo → Extrair dados → RomFS → "
                         f"~/Emulation/romfs/{tid}. Depois mande /traduzir de novo."), False
                 if not romfs:
+                    portugues.mark(paths.data, job["game_id"], formato="fechado")
                     return {"title_id": tid}, (
                         f"Não dá para traduzir este jogo automaticamente: {e}. Os textos dele não estão no formato "
                         "padrão da Nintendo (MSBT), e mexer em formato desconhecido poderia quebrar o jogo."), False
