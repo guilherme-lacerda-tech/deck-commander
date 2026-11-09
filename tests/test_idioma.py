@@ -25,3 +25,20 @@ def test_dominant_language_and_tbl(tmp_path):
     assert idioma.dominant_language(["Нажмите СТАРТ чтобы начать игру", "Вставьте карту памяти", "OK"]) == "ru"
     tbl = idioma.write_tbl(tmp_path / "cp1251.tbl", "cp1251").read_text("utf-8").splitlines()
     assert "C0=А" in tbl and "41=A" in tbl and len(tbl) > 180
+
+
+def test_gate_blocks_real_junk_from_russian_dumps():
+    gos = ["God of War", "o binary in 0.006000 seconds", "ion during this session."] * 10 + ["ヶ淳wミヘワバ", "膜ホュ荘槽喧妹"] * 13
+    ok, why = idioma.extraction_is_clean(gos, idioma.language_from_name("GOW GoS rus.iso"))
+    assert not ok
+    nfs = ["Persistent Memory Pool", "Audio Memory Pool", "Database not initialized"]
+    ok, why = idioma.extraction_is_clean(nfs, idioma.language_from_name(
+        "Need for Speed Most Wanted Black Edition [RUS NTSC] [ViT Company].iso"))
+    assert not ok and "RU" in why
+
+
+def test_gate_accepts_clean_text():
+    ok, _ = idioma.extraction_is_clean(["Press START to continue", "Save your game?", "You found a key"])
+    assert ok
+    ok, _ = idioma.extraction_is_clean(["Нажмите СТАРТ чтобы начать игру", "Вставьте карту памяти"], "ru")
+    assert ok

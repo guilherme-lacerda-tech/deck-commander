@@ -117,6 +117,37 @@ def dominant_language(texts: list[str]) -> Optional[str]:
     return c.most_common(1)[0][0] if c else None
 
 
+def extraction_is_clean(texts: list[str], expected: Optional[str] = None,
+                        min_share: float = 0.7) -> tuple[bool, str]:
+    """Trava de segurança antes de gravar tradução num jogo: o texto extraído precisa ser de UMA língua
+    predominante (>= 70%). Quando a extração pega dados internos, sai uma mistura (inglês de programador +
+    bytes que parecem japonês + desconhecido) e gravar em cima disso quebra o jogo. `expected` = língua que o
+    nome do arquivo indica (ex.: RUS); se o texto achado não for dela, o texto de verdade não foi encontrado."""
+    langs = Counter(language(t) or "?" for t in texts)
+    total = sum(langs.values())
+    if not total:
+        return False, "nenhum texto"
+    top, n = langs.most_common(1)[0]
+    share = n / total
+    resumo = ", ".join(f"{k} {v}" for k, v in langs.most_common(4))
+    if top == "?" or share < min_share:
+        return False, f"texto misturado/ilegível ({resumo}) — o texto de verdade do jogo não foi encontrado"
+    if expected and top != expected:
+        return False, f"o jogo é {expected.upper()} mas o texto achado é {top.upper()} ({resumo})"
+    return True, resumo
+
+
+_NAME_LANG = [(re.compile(r"\b(rus|russian|russkiy)\b|\[ru\]|\(ru\)", re.I), "ru"),
+              (re.compile(r"\b(jpn|japan|japanese)\b|\(j\)|\[j\]", re.I), "ja")]
+
+
+def language_from_name(name: str) -> Optional[str]:
+    for rx, lang in _NAME_LANG:
+        if rx.search(name):
+            return lang
+    return None
+
+
 def write_tbl(path: Path, codec: str) -> Path:
     """Tabela .tbl (formato 'XX=caractere') de uma codificação de 1 byte (cp1251, cp866, koi8_r)."""
     lines = []

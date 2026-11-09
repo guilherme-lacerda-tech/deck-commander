@@ -194,6 +194,11 @@ def translate_rom(paths: Paths, rom: Path, console: str, title: str = "", chain=
                           "codificação desconhecida); nada foi alterado")
         return rep
     from . import idioma
+    ok, why = idioma.extraction_is_clean([e["sourceText"] for e in picked], idioma.language_from_name(rom.name))
+    if not ok:
+        rep.errors.append(f"não traduzi para não estragar o jogo: {why}; precisa de engenharia reversa do "
+                          "formato de texto deste jogo. Nada foi alterado")
+        return rep
     src = idioma.dominant_language([e["sourceText"] for e in picked]) or "en"
     cfg["idioma_origem"] = src  # traduz a partir da língua em que o jogo veio (russo, japonês, inglês…)
     rep.source_lang, rep.encoding = src, enc_used
