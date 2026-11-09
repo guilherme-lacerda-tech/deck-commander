@@ -78,6 +78,8 @@ def test_protect_restore_and_only_codes():
     p, codes = ia.protect(r"Oi [PLAYER]!\nTudo bem?", pat)
     assert p == "Oi ⟦0⟧!⟦1⟧Tudo bem?" and ia.restore(p, codes) == r"Oi [PLAYER]!\nTudo bem?"
     assert ia.only_codes("⟦0⟧ 12!") and not ia.only_codes("⟦0⟧ Oi")
+    assert ia.only_codes("pppppppppppppppp") and ia.only_codes("Item_Banana_01") and not ia.only_codes("DK!")
+    assert not ia.only_codes("Help me!") and not ia.only_codes("Zips, Hops, and Swaps")
     assert ia.placeholders_ok("a ⟦0⟧ b ⟦1⟧", "⟦1⟧ x ⟦0⟧") and not ia.placeholders_ok("a ⟦0⟧", "a")
 
 

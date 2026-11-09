@@ -30,8 +30,8 @@ PH_OPEN, PH_CLOSE = "⟦", "⟧"
 _PH = re.compile(r"⟦(\d+)⟧")
 
 DEFAULT_CFG = {
-    "provider": "ollama",
-    "fallback": ["index_translate", "github_models"],
+    "provider": "index_translate",   # testado 2026-11-09: rápido, grátis, mantém os marcadores
+    "fallback": ["ollama", "github_models"],
     "modelo": "translategemma:4b",
     "idioma": "pt-BR",
     "idioma_origem": "en",
@@ -45,7 +45,7 @@ DEFAULT_CFG = {
         "ollama": {"tipo": "ollama", "url": "http://127.0.0.1:11434", "modelo": "translategemma:4b", "gratis": True},
         "ollama_pc": {"tipo": "ollama", "url": "", "modelo": "translategemma:12b", "gratis": True},
         "index_translate": {"tipo": "openai", "url": "https://index-translate.bilibili.com/v1",
-                            "modelo": "index-translate", "chave": "", "gratis": True, "lote": 8},
+                            "modelo": "Index-Translate-9B", "chave": "", "gratis": True, "lote": 8},
         "github_models": {"tipo": "openai", "url": "https://models.github.ai/inference",
                           "modelo": "openai/gpt-4.1-mini", "segredo": "github_pat", "gratis": True},
         "openai": {"tipo": "openai", "url": "https://api.openai.com/v1", "modelo": "gpt-4.1-mini", "segredo": "ia_api.key"},
@@ -82,8 +82,10 @@ def write_default_cfg(paths: Paths) -> Path:
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(
             '# Tradução com IA (Deck Commander). Cadeia: provider, depois fallback na ordem.\n'
-            'provider = "ollama"            # IA no próprio Deck (grátis, privada, lenta)\n'
-            'fallback = ["index_translate", "github_models"]\n'
+            '# index_translate: grátis e rápida (o texto do jogo vai para o servidor da Bilibili)\n'
+            '# ollama: no próprio Deck, grátis, privada, sem internet, mas lenta (horas)\n'
+            'provider = "index_translate"\n'
+            'fallback = ["ollama", "github_models"]\n'
             'idioma = "pt-BR"\n'
             'idioma_origem = "en"\n'
             'few_shot = true\n'
@@ -130,8 +132,16 @@ def placeholders_ok(src: str, out: str) -> bool:
 
 
 def only_codes(text: str) -> bool:
-    """Frase sem nada traduzível (só códigos, números, pontuação)."""
-    return not re.search(r"[^\W\d_]", _PH.sub("", text))
+    """Frase sem nada traduzível: só códigos/números/pontuação, um caractere repetido (ícones do jogo,
+    ex.: 'pppppppp' que a fonte desenha como figuras) ou identificador interno (Item_01, BTN_A)."""
+    t = _PH.sub("", text).strip()
+    if not re.search(r"[^\W\d_]", t):
+        return True
+    if re.fullmatch(r"(\S)\1+", t):
+        return True
+    if " " not in t and re.fullmatch(r"[A-Za-z0-9]+(?:[_.][A-Za-z0-9]+)+", t):
+        return True
+    return bool(re.search(r"[-]", t)) and not re.search(r"[A-Za-z]{3,}", t)
 
 
 # ----------------------------------------------------------------------------- uso de tokens
