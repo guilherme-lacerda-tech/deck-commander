@@ -120,18 +120,32 @@ _SERIAL = re.compile(r"^[A-Z]{4}[_-]?\d{3}\.?\d{2}$", re.I)  # SLES_005.24, SLUS
 
 
 def mdf_to_cue(mdf: Path, title: str = "") -> Optional[Path]:
-    """CD de PS1 em .mdf (setores de 2352 bytes) com uma faixa só = o mesmo que .bin; escreve o .cue ao lado.
+    """CD de PS1 em .mdf com uma faixa só vira .bin + .cue (o DuckStation e o tradutor abrem). Setores de 2352
+    bytes = já é um .bin; de 2448 (2352 + 96 de subcanal, dump feito com subcanal) tira o subcanal.
     Com várias faixas (áudio CD) deixa como está: o DuckStation abre o .mds direto."""
-    if mdf.stat().st_size % 2352:
+    size = mdf.stat().st_size
+    sector = 2352 if size % 2352 == 0 else 2448 if size % 2448 == 0 else 0
+    if not sector:
         return None
     mds = mdf.with_suffix(".mds")
     if mds.exists() and _mds_tracks(mds) not in (0, 1):
         return None
     stem = mdf.stem
     if title and _SERIAL.match(stem):  # nome do arquivo é o código do disco: usa o nome do download
-        stem = re.sub(r'[<>:"/\|?*]', "", title).strip() or stem
+        stem = re.sub(r'[<>:"/|?*\\]', "", title).strip() or stem
     bin_ = mdf.with_name(stem + ".bin")
-    mdf.rename(bin_)
+    if sector == 2352:
+        mdf.rename(bin_)
+    else:
+        tmp = bin_.with_name(bin_.name + ".tmp")
+        with open(mdf, "rb") as src, open(tmp, "wb") as dst:
+            while True:
+                chunk = src.read(2448 * 4096)
+                if not chunk:
+                    break
+                dst.write(b"".join(chunk[i:i + 2352] for i in range(0, len(chunk), 2448)))
+        os.replace(tmp, bin_)
+        mdf.unlink()
     if mds.exists():
         mds.unlink()
     cue = bin_.with_suffix(".cue")

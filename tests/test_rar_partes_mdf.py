@@ -46,3 +46,11 @@ def test_disc_code_filename_gets_download_name(tmp_path):
     cue = content.mdf_to_cue(mdf, "Castlevania - Symphony of the Night PSX (PAL)")
     assert cue.name == "Castlevania - Symphony of the Night PSX (PAL).cue"
     assert (tmp_path / "Castlevania - Symphony of the Night PSX (PAL).bin").exists()
+
+
+def test_mdf_with_subchannel_is_stripped(tmp_path):
+    sectors = [bytes([i]) * 2352 + b"\xff" * 96 for i in range(5)]
+    mdf = _f(tmp_path / "SLES_00524.mdf", b"".join(sectors))
+    cue = content.mdf_to_cue(mdf, "Castlevania")
+    data = (tmp_path / "Castlevania.bin").read_bytes()
+    assert cue and len(data) == 5 * 2352 and data[2352] == 1 and b"\xff" not in data and not mdf.exists()
