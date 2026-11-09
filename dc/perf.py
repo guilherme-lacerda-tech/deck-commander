@@ -29,7 +29,8 @@ def parse_mangohud(path: Path) -> dict | None:
                     cpu_temp = float(row[header.index('cpu_temp')])
                     gpu_load = float(row[header.index('gpu_load')])
 
-                    fps_values.append(fps)
+                    elapsed = float(row[header.index('elapsed')]) / 1e9 if 'elapsed' in header else 0.0
+                    fps_values.append((elapsed, fps))
                     cpu_temp_max = max(cpu_temp_max, cpu_temp)
                     gpu_load_sum += gpu_load
                     samples += 1
@@ -38,9 +39,13 @@ def parse_mangohud(path: Path) -> dict | None:
 
             if not fps_values:
                 return None
+            # os primeiros 15 s são carregamento/compilação de shaders: não contam como travada do jogo
+            t0 = fps_values[0][0]
+            rest = [f for e, f in fps_values if e - t0 >= 15]
+            fps_values = rest if len(rest) >= 20 else [f for _, f in fps_values]
 
             fps_avg = sum(fps_values) / len(fps_values)
-            fps_low = min(fps_values)
+            fps_low = sorted(fps_values)[len(fps_values) // 100]  # 1% mais lento (com poucas amostras = mínimo)
 
             target = 60 if fps_avg > 35 else 30
             slow_share = sum(1 for f in fps_values if f < 0.9 * target) / len(fps_values)
@@ -128,16 +133,25 @@ def verdict(fps_avg: float, fps_low: float, slow_share: float, target: int) -> s
         return "oscilando"
 
 
-def wrap_command(cmd: list[str], home: Path=Path.home()) -> tuple[list[str], Path]:
+def wrap_command(cmd: list[str], home: Path=Path.home(), seconds: int | None = None) -> tuple[list[str], Path]:
+    """Liga o MangoHud (sem mostrar nada na tela). Ele só grava o arquivo quando o registro termina, então o
+    registro tem duração fixa (benchmark: o tempo do teste; partida: os primeiros 5 minutos) e o arquivo
+    fica pronto mesmo que o jogo seja fechado à força."""
+    seconds = seconds or int(os.environ.get('DC_PERF_SECONDS', '300'))
+    # no_display desliga também o registro; por isso o HUD fica ligado, mas 100% transparente
+    mh = f'alpha=0.0,background_alpha=0.0,fps_only=1,autostart_log=3,log_interval=250,log_duration={seconds}'
     if cmd[0].endswith('flatpak') and cmd[1] == 'run':
         app = cmd[2]
         log_dir = home / '.var/app' / app / 'dc-perf'
         # Inserimos os argumentos logo após 'run'
         # opções do flatpak vêm antes do nome do app
-        new_cmd = cmd[:2] + ['--env=MANGOHUD=1', f'--env=MANGOHUD_CONFIG=no_display,autostart_log=1,log_interval=500,output_folder={log_dir}'] + cmd[2:]
+        # o carregador do Vulkan do sandbox não procura em /usr/lib/extensions: caminho e camada explícitos
+        layer = '/usr/lib/extensions/vulkan/MangoHud/share/vulkan/implicit_layer.d'
+        new_cmd = cmd[:2] + [f'--env=VK_ADD_LAYER_PATH={layer}', '--env=VK_INSTANCE_LAYERS=VK_LAYER_MANGOHUD_overlay_x86_64',
+                             '--env=MANGOHUD=1', f'--env=MANGOHUD_CONFIG={mh},output_folder={log_dir}'] + cmd[2:]
     else:
         log_dir = home / '.local/share/deck-commander/perf-logs'
-        new_cmd = ['/usr/bin/env', 'MANGOHUD=1', 'MANGOHUD_CONFIG=no_display,autostart_log=1,log_interval=500,output_folder=' + str(log_dir)] + cmd
+        new_cmd = ['/usr/bin/env', 'MANGOHUD=1', f'MANGOHUD_CONFIG={mh},output_folder={log_dir}'] + cmd
     log_dir.mkdir(parents=True, exist_ok=True)
     return (new_cmd, log_dir)
 
@@ -191,7 +205,7 @@ def newest_log(folder: Path, since: float) -> Path | None:
     latest_time = 0
     
     for p in folder.iterdir():
-        if not p.is_file() or not p.name.endswith('.csv'):
+        if not p.is_file() or not p.name.endswith('.csv') or p.name.endswith('_summary.csv'):
             continue
         mtime = p.stat().st_mtime
         if mtime >= since and mtime > latest_time:
@@ -257,7 +271,8 @@ def finish_session(paths, game_id: str, console: str, title: str, log_dir, t0: f
     dur = time.time() - t0
     if dur < 20:
         return "partida curta demais (<20 s), não registrada"
-    stats = parse_mangohud(newest_log(log_dir, t0)) if log_dir else None
+    log = newest_log(log_dir, t0) if log_dir else None
+    stats = parse_mangohud(log) if log else None
     stats = stats or {}
     fps_avg = stats.get("fps_avg")
     target = 60 if (fps_avg or 0) > 35 else 30

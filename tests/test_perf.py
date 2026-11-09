@@ -75,7 +75,7 @@ def test_wrap_command_flatpak_gets_mangohud_env(tmp_path):
     assert out[:2] == ["/usr/bin/flatpak", "run"]
     assert "--env=MANGOHUD=1" in out
     cfg = next(a for a in out if a.startswith("--env=MANGOHUD_CONFIG="))
-    assert "no_display" in cfg and "autostart_log" in cfg and f"output_folder={log_dir}" in cfg
+    assert "alpha=0.0" in cfg and "autostart_log" in cfg and f"output_folder={log_dir}" in cfg
     assert log_dir == tmp_path / ".var/app/net.pcsx2.PCSX2/dc-perf"
     assert out[-4:] == ["net.pcsx2.PCSX2", "-fullscreen", "--", "/r/jogo.iso"]
 

@@ -591,14 +591,6 @@ class Bot:
             except Exception as e:  # noqa: BLE001
                 self.log(f"aviso de tradução: {e}")
             try:
-                from . import perf
-                chat = self.cfg.get("notify_chat")
-                msg = perf.pending_message(self.paths) if chat else None
-                if msg:
-                    self.send(chat, msg)
-            except Exception as e:  # noqa: BLE001
-                self.log(f"aviso de desempenho: {e}")
-            try:
                 self.notify_finished()
             except Exception as e:  # noqa: BLE001
                 self.log(f"aviso de download: {e}")

@@ -123,8 +123,9 @@ class Plugin:
         repo = os.path.join(HOME, "deck-commander")
         if repo not in sys.path:
             sys.path.insert(0, repo)
-        from dc import perf, quality, tuning
+        from dc import autotune, perf, quality, tuning
         from dc.paths import get_paths
+        self.autotune = autotune
         return perf, quality, tuning, get_paths()
 
     def _game(self, appid=None, game_id=None):
@@ -147,7 +148,9 @@ class Plugin:
             return out
         over = quality.get_override(paths, game_id)
         cl = tuning.console_level(console) if out["supported"] else None
-        out.update(override=over, game_preset=tuning.preset_of(console, over) if over else None,
+        st = self.autotune.load(paths).get(game_id) or {}
+        out.update(auto=st.get("fase") != "manual", auto_fase=st.get("fase"), trava_em=st.get("trava_em"),
+                   override=over, game_preset=tuning.preset_of(console, over) if over else None,
                    console_level=cl, console_preset=tuning.preset_of(console, cl),
                    levels=[1, 2, 3, 4, 5][:quality.MAX.get(console, 4)],
                    history=[perf.describe(dict(h, title=g.get("title"))) for h in perf.history(paths.state, game_id)[-3:]][::-1])
@@ -156,13 +159,32 @@ class Plugin:
     async def set_game_preset(self, game_id, preset=None):
         perf, quality, tuning, paths = self._dc()
         _, g = self._game(game_id=game_id)
+        self.autotune.set_manual(paths, game_id, True, g.get("console"))
         return tuning.apply_game(paths, game_id, g.get("console"), preset)
 
     async def set_game_level(self, game_id, level=None):
         perf, quality, tuning, paths = self._dc()
         _, g = self._game(game_id=game_id)
+        self.autotune.set_manual(paths, game_id, True, g.get("console"))
         return quality.set_override(paths, game_id, g.get("console"),
                                     None if level is None else quality.LABEL[int(level)])
+
+    async def set_auto(self, game_id):
+        perf, quality, tuning, paths = self._dc()
+        _, g = self._game(game_id=game_id)
+        self.autotune.set_manual(paths, game_id, False, g.get("console"))
+        self.autotune.ensure(paths, game_id, g.get("console"))
+        return "automático: a qualidade se ajusta sozinha"
+
+    async def calibrate(self, game_id):
+        import subprocess
+        unit = "dc-calibra-" + "".join(c for c in game_id if c.isalnum())[:40]
+        r = subprocess.run(["systemd-run", "--user", "--collect", f"--unit={unit}",
+                            f"--working-directory={os.path.join(HOME, 'deck-commander')}",
+                            "python3", "-m", "dc", "x", "calibrar", game_id, "90"], capture_output=True, text=True)
+        if r.returncode:
+            return "não deu para calibrar agora (já está calibrando?)"
+        return "calibrando: o jogo abre e fecha sozinho algumas vezes (~2 min cada). Não mexa no Deck."
 
     async def set_console_preset(self, console, preset):
         perf, quality, tuning, paths = self._dc()

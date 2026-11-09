@@ -243,22 +243,26 @@ function DesempenhoPanel() {
     if (!g.supported) {
         out.push(row("Este console ainda não tem ajuste de qualidade (roda na resolução do emulador)."));
     } else {
-        out.push(row("Só este jogo (vale ao reabrir o jogo):"));
+        const fase = { subindo: "calibrando: sobe um nível a cada medição lisa", fixo: "calibrado",
+            manual: "manual (você escolheu)" }[g.auto_fase] || "calibra na primeira abertura";
+        out.push(row("Qualidade: " + (g.override ? NIVEL(g.override) : "padrão") + " — " + fase +
+            (g.trava_em ? " · travou em " + NIVEL(g.trava_em) : "")));
         out.push(h("div", null,
-            ...g.presets.map((p) => h(Btn, { key: p, on: g.game_preset === p, onClick: () => act("set_game_preset", g.game_id, p) }, NOMES[p])),
-            h(Btn, { on: !g.override, onClick: () => act("set_game_preset", g.game_id, null) }, "Padrão")));
-        out.push(row("Agora: " + (g.override ? NIVEL(g.override) + " (deste jogo)" :
-            (g.console_level ? NIVEL(g.console_level) + " (padrão do console)" : "padrão do emulador")), { opacity: 0.8 }));
+            h(Btn, { on: g.auto, onClick: () => act("set_auto", g.game_id) }, "🤖 Automático"),
+            h(Btn, { onClick: () => act("calibrate", g.game_id) }, "Calibrar agora")));
     }
     if (g.history && g.history.length) {
         out.push(row("Últimas partidas:", { marginTop: "6px", fontWeight: "bold" }));
         g.history.forEach((t) => out.push(row(t, { whiteSpace: "pre-wrap", opacity: 0.9 })));
     } else {
-        out.push(row("Ainda sem medição: jogue alguns minutos e feche o jogo — o resumo aparece aqui e no Telegram.", { opacity: 0.8 }));
+        out.push(row("Ainda sem medição deste jogo.", { opacity: 0.8 }));
     }
     out.push(h(Btn, { style: { marginTop: "6px" }, onClick: () => setAdv(!adv) }, adv ? "Fechar avançado" : "Avançado…"));
     if (adv) {
         if (g.supported) {
+            out.push(row("Fixar manualmente (desliga o automático deste jogo):"));
+            out.push(h("div", null, ...g.presets.map((p) => h(Btn, { key: p, on: !g.auto && g.game_preset === p,
+                onClick: () => act("set_game_preset", g.game_id, p) }, NOMES[p]))));
             out.push(row("Resolução exata deste jogo:"));
             out.push(h("div", null, ...g.levels.map((n) => h(Btn, { key: n, on: g.override === n,
                 onClick: () => act("set_game_level", g.game_id, n) }, NIVEL(n)))));

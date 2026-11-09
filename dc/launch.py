@@ -62,6 +62,8 @@ def main(argv: list[str]) -> None:
         msg = quality.restore(paths)  # sobra de um jogo anterior fechado à força
         if msg:
             say(f"qualidade: {msg}")
+        from . import autotune
+        autotune.ensure(paths, game_id, launch_map[game_id]["console"])  # jogo novo: começa no nível "OK"
         rec = quality.apply_for_launch(paths, game_id, launch_map[game_id]["console"])
     except Exception as e:  # noqa: BLE001 — ajuste de qualidade nunca impede o jogo de abrir
         say(f"qualidade: ignorado ({e})"); rec = None
@@ -71,7 +73,11 @@ def main(argv: list[str]) -> None:
     log_dir = None
     if measure:
         try:
-            cmd, log_dir = perf.wrap_command(cmd)
+            bs = paths.data / "bench-seconds"  # deixado pelo benchmark: vale só para esta abertura
+            secs = int(bs.read_text()) if bs.exists() else None
+            if secs:
+                bs.unlink()
+            cmd, log_dir = perf.wrap_command(cmd, seconds=secs)
         except Exception as e:  # noqa: BLE001 — medição nunca impede o jogo de abrir
             say(f"desempenho: medição desligada ({e})"); measure = False
     say(f"lançando {game_id}: {cmd}")
@@ -88,6 +94,10 @@ def main(argv: list[str]) -> None:
 
     def _stop(signum, _frame):  # "Sair do jogo" do Steam: fecha o emulador e ainda devolve a qualidade
         child.send_signal(signum)
+        if cmd[0].endswith("flatpak") and len(cmd) > 2:  # o emulador roda no sandbox: fechar só o flatpak não basta
+            app = next((a for a in cmd[2:] if not a.startswith("-")), None)
+            if app:
+                subprocess.run(["flatpak", "kill", app], check=False, capture_output=True)
         try:
             child.wait(timeout=8)
         except subprocess.TimeoutExpired:
@@ -104,6 +114,11 @@ def main(argv: list[str]) -> None:
             try:
                 res = perf.finish_session(paths, game_id, console, title, log_dir, t0, sampler, rec)
                 say(f"desempenho: {res}")
+                from . import autotune
+                v = json.loads(res).get("verdict") if res.startswith("{") else None
+                change = autotune.record(paths, game_id, console, v)
+                if change:
+                    say(f"auto-ajuste: {change}")
             except Exception as e:  # noqa: BLE001
                 say(f"desempenho: não registrado ({e})")
         if rec:

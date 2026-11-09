@@ -114,6 +114,9 @@ def _extra(paths, args) -> int:
     elif c == "sync":
         from .qbt import Qbt
         print(syncer.run_sync(paths, _store(paths), Qbt(), confirm_many="tudo" in r))
+    elif c == "calibrar":
+        from . import bench
+        print(bench.calibrate(paths, r[0], int(r[1]) if len(r) > 1 else 90))
     elif c == "bench":
         from . import bench
         bench.run(paths, r[0], int(r[1]) if len(r) > 1 else 120)

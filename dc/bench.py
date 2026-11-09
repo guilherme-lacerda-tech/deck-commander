@@ -49,6 +49,8 @@ def run(paths: Paths, game_id: str, seconds: int = 120, log=print) -> dict | Non
         log(f"{game_id} não tem atalho no Steam ainda.")
         return None
     before = (paths.data / "perf-last.json").stat().st_mtime if (paths.data / "perf-last.json").exists() else 0
+    # o dc-launch lê esta duração (o arquivo de FPS precisa ficar pronto antes de o teste fechar o jogo)
+    (paths.data / "bench-seconds").write_text(str(max(20, seconds - 15)), "utf-8")
     subprocess.run(["steam", f"steam://rungameid/{steam_gameid(appid)}"], check=False,
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
     t0 = time.time()
@@ -78,3 +80,24 @@ def run(paths: Paths, game_id: str, seconds: int = 120, log=print) -> dict | Non
         f.write_text(json.dumps(hist, ensure_ascii=False, indent=1), "utf-8")
     log(perf.describe(d))
     return d
+
+
+def calibrate(paths: Paths, game_id: str, seconds: int = 90, log=print, max_rounds: int = 6) -> str:
+    """Roda benchmarks seguidos até o auto-ajuste fixar a qualidade do jogo (sobe até travar, volta um)."""
+    from . import autotune
+    lm = json.loads((paths.data / "launch-map.json").read_text("utf-8"))
+    console = lm[game_id]["console"]
+    autotune.ensure(paths, game_id, console)
+    for i in range(max_rounds):
+        if not autotune.needs_calibration(paths, game_id, console):
+            break
+        lvl = autotune.load(paths)[game_id]["level"]
+        log(f"rodada {i + 1}: testando {lvl}x")
+        d = run(paths, game_id, seconds, log)
+        if d is None:
+            return "calibração interrompida (Deck ocupado ou jogo não abriu)"
+        if not d.get("verdict"):
+            return "calibração interrompida: o FPS não foi medido neste emulador"
+        time.sleep(5)
+    st = autotune.load(paths)[game_id]
+    return f"{lm[game_id]['title']}: qualidade automática {st['level']}x ({st['fase']})"
