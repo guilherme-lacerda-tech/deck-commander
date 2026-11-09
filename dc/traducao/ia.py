@@ -214,17 +214,20 @@ class Provider:
         return "translategemma" in self.model.lower() or self.spec.get("unitario", False)
 
     def chat(self, system: str, user: str, timeout: float = 180) -> tuple[str, int]:
+        # teto de resposta proporcional à entrada: modelo pequeno que entra em repetição não trava a tarefa
+        max_tokens = min(4096, 64 + len(user) * 2)
         if self.spec["tipo"] == "ollama":
             if not self.spec.get("url"):
                 raise ProviderError("sem endereço configurado")
             out = self.http(self.spec["url"].rstrip("/") + "/api/chat",
-                            {"model": self.model, "stream": False, "options": {"temperature": 0.2},
+                            {"model": self.model, "stream": False,
+                             "options": {"temperature": 0.2, "num_predict": max_tokens, "repeat_penalty": 1.1},
                              "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]},
                             {}, timeout)
             return out["message"]["content"], int(out.get("prompt_eval_count", 0)) + int(out.get("eval_count", 0))
         headers = {"Authorization": f"Bearer {self.key or 'deck-commander'}"}
         out = self.http(self.spec["url"].rstrip("/") + "/chat/completions",
-                        {"model": self.model, "temperature": 0.2,
+                        {"model": self.model, "temperature": 0.2, "max_tokens": max_tokens,
                          "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]},
                         headers, timeout)
         try:
