@@ -116,7 +116,10 @@ def _mds_tracks(mds: Path) -> int:
         return 0
 
 
-def mdf_to_cue(mdf: Path) -> Optional[Path]:
+_SERIAL = re.compile(r"^[A-Z]{4}[_-]?\d{3}\.?\d{2}$", re.I)  # SLES_005.24, SLUS-00067…
+
+
+def mdf_to_cue(mdf: Path, title: str = "") -> Optional[Path]:
     """CD de PS1 em .mdf (setores de 2352 bytes) com uma faixa só = o mesmo que .bin; escreve o .cue ao lado.
     Com várias faixas (áudio CD) deixa como está: o DuckStation abre o .mds direto."""
     if mdf.stat().st_size % 2352:
@@ -124,7 +127,10 @@ def mdf_to_cue(mdf: Path) -> Optional[Path]:
     mds = mdf.with_suffix(".mds")
     if mds.exists() and _mds_tracks(mds) not in (0, 1):
         return None
-    bin_ = mdf.with_suffix(".bin")
+    stem = mdf.stem
+    if title and _SERIAL.match(stem):  # nome do arquivo é o código do disco: usa o nome do download
+        stem = re.sub(r'[<>:"/\|?*]', "", title).strip() or stem
+    bin_ = mdf.with_name(stem + ".bin")
     mdf.rename(bin_)
     if mds.exists():
         mds.unlink()
@@ -182,7 +188,7 @@ def ingest(content: Path, console: Optional[str], roms_root: Path, quarantine_ro
         if console == "psx":  # imagem .mdf/.mds de CD: vira .bin + .cue (o DuckStation e o tradutor abrem)
             for i, f in enumerate(collected):
                 if f.suffix.lower() == ".mdf":
-                    cue = mdf_to_cue(f)
+                    cue = mdf_to_cue(f, re.sub(r"\.(zip|7z|rar)$", "", name, flags=re.I))
                     if cue:
                         collected[i] = cue
         games = playable(collected, console)

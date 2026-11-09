@@ -39,3 +39,10 @@ def test_mdf_multi_track_or_dvd_untouched(tmp_path):
     assert content.mdf_to_cue(mdf) is None and mdf.exists()
     odd = _f(tmp_path / "b.mdf", bytes(2048 * 3))
     assert content.mdf_to_cue(odd) is None and odd.exists()
+
+
+def test_disc_code_filename_gets_download_name(tmp_path):
+    mdf = _f(tmp_path / "SLES_00524.mdf", bytes(2352 * 2))
+    cue = content.mdf_to_cue(mdf, "Castlevania - Symphony of the Night PSX (PAL)")
+    assert cue.name == "Castlevania - Symphony of the Night PSX (PAL).cue"
+    assert (tmp_path / "Castlevania - Symphony of the Night PSX (PAL).bin").exists()
