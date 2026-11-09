@@ -30,6 +30,7 @@ TITLE_IDS = {"0100DCA0064A6000"}
 PATCH_NAME = "init.patch"
 LOCALES = (0, 9)                       # inglês EUA e inglês Europa
 GROWTH = 1.12                          # quanto uma frase pode crescer antes de pedir versão curta
+GROWTH_2 = 1.6                         # 2ª chance (usa a folga que sobrou na tabela)
 CODE = re.compile(r"\[tp:[^\]]*\] ?\[/tp\]|\[[^\[\]]*\]|\{\d*\}")
 TAG = re.compile(r"\[[^\[\]]*\]")
 
@@ -254,6 +255,17 @@ def translate_game(paths, title_id: str, patch_file: Path, game_name: str = "", 
     glossary = ia.load_glossary(paths, game_name or "Luigi's Mansion 3")
     res = ia.translate(paths, cfg, items, f"switch-{title_id}", glossary, chain=chain,
                        progress=progress, should_pause=should_pause)
+    # 2ª chance para o que só passou do limite por frase: a tabela tem folga no total (frases que encolheram),
+    # então aceita até ~1,6× aqui; se no fim não couber, _fit devolve ao inglês as que mais cresceram
+    longos = [ia.Item(it.id, it.text, max_len=max(16, int(len(it.text) * GROWTH_2) + 4)) for it in items
+              if "maior que o espaço" in res.flagged.get(it.id, "")]
+    if longos:
+        res2 = ia.translate(paths, cfg, longos, f"switch-{title_id}", glossary, chain=chain,
+                            should_pause=should_pause)
+        for k, v in res2.translated.items():
+            res.translated[k] = v
+            res.flagged.pop(k, None)
+        res.tokens += res2.tokens
     rep.provider, rep.tokens, rep.errors = res.provider_used, res.tokens, rep.errors + res.errors
     by_core = {}
     for it in items:
