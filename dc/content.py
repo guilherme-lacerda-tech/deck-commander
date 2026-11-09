@@ -26,7 +26,8 @@ _HACK = re.compile(r"\[(br|pt-?br|t[-+]?por?)\]|\((br|pt-?br|translated|traduzid
 NAME_HINTS = [(re.compile(p, re.I), c) for p, c in (
     (r"\bps2\b|playstation 2", "ps2"), (r"\bpsx\b|\bps1\b|playstation(?! [2-9])", "psx"),
     (r"gamecube|\bngc\b", "gc"), (r"\bwii\b", "wii"), (r"\bpsp\b", "psp"), (r"\bswitch\b|\bnsw\b", "switch"),
-    (r"\bsnes\b|super nintendo", "snes"), (r"\bn64\b|nintendo 64", "n64"), (r"\bgba\b|game boy advance", "gba"))]
+    (r"\bsnes\b|super nintendo", "snes"), (r"\bn64\b|nintendo 64", "n64"), (r"\bgba\b|game boy advance", "gba"),
+    (r"\bnds\b|nintendo ds\b|\(ds\)|\[ds\]", "nds"))]
 
 
 def _link_or_copy(src: Path, dst: Path) -> None:

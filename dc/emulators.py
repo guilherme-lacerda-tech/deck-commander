@@ -35,6 +35,8 @@ CONSOLES = {
                "cmd": [FLATPAK, "run", "org.libretro.RetroArch", "-f", "-L", str(RA_CORES / "mupen64plus_next_libretro.so"), "{rom}"]},
     "gba":    {"label": "Game Boy Advance", "exts": [".gba", ".zip"],
                "cmd": [FLATPAK, "run", "org.libretro.RetroArch", "-f", "-L", str(RA_CORES / "mgba_libretro.so"), "{rom}"]},
+    "nds":    {"label": "Nintendo DS", "exts": [".nds", ".dsi", ".zip"],
+               "cmd": [FLATPAK, "run", "net.kuribo64.melonDS", "-f", "{rom}"]},
     "psp":    {"label": "PSP", "exts": [".chd", ".cso", ".iso", ".pbp"],
                "cmd": [FLATPAK, "run", "org.ppsspp.PPSSPP", "--fullscreen", "{rom}"]},
     "switch": {"label": "Nintendo Switch", "exts": [".xci", ".nsp", ".nsz", ".xcz"],
@@ -80,7 +82,8 @@ def detect(home: Path = H, check_flatpak: bool = True) -> dict[str, list[str]]:
 
 RA_CORE_FILES = ["snes9x_libretro.so", "mupen64plus_next_libretro.so", "mgba_libretro.so"]
 RA_CORE_URL = "https://buildbot.libretro.com/nightly/linux/x86_64/latest/{core}.zip"
-FLATPAK_IDS = ["net.pcsx2.PCSX2", "org.DolphinEmu.dolphin-emu", "org.libretro.RetroArch", "org.ppsspp.PPSSPP"]
+FLATPAK_IDS = ["net.pcsx2.PCSX2", "org.DolphinEmu.dolphin-emu", "org.libretro.RetroArch", "org.ppsspp.PPSSPP",
+               "net.kuribo64.melonDS"]
 
 # Perfil "equilibrado" (v5.1 M3.1) para os emuladores sem ajuste manual.
 # Dolphin tem UM valor global para GC e Wii: 2x (spec pede GC 3x / Wii 2x; 2x é o que cabe nos dois).

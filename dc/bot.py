@@ -32,6 +32,7 @@ ALIASES = [
     (r"psp", "psp"), (r"game\s*cube|gamecube|ngc|\bgc\b", "gc"), (r"wii", "wii"),
     (r"n64|nintendo\s*64", "n64"), (r"snes|super\s*nintendo|super\s*nes", "snes"),
     (r"gba|game\s*boy\s*advance", "gba"),
+    (r"nds|nintendo\s*ds|ds|dsi", "nds"),
 ]
 
 
@@ -46,7 +47,7 @@ HELP = """Deck Commander — comandos
 Mais fácil: mande o nome do console (ex.: Switch 1, PS2) e depois encaminhe o .torrent ou cole o magnet.
 Aviso aqui quando o download terminar.
 
-/add [console] <magnet> — baixa (console: ps2 psx gc wii snes n64 gba psp switch)
+/add [console] <magnet> — baixa (console: ps2 psx gc wii snes n64 gba psp nds switch)
 /sync — leva downloads concluídos para a biblioteca  (/sync tudo confirma pacotes grandes)
 /console <id> <console> — responde quando o /sync perguntar
 /reiniciar — reinicia o Steam para mostrar jogos novos
@@ -271,7 +272,7 @@ class Bot:
                 return f"❌ {e}"
             pend.pop(str(uid), None); self.save_cfg()
             self.log(f"{uid}: torrent {name} ({cat})")
-            label = {"switch": "Switch", "ps2": "PS2", "psx": "PS1"}.get(cat, cat)
+            label = {"switch": "Switch", "ps2": "PS2", "psx": "PS1", "nds": "DS", "psp": "PSP"}.get(cat, cat)
             return (f"⬇️ Baixando {name[:-8]} ({label}). Aviso aqui quando terminar."
                     if console else f"⬇️ Baixando {name[:-8]}. Não sei o console ainda — o /sync vai perguntar.") \
                 + self._power_note()
@@ -281,6 +282,11 @@ class Bot:
         if c:
             pend[str(uid)] = {"console": c, "at": time.time()}; self.save_cfg()
             return f"Ok, próximo .torrent ou magnet = {c}. Pode encaminhar."
+        import re as _re
+        if _re.fullmatch(r"\s*[\w .+-]{1,24}\s*", text) and len(text.split()) <= 3 and not _re.search(
+                r"(?i)\b(ok|oi|ol[aá]|valeu|obrigad[oa]|blz|beleza|sim|n[aã]o|bom dia|boa (tarde|noite)|kk+|haha)\b", text):
+            return (f"Não conheço o console \"{text.strip()}\". Uso: Switch, PS2, PS1, PSP, DS, GameCube, Wii, "
+                    "SNES, N64, GBA — mande o nome e depois o .torrent ou magnet.")
         return None  # conversa comum: ignora
 
     # -- energia ------------------------------------------------------------------
