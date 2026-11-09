@@ -9,6 +9,12 @@
 - IA mais robusta: erro passageiro não abandona o provedor rápido; teto de resposta; aspas de diálogo preservadas.
 - Tarefas de tradução rodam como serviço próprio do systemd (não morrem se o bot reiniciar).
 - FireRed (Switch) traduzido de ponta a ponta: 2.332 frases, 0 problemas.
+- **Todos os consoles pré-prontos**: 3DS, Wii U, PS3, Xbox, Dreamcast, Saturn, Sega CD, Mega Drive, Master System,
+  Game Gear, NES, Game Boy/Color, PC Engine e Arcade (emulador instalado, aba, nome no bot, controle).
+- **Tradução de qualquer idioma** (russo, japonês, espanhol…): detecta a língua do jogo; tabelas cirílicas
+  CP1251/CP866/KOI8-R para versões russas.
+- Downloads em **RAR dividido** (`.rar` + `.r00`… ou `.partN.rar`) e CD de PS1 em **`.mdf/.mds`** (Alcohol 120%,
+  com ou sem subcanal, com faixas de áudio) viram `.bin + .cue`; arquivo com nome de código (SLES_…) ganha o nome do download.
 
 ## 0.5.1 — 2026-11-09 — "Em português" sem duplicar a biblioteca
 - Aba/coleção **"Em português"**: só os jogos que você pode jogar em português (PT-BR oficial do Switch,
