@@ -75,6 +75,20 @@ def mark(data_dir: Path, gid: str, **fields) -> None:
     tmp.replace(p)
 
 
+def unmark(data_dir: Path, gid: str, *fields: str) -> None:
+    """Tira anotações (ex.: 'formato' quando o jogo passou a ser traduzível)."""
+    idi = load_idiomas(data_dir)
+    e = idi.get(gid)
+    if not e or not any(f in e for f in fields):
+        return
+    for f in fields:
+        e.pop(f, None)
+    p = idiomas_path(data_dir)
+    tmp = p.with_name(p.name + ".tmp")
+    tmp.write_text(json.dumps(idi, ensure_ascii=False, indent=1), "utf-8")
+    tmp.replace(p)
+
+
 def detect_switch(paths, launch_map: dict, roots: list[Path], log=lambda s: None) -> dict:
     """Lê os idiomas de cada jogo de Switch (só quando base/atualização mudaram) e liga o PT-BR
     oficial por jogo. Devolve {gid: {...}}."""

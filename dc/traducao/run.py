@@ -289,6 +289,34 @@ def _translate_gba_inside(paths, job, g, tid, inner, progress, should_pause):
             rep.text() + f"\n✅ mod ativo: a ROM de GBA dentro do jogo foi trocada pela traduzida ({inner}).", True)
 
 
+def _translate_trinity(paths, job, g, tid, rom, cfg, progress, should_pause):
+    """Engine Trinity (Pokémon Legends Z-A): mensagens .dat + data.trpfd alterado, como mod."""
+    from .. import syncer
+    from . import portugues, trinity_game
+    if not job["args"].get("aprovado"):
+        src_dir, info = trinity_game.extract(paths, rom, tid, syncer.rom_roots(), cfg["idioma_origem"])
+        from . import trinity_msg
+        texts = [t for rel in info["mensagens"]
+                 for t, _ in trinity_msg.read_dat((src_dir / "romfs" / rel).read_bytes()).texts() if t.strip()]
+        est = ia.estimate_tokens(texts)
+        need = _approval_needed(paths, cfg, est, job)
+        if need:
+            job["status"] = "aguardando aprovação"
+            return {"estimate": est}, need, False
+    job["extracao"] = "trinity (data.trpfs)"
+    rep = trinity_game.translate_game(paths, tid, rom, syncer.rom_roots(), g.get("title", ""),
+                                      force_font=job["args"].get("forcar", False),
+                                      progress=progress, should_pause=should_pause)
+    portugues.unmark(paths.data, job["game_id"], "formato")
+    if rep.applied:
+        _refresh_tabs(paths)
+    result = {"traducao_pt_br": rep.applied, "provider": rep.provider, "modelo": cfg["providers"].get(
+        rep.provider, {}).get("modelo", ""), "msbt_count": rep.msbt_count, "strings": rep.strings,
+        "translated": rep.translated, "flagged": rep.flagged, "formato": "trinity", "mod": rep.mod_dir,
+        "title_id": tid, "data": datetime.now(timezone.utc).isoformat()}
+    return result, rep.text(), rep.translated > 0 and not (rep.errors and not rep.applied)
+
+
 def _translate_lm3(paths, job, g, tid, rom, cfg, progress, should_pause):
     """Luigi's Mansion 3: copia o init.patch (base + atualização), traduz as tabelas em inglês e grava o mod."""
     from .. import syncer
@@ -357,6 +385,10 @@ def _dispatch(paths, store, job, cfg, progress, should_pause) -> tuple[dict, str
                 gba = _gba_inside(rom, tid, syncer.rom_roots())
                 if gba:
                     return _translate_gba_inside(paths, job, g, tid, gba, progress, should_pause)
+                from . import trinity_game
+                files = trinity_game.find_rom_files(rom, tid, syncer.rom_roots())
+                if files and trinity_game.is_trinity(files):  # Pokémon Legends Z-A / Scarlet-Violet
+                    return _translate_trinity(paths, job, g, tid, rom, cfg, progress, should_pause)
                 romfs = switch.extract_with_hactool(rom, tid)
                 if not romfs and ("prod.keys" in str(e) or "ausente" in str(e)):
                     return {"title_id": tid}, (

@@ -195,6 +195,65 @@ def read_pack(raw: bytes) -> list[PackedFile]:
     return out
 
 
+# ============================================================================ fontes (.bfotf/.bfttf)
+_FONT_KEY = bytes.fromhex("49621806")
+PTBR_CHARS = "ãõÃÕçÇáéíóúâêôàÁÉÍÓÚÂÊÔÀ"
+
+
+def decrypt_bfotf(data: bytes) -> bytes:
+    """Fonte do Switch: 8 bytes de cabeçalho + OpenType com XOR 49 62 18 06."""
+    if len(data) < 16:
+        raise TrinityError("fonte curta demais")
+    key = (_FONT_KEY * (len(data) // 4 + 1))[:len(data) - 8]
+    body = bytes(a ^ b for a, b in zip(data[8:], key))
+    if body[:4] not in (b"OTTO", b"\0\1\0\0", b"true"):
+        raise TrinityError("fonte não reconhecida")
+    return body
+
+
+def otf_chars(otf: bytes) -> set[int]:
+    """Caracteres mapeados na tabela cmap (formatos 4 e 12)."""
+    n = struct.unpack_from(">H", otf, 4)[0]
+    cmap = None
+    for i in range(n):
+        tag, _ck, off, _ln = struct.unpack_from(">4sIII", otf, 12 + 16 * i)
+        if tag == b"cmap":
+            cmap = off
+    if cmap is None:
+        raise TrinityError("fonte sem cmap")
+    out: set[int] = set()
+    for i in range(struct.unpack_from(">H", otf, cmap + 2)[0]):
+        _plat, _enc, off = struct.unpack_from(">HHI", otf, cmap + 4 + 8 * i)
+        t = cmap + off
+        fmt = struct.unpack_from(">H", otf, t)[0]
+        if fmt == 4:
+            segx2 = struct.unpack_from(">H", otf, t + 6)[0]
+            ends = struct.unpack_from(f">{segx2 // 2}H", otf, t + 14)
+            starts = struct.unpack_from(f">{segx2 // 2}H", otf, t + 16 + segx2)
+            deltas = struct.unpack_from(f">{segx2 // 2}h", otf, t + 16 + 2 * segx2)
+            ro_at = t + 16 + 3 * segx2
+            for k, (s, e) in enumerate(zip(starts, ends)):
+                ro = struct.unpack_from(">H", otf, ro_at + 2 * k)[0]
+                for c in range(s, min(e, 0xFFFE) + 1):
+                    if ro == 0:
+                        g = (c + deltas[k]) & 0xFFFF
+                    else:
+                        g = struct.unpack_from(">H", otf, ro_at + 2 * k + ro + 2 * (c - s))[0]
+                        g = (g + deltas[k]) & 0xFFFF if g else 0
+                    if g:
+                        out.add(c)
+        elif fmt == 12:
+            ng = struct.unpack_from(">I", otf, t + 12)[0]
+            for k in range(ng):
+                s, e, g = struct.unpack_from(">III", otf, t + 16 + 12 * k)
+                out.update(range(s, e + 1))
+    return out
+
+
+def missing_ptbr(chars: set[int]) -> str:
+    return "".join(c for c in PTBR_CHARS if ord(c) not in chars)
+
+
 # ============================================================================ acesso ao jogo
 class Archive:
     """Lê arquivos do jogo a partir de `read(off, size)` sobre o data.trpfs e do data.trpfd."""

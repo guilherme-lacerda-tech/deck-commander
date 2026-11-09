@@ -55,7 +55,7 @@ A aba **"Em português"** mostra só o que dá para jogar em português:
 | FireRed (Switch) | ✅ a ROM de GBA de dentro foi traduzida (2.332 frases) e entrou como mod. O Meowth aumenta a ROM para 32 MB: confira se abre; se não, `/traduzir desfazer firered` |
 | LeafGreen e versões espanholas | ⏳ na fila (mesmo caminho do FireRed) |
 | Luigi's Mansion 3 | 🟡 traduzido e instalado como mod (1.314 de 1.612 frases; o resto ficou em inglês). Arquivo conferido byte a byte; **falta conferir no jogo** (ver "Luigi's Mansion 3" abaixo) |
-| Pokémon Legends Z-A | 🔬 arquivo `.trpfs` comprimido com Oodle (biblioteca fechada); as ferramentas da comunidade são só para Windows |
+| Pokémon Legends Z-A | 🟡 traduzível: textos lidos do `data.trpfs` (Oodle descomprimido em Python), 427 arquivos / 76.810 frases relidos byte a byte; fonte tem todos os acentos. Testado no Deck: com o mod o jogo abre e lê os textos soltos (ver abaixo) |
 | Hercules (PS1) | RomTranslate: o jogo quase não tem texto comum (nomes de fase e mensagens do sistema; as falas são voz/imagem) |
 | Shadow of the Colossus (inglês) | você já tem a versão dublada |
 | Donkey Kong Bananza, Pokopia | ❌ Switch 2 (Lichii): ainda sem suporte |
@@ -155,6 +155,24 @@ Os textos não são MSBT: ficam no `init.patch` da atualização 1.4 (formato da
 ```
 Instala o Ollama dentro da sua pasta pessoal (o SteamOS é somente leitura), baixa o modelo `translategemma:4b` (~3 GB), e instala o Meowth e o `nsz` em ambientes isolados.
 A tradução de Switch com o Index-Translate funciona **sem instalar nada**.
+
+## Pokémon Legends Z-A (engine Trinity)
+Os textos não são MSBT: ficam dentro de `arc/data.trpfs`, em pacotes FlatBuffers comprimidos com Oodle.
+- **Leitura:** só os pacotes de mensagem em inglês (~5 MB) e as fontes saem do jogo, com cache em
+  `~/.local/share/deck-commander/traducao/trinity/<TitleID>/` (refeito se a atualização mudar). O Oodle (Mermaid)
+  é descomprimido por um porte em Python do `ooz` (código aberto), sem programa extra.
+- **Formato das falas:** `.dat` cifrado (formato TextFile do pkNX). Códigos do jogo (nome do jogador, pausas, troca
+  de caixa, ícones) viram `⟦n⟧`. Depois da IA, as quebras de linha são refeitas na largura original, com no
+  máximo 2 linhas por caixa (abre caixa nova como o jogo faz).
+- **Mod:** os `.dat` traduzidos ficam soltos em `romfs/ik_message/dat/English/...`, mais um `romfs/arc/data.trpfd`
+  sem esses arquivos na lista. Assim o jogo lê os soltos (mesma técnica do Trinity Mod Loader).
+- **Versão:** o mod é feito da versão que o Ryujinx **carrega** (`games/<tid>/updates.json`; sem ele, a versão base).
+  Um `data.trpfd` de outra versão aponta para pacotes errados e o jogo trava ao abrir (aconteceu no 1º piloto).
+  Se você ligar/trocar a atualização no Ryujinx, rode `/traduzir <jogo> --forcar` de novo.
+- **Testado no Deck (Ryujinx 1.3.3, versão base):** com o mod, o jogo abre e roda; o log de acesso a arquivos mostra o
+  jogo lendo os `.dat` soltos do RomFS (27 abertos só até a tela inicial). Se o jogo não abrir: `/traduzir desfazer z-a`.
+- Tradução completa: ~63 mil frases (versão base). Com o Index-Translate, ~125 frases/min: cerca de 7 h (retoma de onde parou).
+- Conferência com os arquivos reais: `python3 tools/trinity_check.py <jogo.nsp> [--piloto N --arquivo script/x.dat --saida DIR]`.
 
 ## Ferramentas de diagnóstico (no Deck)
 - `python3 tools/switch_text_check.py <romfs>`: só lê. Mostra quantos textos e frases existem e se tudo é reproduzido byte a byte.

@@ -290,23 +290,61 @@ def _huff_fluff(r: _Msb, num: int) -> int:
     return v >> 1
 
 
-def _huff_lengths_new(r: _Msb, syms: list, prefix: list) -> int:
-    forced = r.read(2)
-    num = r.read(8) + 1
-    fluff = _huff_fluff(r, num)
+def _rice_lengths(r: _Msb, count: int) -> list[int]:
+    """DecodeGolombRiceLengths: cada valor = quantidade de zeros antes do próximo 1 (MSB-first)."""
     buf, pos, bitlen = r.buf, r.pos, r.end * 8
     vals = []
-    for _ in range(num + fluff):  # DecodeGolombRiceLengths: zeros antes de cada 1
+    for _ in range(count):
         c = 0
         while True:
             if pos >= bitlen:
-                _fail("Huffman: comprimentos truncados")
+                _fail("comprimentos Golomb-Rice truncados")
             bit = (buf[pos >> 3] >> (7 - (pos & 7))) & 1
             pos += 1
             if bit:
                 break
             c += 1
         vals.append(c & 0xFF)
+    r.pos = pos
+    return vals
+
+
+def _convert_ranges(r: _Msb, num: int, fluff: int, symlen: list[int]) -> list[tuple[int, int]]:
+    """Huff_ConvertToRanges: faixas (primeiro símbolo, quantidade) dos símbolos usados."""
+    sl = 0
+    sym_idx = 0
+    if fluff & 1:
+        v = symlen[sl]; sl += 1
+        if v >= 8:
+            _fail("faixa de símbolos inválida")
+        sym_idx = r.read(v + 1) + (1 << (v + 1)) - 1
+    used = 0
+    ranges = []
+    for _ in range(fluff >> 1):
+        v = symlen[sl]
+        if v >= 9:
+            _fail("faixa de símbolos inválida")
+        n = r.read(v) + (1 << v)
+        v = symlen[sl + 1]
+        if v >= 8:
+            _fail("faixa de símbolos inválida")
+        space = r.read(v + 1) + (1 << (v + 1)) - 1
+        ranges.append((sym_idx, n))
+        used += n
+        sym_idx += n + space
+        sl += 2
+    if sym_idx >= 256 or used >= num or sym_idx + num - used > 256:
+        _fail("faixas de símbolos incoerentes")
+    ranges.append((sym_idx, num - used))
+    return ranges
+
+
+def _huff_lengths_new(r: _Msb, syms: list, prefix: list) -> int:
+    forced = r.read(2)
+    num = r.read(8) + 1
+    fluff = _huff_fluff(r, num)
+    vals = _rice_lengths(r, num + fluff)
+    pos = r.pos
     if forced:  # DecodeGolombRiceBits
         if (pos + forced * num + 7) >> 3 > r.end:
             _fail("Huffman: bits extras truncados")
@@ -324,32 +362,7 @@ def _huff_lengths_new(r: _Msb, syms: list, prefix: list) -> int:
             _fail("Huffman: comprimento de código inválido")
         vals[i] = cl
         running += v
-    # Huff_ConvertToRanges
-    sl = num
-    sym_idx = 0
-    if fluff & 1:
-        v = vals[sl]; sl += 1
-        if v >= 8:
-            _fail("Huffman: faixa inválida")
-        sym_idx = r.read(v + 1) + (1 << (v + 1)) - 1
-    used = 0
-    ranges = []
-    for _ in range(fluff >> 1):
-        v = vals[sl]
-        if v >= 9:
-            _fail("Huffman: faixa inválida")
-        n = r.read(v) + (1 << v)
-        v = vals[sl + 1]
-        if v >= 8:
-            _fail("Huffman: faixa inválida")
-        space = r.read(v + 1) + (1 << (v + 1)) - 1
-        ranges.append((sym_idx, n))
-        used += n
-        sym_idx += n + space
-        sl += 2
-    if sym_idx >= 256 or used >= num or sym_idx + num - used > 256:
-        _fail("Huffman: faixas incoerentes")
-    ranges.append((sym_idx, num - used))
+    ranges = _convert_ranges(r, num, fluff, vals[num:])
     cp = 0
     for s, n in ranges:
         for k in range(n):
@@ -610,8 +623,181 @@ def _multiarray(src, p0, end, cap):
     return out, p + varlen - p0
 
 
-def _decode_tans(src, p, size, dst_size):
-    raise OodleError("tANS ainda não implementado")
+# ---------------------------------------------------------------------------- tANS (1)
+def _tans_table(r: _Msb, L_bits: int) -> tuple[list[int], list[int]]:
+    """Tans_DecodeTable: A = símbolos de peso 1, B = (símbolo << 16) + peso para peso >= 2."""
+    L = 1 << L_bits
+    A, B = [], []
+    if r.read(1):
+        Q = r.read(3)
+        num = r.read(8) + 1
+        if num < 2:
+            _fail("tANS: tabela pequena demais")
+        fluff = _huff_fluff(r, num)
+        rice = _rice_lengths(r, num + fluff)
+        ranges = _convert_ranges(r, num, fluff, rice[num:])
+        avg, total, ri = 6, 0, 0
+        for sym, n in ranges:
+            for _ in range(n):
+                nextra = Q + rice[ri]
+                ri += 1
+                if nextra > 15:
+                    _fail("tANS: peso grande demais")
+                v = r.read(nextra) + (1 << nextra) - (1 << Q)
+                d4 = avg >> 2
+                limit = 2 * d4
+                if v <= limit:
+                    v = d4 + ((-(v & 1)) ^ (v >> 1))
+                if limit > v:
+                    limit = v
+                v += 1
+                avg += limit - d4
+                if v == 1:
+                    A.append(sym)
+                elif v >= 2:
+                    B.append((sym << 16) + v)
+                total += v
+                sym += 1
+        if total != L:
+            _fail("tANS: pesos não somam L")
+        return A, B
+    seen = [False] * 256
+    count = r.read(3) + 1
+    max_delta = r.read(_bsr(L_bits) + 1)
+    if max_delta == 0 or max_delta > L_bits:
+        _fail("tANS: tabela inválida")
+    weight = total = 0
+    for _ in range(count):
+        sym = r.read(8)
+        if seen[sym]:
+            _fail("tANS: símbolo repetido")
+        weight += r.read(max_delta)
+        if weight == 0:
+            _fail("tANS: peso zero")
+        seen[sym] = True
+        if weight == 1:
+            A.append(sym)
+        else:
+            B.append((sym << 16) + weight)
+        total += weight
+    sym = r.read(8)
+    if seen[sym]:
+        _fail("tANS: símbolo repetido")
+    if L - total < weight or L - total <= 1:
+        _fail("tANS: pesos incoerentes")
+    B.append((sym << 16) + (L - total))
+    A.sort()
+    B.sort()
+    return A, B
+
+
+def _tans_lut(A: list[int], B: list[int], L_bits: int) -> list:
+    """Tans_InitLut: entradas (máscara x, bits a ler, símbolo, w)."""
+    L = 1 << L_bits
+    lut: list = [None] * L
+    slots = L - len(A)
+    sa = slots >> 2
+    ptr = [0, 0, 0, 0]
+    sb = sa + ((slots & 3) > 0); ptr[1] = sb
+    sb += sa + ((slots & 3) > 1); ptr[2] = sb
+    sb += sa + ((slots & 3) > 2); ptr[3] = sb
+    for i, s in enumerate(A):
+        lut[slots + i] = ((1 << L_bits) - 1, L_bits, s, 0)
+    wsum = 0
+    for e in B:
+        weight, symbol = e & 0xFFFF, e >> 16
+        if weight > 4:
+            sym_bits = _bsr(weight)
+            Z = L_bits - sym_bits
+            x, bx, w = (1 << Z) - 1, Z, (L - 1) & (weight << Z)
+            add = 1 << Z
+            X = (1 << (sym_bits + 1)) - weight
+            for j in range(4):
+                d = ptr[j]
+                Y = (weight + ((wsum - j - 1) & 3)) >> 2
+                if X >= Y:
+                    for _ in range(Y):
+                        lut[d] = (x, bx, symbol, w & 0xFFFF); d += 1; w += add
+                    X -= Y
+                else:
+                    for _ in range(X):
+                        lut[d] = (x, bx, symbol, w & 0xFFFF); d += 1; w += add
+                    Z -= 1
+                    add >>= 1
+                    bx, w, x = Z, 0, x >> 1
+                    for _ in range(Y - X):
+                        lut[d] = (x, bx, symbol, w & 0xFFFF); d += 1; w += add
+                    X = weight
+                ptr[j] = d
+        else:
+            if weight <= 0:
+                _fail("tANS: peso inválido")
+            bits = ((1 << weight) - 1) << (wsum & 3)
+            bits |= bits >> 4
+            ww = weight
+            for _ in range(weight):
+                idx = (bits & -bits).bit_length() - 1
+                bits &= bits - 1
+                d = ptr[idx]
+                ptr[idx] += 1
+                wb = _bsr(ww)
+                lut[d] = ((1 << (L_bits - wb)) - 1, L_bits - wb, symbol, (L - 1) & (ww << (L_bits - wb)))
+                ww += 1
+        wsum += weight
+    if any(e is None for e in lut):
+        _fail("tANS: tabela incompleta")
+    return lut
+
+
+def _decode_tans(src, p, size, dst_size) -> bytearray:
+    """Krak_DecodeTans: 5 estados; fluxo LSB-first para frente (do início) e para trás (do fim), que precisam
+    se encontrar. Os 5 últimos bytes da saída são os estados finais."""
+    if size < 8 or dst_size < 5:
+        _fail("tANS: bloco curto demais")
+    end = p + size
+    r = _Msb(src, p, end)
+    if r.read(1):
+        _fail("tANS: bit reservado")
+    L_bits = r.read(2) + 8
+    A, B = _tans_table(r, L_bits)
+    q = (r.pos + 7) >> 3
+    if q >= end:
+        _fail("tANS: sem dados")
+    lut = _tans_lut(A, B, L_bits)
+    L = 1 << L_bits
+    fs = bytes(src[q:end]) + b"\0\0\0\0"
+    bs = bytes(src[q:end])[::-1] + b"\0\0\0\0"
+    pos = [0, 0]
+    streams = (fs, bs)
+
+    def rd(k: int, n: int) -> int:
+        s, ps = streams[k], pos[k]
+        j = ps >> 3
+        v = ((s[j] | s[j + 1] << 8 | s[j + 2] << 16) >> (ps & 7)) & ((1 << n) - 1)
+        pos[k] = ps + n
+        return v
+
+    st = [rd(0, L_bits), rd(1, L_bits), rd(0, L_bits), rd(1, L_bits), rd(0, L_bits)]
+    n_out = dst_size - 5
+    out = bytearray()
+    while len(out) < n_out:
+        for k in (0, 1):
+            for i in range(5):
+                if st[i] >= L:
+                    _fail("tANS: estado fora da tabela")
+                x, bx, sym, w = lut[st[i]]
+                out.append(sym)
+                st[i] = rd(k, bx) + w
+                if len(out) >= n_out:
+                    break
+            if len(out) >= n_out:
+                break
+    if q + ((pos[0] + 7) >> 3) != end - ((pos[1] + 7) >> 3):
+        _fail("tANS: fluxos não se encontram")
+    if any(s > 0xFF for s in st):
+        _fail("tANS: estado final inválido")
+    out += bytes(st)
+    return out
 
 
 # ============================================================================ Mermaid
