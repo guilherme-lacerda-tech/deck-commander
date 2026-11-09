@@ -162,7 +162,7 @@ def scan(romfs: Path, report: Report, source: str = "en") -> tuple[list[TextFile
     for rel in rels:
         low = rel.lower()
         p = romfs / rel
-        if low.endswith(".bffnt") or low.endswith(".bffnt.zs"):
+        if low.endswith((".bffnt", ".bffnt.zs", ".bcfnt")):  # Switch / 3DS
             try:
                 fonts.append((rel, nx.unpack_layer(rel, p.read_bytes())[0]))
             except nx.FormatError:
@@ -279,7 +279,10 @@ def item_id(f: TextFile, i: int) -> str:
 
 def translate_game(paths: Paths, title_id: str, romfs: Path, game_name: str = "",
                    force_font: bool = False, chain=None, log: Callable[[str], None] = lambda s: None,
-                   progress=lambda d, t: None, should_pause=lambda: False) -> Report:
+                   progress=lambda d, t: None, should_pause=lambda: False,
+                   install: Optional[Callable[[str, Path], Path]] = None, tag: str = "switch") -> Report:
+    """Traduz os MSBT de um RomFS e grava o mod. `install` decide onde o mod vai (padrão: Ryujinx);
+    o 3DS (Azahar) e o Wii U (Cemu) usam a mesma tradução com outro destino."""
     cfg = ia.load_cfg(paths)
     sw = {"permitir_sem_fonte_ptbr": False, "validar_com_referencia": True, "similaridade_minima": 0.75}
     try:
@@ -298,7 +301,7 @@ def translate_game(paths: Paths, title_id: str, romfs: Path, game_name: str = ""
     # memória de tradução e few-shot a partir das referências
     memory, examples, ref_name = {}, [], ""
     for ref in load_references(paths):
-        if ref.get("console") != "switch":
+        if ref.get("console") != tag:
             continue
         try:
             pairs = reference_pairs(ref, cfg["idioma_origem"])
@@ -320,7 +323,7 @@ def translate_game(paths: Paths, title_id: str, romfs: Path, game_name: str = ""
                 items.append(ia.Item(iid, text))
     rep.strings = len(all_texts)
     glossary = ia.load_glossary(paths, game_name)
-    res = ia.translate(paths, cfg, items, f"switch-{title_id}", glossary, examples, chain=chain,
+    res = ia.translate(paths, cfg, items, f"{tag}-{title_id}", glossary, examples, chain=chain,
                        progress=progress, should_pause=should_pause)
     rep.provider, rep.tokens, rep.errors = res.provider_used, res.tokens, rep.errors + res.errors
     rep.flagged, rep.review = len(res.flagged), len(res.review)
@@ -337,10 +340,11 @@ def translate_game(paths: Paths, title_id: str, romfs: Path, game_name: str = ""
     if sims:
         rep.similarity = sum(sims) / len(sims)
     rep.reference = ref_name
-    return _write_mod(paths, rep, files, containers, cfg)
+    return _write_mod(paths, rep, files, containers, cfg, install or install_mod)
 
 
-def _write_mod(paths: Paths, rep: Report, files: list[TextFile], containers: dict, cfg: dict) -> Report:
+def _write_mod(paths: Paths, rep: Report, files: list[TextFile], containers: dict, cfg: dict,
+               install: Callable[[str, Path], Path] = None) -> Report:
     threshold = float(cfg.get("flagged_threshold", 10))
     stage = paths.data / "traducao" / "mods" / rep.title_id / "romfs"
     shutil.rmtree(stage.parent, ignore_errors=True)
@@ -373,7 +377,7 @@ def _write_mod(paths: Paths, rep: Report, files: list[TextFile], containers: dic
          "skipped": rep.skipped_files}, ensure_ascii=False, indent=1), "utf-8")
     rep.mod_dir = str(stage.parent)
     if rep.translated and rep.pct_flagged() <= threshold and not rep.errors:
-        rep.mod_dir = str(install_mod(rep.title_id, stage.parent))
+        rep.mod_dir = str((install or install_mod)(rep.title_id, stage.parent))
         rep.applied = True
     return rep
 

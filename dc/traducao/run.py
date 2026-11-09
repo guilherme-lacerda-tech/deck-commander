@@ -25,7 +25,7 @@ from ..paths import Paths, get_paths
 from ..store import Store
 from . import ia
 
-TYPES = ("translate_switch", "translate_retro", "convert_switch")
+TYPES = ("translate_switch", "translate_retro", "convert_switch", "translate_n3ds")
 
 
 def jobs_dir(paths: Paths) -> Path:
@@ -132,6 +132,8 @@ def auto_queue(paths: Paths, store: Store, game_ids: list[str]) -> list[str]:
             continue
         if g["console"] == "switch":
             kind = "translate_switch"
+        elif g["console"] == "n3ds":
+            kind = "translate_n3ds"
         else:
             okc, _why = rts.supported(g["console"], Path(g.get("rom", "")))
             if not okc:
@@ -355,6 +357,45 @@ def _approval_needed(paths: Paths, cfg: dict, texts_estimate: int, job: dict) ->
             f"Para seguir: /traduzir aprovar {job['op']}").replace(",", ".")
 
 
+N3DS_TEXT = (".msbt", ".sarc", ".szs", ".arc", ".bcfnt", ".msbt.lz", ".zs")
+
+
+def _translate_n3ds(paths, job, g, rom: Path, cfg, progress, should_pause) -> tuple[dict, str, bool]:
+    """3DS: mesmo tradutor de MSBT do Switch; o mod vai para o Azahar (load/mods/<TitleID>/romfs)."""
+    import shutil
+    from . import n3ds, switch
+    try:
+        game = n3ds.open_game(rom)
+    except n3ds.Encrypted as e:
+        return {}, f"Não dá para traduzir: {e}. (O Azahar também só roda dump descriptografado.)", False
+    except (n3ds.FormatError, OSError) as e:
+        return {}, f"Não consegui abrir o jogo de 3DS: {e}", False
+    tid = game.title_id
+    work = paths.data / "traducao" / "n3ds" / tid / "romfs"
+    shutil.rmtree(work, ignore_errors=True)
+    n = game.extract(work, lambda rel: rel.lower().endswith(N3DS_TEXT))
+    if not n:
+        return {"title_id": tid}, ("Este jogo de 3DS não tem textos no formato padrão da Nintendo (MSBT). "
+                                   "Use a tradução fora do padrão."), False
+
+    def install(title_id: str, staged: Path) -> Path:
+        dst = n3ds.mod_dir(title_id)
+        if (dst / "romfs").exists():
+            shutil.rmtree(dst / "romfs")
+        dst.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(staged / "romfs", dst / "romfs")
+        return dst
+
+    rep = switch.translate_game(paths, tid, work, g.get("title", ""), force_font=job["args"].get("forcar", False),
+                                progress=progress, should_pause=should_pause, install=install, tag="n3ds")
+    if rep.applied:
+        _refresh_tabs(paths)
+    result = {"traducao_pt_br": rep.applied, "provider": rep.provider, "strings": rep.strings,
+              "translated": rep.translated, "flagged": rep.flagged, "mod": rep.mod_dir, "title_id": tid,
+              "data": datetime.now(timezone.utc).isoformat()}
+    return result, rep.text(), rep.translated > 0 and not (rep.errors and not rep.applied)
+
+
 def _dispatch(paths, store, job, cfg, progress, should_pause) -> tuple[dict, str, bool]:
     from .. import syncer
     g = _game(paths, job["game_id"])
@@ -419,6 +460,8 @@ def _dispatch(paths, store, job, cfg, progress, should_pause) -> tuple[dict, str
             "compressao": sorted(rep.compression), "referencia_usada": rep.reference, "mod": rep.mod_dir,
             "title_id": tid, "data": datetime.now(timezone.utc).isoformat()}
         return result, rep.text(), rep.translated > 0 and not (rep.errors and not rep.applied)
+    if job["type"] == "translate_n3ds":
+        return _translate_n3ds(paths, job, g, rom, cfg, progress, should_pause)
     if job["type"] == "translate_retro":
         from . import retro, rts
         if g["console"] == "gba" and retro.is_pokemon_gba(rom) and retro.meowth_bin():
