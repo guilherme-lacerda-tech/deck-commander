@@ -7,10 +7,36 @@
 | A1 — tradução retrô | `/traduzir <jogo>` | Pokémon de GBA: o Meowth extrai e regrava o texto, a nossa IA traduz e sai uma ROM nova "(PT-BR)" + patch `.bps` | ⏳ código e testes prontos; falta testar com uma ROM real (S12) |
 | A3 — conversão de Switch | `/converter <jogo> [organizar\|descompactar]` | Confere, organiza atualização e DLC numa pasta por jogo e descompacta NSZ/XCZ | ✅ diagnóstico validado na biblioteca real; descompactar depende do `nsz` |
 
+## Aba "Em português" (jogar sem se perder)
+A biblioteca **não é duplicada**:
+- **Switch:** tradução vira mod, e o jogo continua um só.
+- **Retrô:** a ROM "(PT-BR)" substitui o atalho do original. O arquivo original fica guardado, e `/devolver` traz de volta.
+
+A aba **"Em português"** mostra só o que dá para jogar em português:
+| Tipo | Como é detectado |
+|---|---|
+| Switch com **PT-BR oficial** | lido do arquivo de controle do jogo, já com a atualização. O jogo abre com o Ryujinx em português **só para ele** |
+| Switch com a nossa tradução | mod "Deck Commander PT-BR" instalado |
+| ROM traduzida/dublada | nome com (BR), PT-BR, Dublado, DUB, Dub-e-Leg, VERSÃO I.A, romsportugues… |
+
+`/traduzir lista` mostra o que está em português, o que dá para traduzir e o que não dá.
+
+### Resultado na biblioteca de teste (2026-11-09)
+| Jogo | Situação |
+|---|---|
+| Super Mario Galaxy, Galaxy 2, Castlevania Belmont's Curse | ✅ PT-BR oficial: abrem em português |
+| 13 de PS2 + Final Fantasy Tactics (PS1) | ✅ já traduzidos/dublados (pelo nome) |
+| FireRed / LeafGreen (Switch) | ⏳ trazem uma ROM de GBA dentro: traduzíveis com o Meowth (`./setup-deck.sh --modules A1`) |
+| Luigi's Mansion 3, Pokémon Legends Z-A | ❌ textos em formato próprio do estúdio (`.data`, `.trpfs`): não dá com segurança |
+| Shadow of the Colossus (versão inglesa), Hercules | ❌ PS1/PS2: sem extrator de texto confiável |
+| Donkey Kong Bananza, Pokopia | ❌ Switch 2 (Lichii): ainda sem suporte |
+
 ## Como traduzir um jogo de Switch
-1. **Uma vez por jogo**, no modo desktop: Ryujinx → botão direito no jogo → **Extrair dados → RomFS** →
-   escolha a pasta `~/Emulation/romfs/<TitleID>` (o TitleID é o código `0100…` do nome do arquivo).
-   Se você instalar o `hactool`, essa etapa é automática.
+1. Nada a preparar: o Deck Commander abre o jogo, já com a atualização, usando as chaves que o seu Ryujinx
+   já tem, e copia **só os arquivos de texto**. Não altera nada no jogo.
+   - Se o jogo tiver português oficial, ele só liga o idioma e não usa IA.
+   - Se não conseguir abrir o jogo, extraia pelo Ryujinx (modo desktop: botão direito no jogo → Extrair dados →
+     RomFS → `~/Emulation/romfs/<TitleID>`).
 2. No Telegram: `/traduzir <nome do jogo>`. O bot responde na hora e avisa quando terminar.
 3. Abra o jogo normalmente. A tradução aparece como mod "Deck Commander PT-BR" do Ryujinx.
    Para voltar ao inglês: `/traduzir desfazer <jogo>`.

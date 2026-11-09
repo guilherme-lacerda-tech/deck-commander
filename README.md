@@ -66,7 +66,8 @@ Removeu um jogo pelo próprio Steam? Ele não volta sozinho (`/devolver <nome>` 
 Jogo pesado ou com gráfico estranho? `/qualidade <jogo> nativo|2x|3x` muda a resolução só daquele jogo —
 veja [docs/QUALIDADE-E-CONTROLES.md](docs/QUALIDADE-E-CONTROLES.md).
 
-Quer em português? `/traduzir <jogo>` traduz jogos de Switch (como mod, sem alterar o jogo) e Pokémon de GBA
+Quer jogar só o que está em português? Abra a aba **"Em português"**. Jogos de Switch com português oficial já
+abrem em português sozinhos. Quer traduzir? `/traduzir <jogo>` traduz jogos de Switch (como mod, sem alterar o jogo) e Pokémon de GBA
 com IA — veja [docs/TRADUCAO-E-CONVERSAO.md](docs/TRADUCAO-E-CONVERSAO.md).
 
 Na bateria os downloads esperam a tomada (o bot avisa); `/bateria sim` libera. Depois de baixar, o compartilhamento

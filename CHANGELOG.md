@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.1 — 2026-11-09 — "Em português" sem duplicar a biblioteca
+- Aba/coleção **"Em português"**: só os jogos que você pode jogar em português (PT-BR oficial do Switch,
+  tradução do Deck Commander, ROMs traduzidas/dubladas pelo nome). Atualiza ao vivo; sai da aba o que deixar de estar.
+- **PT-BR oficial do Switch**: lido do control.nacp (com a atualização). Esses jogos abrem com o Ryujinx em
+  BrazilianPortuguese só para eles (aplicado ao abrir, devolvido ao fechar). Na biblioteca de teste: Super Mario
+  Galaxy, Galaxy 2 e Castlevania Belmont's Curse.
+- **Extração automática** dos textos do Switch (sem Ryujinx/hactool): leitor próprio em Python puro de
+  NSP/NCA/ticket, NCA esparso e atualização (BKTR), com as chaves do próprio Ryujinx. Só leitura.
+- ROM de GBA dentro de jogo de Switch (FireRed/LeafGreen) traduzida como mod (precisa do Meowth).
+- Tradução retrô substitui o atalho do original (sem duplicar); `/devolver` traz de volta.
+- `/traduzir lista`; jogo que já está em português é avisado em vez de traduzido de novo.
+
 ## 0.5.0 — 2026-11-09 — Tradução com IA e conversão de Switch (adições A1/A2/A3)
 - `/traduzir <jogo>`: Switch vira **mod LayeredFS** do Ryujinx (jogo nunca alterado); Pokémon de GBA via
   Meowth vira ROM "(PT-BR)" + patch BPS. Validado com 552 MSBT reais (12.742 frases, 8.614 tags) lidos e
