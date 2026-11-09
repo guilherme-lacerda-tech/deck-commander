@@ -37,3 +37,20 @@ def test_dolphin_user_mapping_is_respected(tmp_path):
 
 def test_dolphin_not_installed_does_nothing(tmp_path):
     assert controls.dolphin_defaults(tmp_path) == []
+
+
+def test_melonds_mapping_written_once_and_respects_user(tmp_path):
+    import tomllib
+    (tmp_path / ".var/app/net.kuribo64.melonDS").mkdir(parents=True)
+    assert controls.melonds_defaults(tmp_path)
+    cfg = tomllib.loads(controls.melonds_path(tmp_path).read_text())
+    j = cfg["Instance0"]["Joystick"]
+    assert j["A"] == 0 and j["Start"] == 7 and j["Up"] & 0x100 and j["Up"] & 0x10000 and cfg["Instance0"]["JoystickID"] == 0
+    assert controls.melonds_defaults(tmp_path) == []  # já mapeado: não mexe
+    assert [c for c in controls.check(tmp_path) if "melonDS" in c.emulator][0].ok
+    # configuração existente do usuário (sem controle) é preservada
+    p = controls.melonds_path(tmp_path)
+    p.write_text('[Instance0]\nJoystickID = 1\nAudioVolume = 200\n')
+    controls.melonds_defaults(tmp_path)
+    cfg = tomllib.loads(p.read_text())
+    assert cfg["Instance0"]["JoystickID"] == 1 and cfg["Instance0"]["AudioVolume"] == 200 and "Joystick" in cfg["Instance0"]

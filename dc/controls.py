@@ -81,6 +81,10 @@ def check(home: Path = H) -> list[Check]:
     for name, d in (("RetroArch", home / ".var/app/org.libretro.RetroArch"), ("PPSSPP", home / ".var/app/org.ppsspp.PPSSPP")):
         if d.exists():
             out.append(Check(name, True, "autoconfiguração do emulador"))
+    if (home / ".var/app/net.kuribo64.melonDS").exists():
+        t = melonds_path(home)
+        ok = t.exists() and "[Instance0.Joystick]" in t.read_text("utf-8", "replace")
+        out.append(Check("melonDS (DS)", ok, "controle mapeado (A=A)" if ok else "sem controle mapeado"))
     return out
 
 
@@ -168,3 +172,40 @@ def dolphin_defaults(home: Path = H) -> list[str]:
         os.replace(tmp, p)
         log.append(f"{fname}: controle do Deck mapeado no jogador 1 (original em {fname}.dc-orig)")
     return log
+
+
+# melonDS (Nintendo DS): valores conferidos no código do melonDS (EmuInstance::joystickButtonDown):
+# botão = número; direcional = 0x100 | (chapéu << 4) | direção (1 cima, 2 direita, 4 baixo, 8 esquerda);
+# analógico = 0x10000 | (eixo << 24) | (sentido << 20) (0 positivo, 1 negativo). Um valor pode ter os dois.
+# O Steam Input entrega o controle no padrão Xbox: A=0 B=1 X=2 Y=3 LB=4 RB=5 Back=6 Start=7; direcional = chapéu 0.
+MELONDS_JOY = {
+    "A": 0, "B": 1, "X": 2, "Y": 3, "L": 4, "R": 5, "Select": 6, "Start": 7,  # por rótulo (A=A), como no Switch
+    "Up": 0x101 | 0x10000 | (1 << 24) | (1 << 20), "Down": 0x104 | 0x10000 | (1 << 24),
+    "Left": 0x108 | 0x10000 | (1 << 20), "Right": 0x102 | 0x10000,
+}
+
+
+def melonds_path(home: Path = H) -> Path:
+    return home / ".var/app/net.kuribo64.melonDS/config/melonDS/melonDS.toml"
+
+
+def melonds_defaults(home: Path = H) -> list[str]:
+    """Mapeia o controle do Deck no melonDS se ele ainda não tiver mapeamento de controle (não mexe no resto)."""
+    if not (home / ".var/app/net.kuribo64.melonDS").exists():
+        return []
+    p = melonds_path(home)
+    text = p.read_text("utf-8", "replace") if p.exists() else ""
+    if "[Instance0.Joystick]" in text:
+        return []
+    block = ["", "[Instance0.Joystick]"] + [f"{k} = {v}" for k, v in MELONDS_JOY.items()]
+    if "JoystickID" not in text:
+        block = (["", "[Instance0]", "JoystickID = 0"] if "[Instance0]" not in text else []) + block
+    if p.exists():
+        orig = p.with_name(p.name + ".dc-orig")
+        if not orig.exists():
+            orig.write_bytes(p.read_bytes())
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_name(p.name + ".dc-tmp")
+    tmp.write_text(text.rstrip("\n") + "\n".join(block) + "\n", "utf-8")
+    os.replace(tmp, p)
+    return [f"{p.name}: controle do Deck mapeado no melonDS (A=A, direcional e analógico)"]

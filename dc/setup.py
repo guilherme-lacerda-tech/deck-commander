@@ -358,6 +358,8 @@ def setup(paths: Paths, modules: list[str], dev: bool = False, downloads: bool =
             log.append("controle " + l)
         for l in controls.dolphin_defaults():
             log.append("controle " + l)
+        for l in controls.melonds_defaults():
+            log.append("controle " + l)
     if "M2" in wanted:
         setup_plugin(log)
     if "M4" in wanted:
