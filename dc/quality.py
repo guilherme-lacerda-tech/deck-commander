@@ -75,7 +75,10 @@ def set_override(paths: Paths, game_id: str, console: str, level: Optional[str])
         return "Esse console não tem ajuste de resolução por jogo (roda sempre na resolução original)."
     ov = _load(_overrides_path(paths), {})
     if level in (None, "padrao", "padrão", "default"):
-        ov.pop(game_id, None)
+        e = ov.get(game_id, {})
+        e.pop("res", None)  # o idioma por jogo (se houver) continua
+        if not e:
+            ov.pop(game_id, None)
         _save(_overrides_path(paths), ov)
         return "voltou ao padrão do console"
     n = LEVELS.get(level.lower())
@@ -83,7 +86,7 @@ def set_override(paths: Paths, game_id: str, console: str, level: Optional[str])
         raise ValueError("use: nativo, 2x, 3x, 4x ou padrão")
     if n > MAX.get(console, 4):
         raise ValueError(f"máximo para esse console: {MAX.get(console, 4)}x")
-    ov[game_id] = {"res": n}
+    ov.setdefault(game_id, {})["res"] = n
     _save(_overrides_path(paths), ov)
     return f"{LABEL[n]} só para este jogo (vale a partir do próximo lançamento)"
 
@@ -114,61 +117,107 @@ def _write(fmt: str, f: Path, sec, key, value: Optional[str]) -> None:
     else:
         import re
         raw = f.read_text("utf-8")
-        rx = re.compile(r'("' + re.escape(key) + r'"\s*:\s*)(-?\d+(?:\.\d+)?)')
+        numeric = value is not None and re.fullmatch(r"-?\d+", value) is not None
+        if numeric:
+            rx = re.compile(r'("' + re.escape(key) + r'"\s*:\s*)(-?\d+(?:\.\d+)?)')
+            new = str(int(value))
+        else:
+            rx = re.compile(r'("' + re.escape(key) + r'"\s*:\s*)("(?:[^"\\]|\\.)*")')
+            new = json.dumps(value)
         if value is not None and len(rx.findall(raw)) == 1:
-            # troca só o número: o resto do arquivo fica byte a byte igual
-            data = rx.sub(lambda m: m.group(1) + str(int(value)), raw).encode("utf-8")
+            # troca só o valor: o resto do arquivo fica byte a byte igual
+            data = rx.sub(lambda m: m.group(1) + new, raw).encode("utf-8")
         else:
             cfg = json.loads(raw)
             if value is None:
                 cfg.pop(key, None)
             else:
-                cfg[key] = int(value)
+                cfg[key] = int(value) if numeric else value
             data = (json.dumps(cfg, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
     tmp = f.with_name(f.name + ".dc-tmp")
     tmp.write_bytes(data)
     os.replace(tmp, f)
 
 
-def apply_for_launch(paths: Paths, game_id: str, console: str) -> Optional[dict]:
-    """Aplica o valor do jogo. Devolve o registro de devolução (já gravado em disco) ou None."""
+LANG_TARGET = {"switch": ("json", TARGETS["switch"][1], None, "system_language")}
+
+
+def get_language(paths: Paths, game_id: str) -> Optional[str]:
+    return _load(_overrides_path(paths), {}).get(game_id, {}).get("idioma")
+
+
+def set_language(paths: Paths, game_id: str, lang: Optional[str], why: str = "") -> None:
+    """Idioma do console só para este jogo (ex.: BrazilianPortuguese para quem tem PT-BR oficial)."""
+    ov = _load(_overrides_path(paths), {})
+    e = ov.setdefault(game_id, {})
+    if lang:
+        e["idioma"] = lang
+        if why:
+            e["idioma_motivo"] = why
+    else:
+        e.pop("idioma", None); e.pop("idioma_motivo", None)
+    if not e:
+        ov.pop(game_id, None)
+    _save(_overrides_path(paths), ov)
+
+
+def _plan(paths: Paths, game_id: str, console: str) -> list[tuple]:
+    out = []
     n = get_override(paths, game_id)
-    if not n or not supported(console):
+    if n and supported(console):
+        t = _target(console)
+        if t:
+            out.append((*t, str(n)))
+    lang = get_language(paths, game_id)
+    if lang and console in LANG_TARGET:
+        fmt, files, sec, key = LANG_TARGET[console]
+        f = next((x for x in files if x.exists()), None)
+        if f:
+            out.append((fmt, f, sec, key, lang))
+    return out
+
+
+def apply_for_launch(paths: Paths, game_id: str, console: str) -> Optional[dict]:
+    """Aplica os ajustes do jogo (resolução, idioma). Devolve o registro de devolução (já em disco) ou None."""
+    recs = []
+    for fmt, f, sec, key, new in _plan(paths, game_id, console):
+        old = _read(fmt, f, sec, key)
+        if old is not None and old.strip() in (new, f"{new}.0", f"{new}.000000"):
+            continue
+        recs.append({"game_id": game_id, "fmt": fmt, "file": str(f), "section": sec, "key": key, "old": old, "new": new})
+    if not recs:
         return None
-    t = _target(console)
-    if not t:
-        return None
-    fmt, f, sec, key = t
-    old = _read(fmt, f, sec, key)
-    new = str(n)
-    if old is not None and old.strip() in (new, f"{n}.0", f"{n}.000000"):
-        return None
-    rec = {"game_id": game_id, "fmt": fmt, "file": str(f), "section": sec, "key": key, "old": old, "new": new}
-    _save(_restore_path(paths), rec)  # primeiro registra, depois muda
-    _write(fmt, f, sec, key, new)
-    return rec
+    _save(_restore_path(paths), recs)  # primeiro registra, depois muda
+    for r in recs:
+        _write(r["fmt"], Path(r["file"]), r["section"], r["key"], r["new"])
+    return {"key": ", ".join(r["key"] for r in recs), "old": ", ".join(str(r["old"]) for r in recs),
+            "new": ", ".join(r["new"] for r in recs), "records": recs}
 
 
 def restore(paths: Paths) -> Optional[str]:
-    """Devolve o valor original se houver devolução pendente. Seguro de chamar a qualquer momento
+    """Devolve os valores originais se houver devolução pendente. Seguro de chamar a qualquer momento
     em que nenhum jogo esteja aberto."""
     rp = _restore_path(paths)
-    rec = _load(rp, None)
-    if not rec:
+    data = _load(rp, None)
+    if not data:
         return None
-    f = Path(rec["file"])
-    msg = None
-    if f.exists():
+    recs = data if isinstance(data, list) else [data]
+    msgs = []
+    for rec in reversed(recs):  # na ordem inversa (vários ajustes no mesmo arquivo)
+        f = Path(rec["file"])
+        if not f.exists():
+            continue
         cur = _read(rec["fmt"], f, rec["section"], rec["key"])
         if cur is not None and cur.strip() == rec["new"]:
             _write(rec["fmt"], f, rec["section"], rec["key"], rec["old"])
-            msg = f"{rec['key']} devolvido para {rec['old']}"
+            msgs.append(f"{rec['key']} devolvido para {rec['old']}")
         else:
-            msg = f"{rec['key']} mudou durante o jogo ({cur}); mantido como você deixou"
+            msgs.append(f"{rec['key']} mudou durante o jogo ({cur}); mantido como você deixou")
     rp.unlink(missing_ok=True)
-    return msg
+    return "; ".join(msgs) or None
 
 
 def listing(paths: Paths, launch_map: dict) -> list[str]:
     ov = _load(_overrides_path(paths), {})
-    return [f"{launch_map.get(g, {}).get('title', g)}: {LABEL.get(v.get('res'), v.get('res'))}" for g, v in ov.items()]
+    return [f"{launch_map.get(g, {}).get('title', g)}: {LABEL.get(v.get('res'), v.get('res'))}"
+            for g, v in ov.items() if v.get("res")]

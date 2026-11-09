@@ -178,6 +178,63 @@ def _game(paths: Paths, game_id: str) -> dict:
     return lm[game_id]
 
 
+def _refresh_tabs(paths: Paths) -> None:
+    try:
+        from .. import syncer, tabs, vdf
+        if tabs.SETTINGS.exists():
+            sc = syncer.shortcuts_path()
+            tabs.apply(vdf.read_shortcuts(sc), json.loads((paths.data / "launch-map.json").read_text("utf-8")),
+                       sc.parents[1].name, data_dir=paths.data)
+    except Exception:  # noqa: BLE001 — aba é conforto
+        pass
+
+
+def _gba_inside(rom: Path, tid: str, roots) -> str | None:
+    """Jogos de GBA vendidos no Switch (ex.: FireRed/LeafGreen) trazem a ROM .gba dentro do RomFS."""
+    from . import converter, extract, nca, switch
+    try:
+        keys = nca.load_keys(switch.keys_path())
+        rfs, hs = nca.open_romfs(rom, keys, extract.latest_update(converter.collect(roots, tid)))
+    except (nca.NcaError, OSError, TypeError):
+        return None
+    try:
+        gbas = [p for p in rfs.files() if p.lower().endswith(".gba")]
+        return gbas[0] if len(gbas) == 1 else None
+    finally:
+        for h in hs:
+            h.close()
+
+
+def _translate_gba_inside(paths, job, g, tid, inner, progress, should_pause):
+    """ROM de GBA dentro de um jogo de Switch: tradução retrô (Meowth) e a ROM traduzida vira mod."""
+    from .. import syncer
+    from . import converter, extract, nca, retro, switch
+    keys = nca.load_keys(switch.keys_path())
+    rom = Path(g["rom"])
+    rfs, hs = nca.open_romfs(rom, keys, extract.latest_update(converter.collect(syncer.rom_roots(), tid)))
+    try:
+        off, size = rfs.files()[inner]
+        work = paths.data / "traducao" / "gba" / tid
+        work.mkdir(parents=True, exist_ok=True)
+        src = work / Path(inner).name
+        src.write_bytes(rfs.read_at(off, size))
+    finally:
+        for h in hs:
+            h.close()
+    if not src.read_bytes()[0xAC:0xB0].isalnum():  # código do jogo no cabeçalho do GBA (ex.: BPRE)
+        return {"title_id": tid}, "o arquivo .gba dentro do jogo não parece uma ROM de GBA", False
+    rep = retro.translate_rom(paths, src, g.get("title", ""), progress=progress, should_pause=should_pause)
+    if not rep.output or Path(rep.output).parent != src.parent:
+        return {"title_id": tid}, rep.text(), False
+    dst = switch.mod_target(tid) / "romfs" / inner
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    dst.write_bytes(Path(rep.output).read_bytes())
+    _refresh_tabs(paths)
+    return ({"title_id": tid, "traducao_pt_br": True, "provider": rep.provider, "translated": rep.translated,
+             "mod": str(switch.mod_target(tid))},
+            rep.text() + f"\n✅ mod ativo: a ROM de GBA dentro do jogo foi trocada pela traduzida ({inner}).", True)
+
+
 def _approval_needed(paths: Paths, cfg: dict, texts_estimate: int, job: dict) -> str | None:
     chain = ia.build_chain(paths, cfg)
     if not chain or chain[0].free or job["args"].get("aprovado") or not cfg.get("estimativa_antes_de_iniciar", True):
@@ -197,11 +254,34 @@ def _dispatch(paths, store, job, cfg, progress, should_pause) -> tuple[dict, str
         tid = base_title_id(rom.name)
         if not tid:
             return {}, "não achei o Title ID no nome do arquivo ([0100…])", False
-        romfs = switch.find_romfs(tid) or switch.extract_with_hactool(rom, tid)
+        from . import extract, nca, portugues
+        # 1) o jogo já tem português oficial? então é só abrir com o idioma certo (sem IA, sem cópia)
+        idi = portugues.detect_switch(paths, {job["game_id"]: g}, syncer.rom_roots())
+        if idi.get(job["game_id"], {}).get("ptbr") == "oficial":
+            _refresh_tabs(paths)
+            return ({"title_id": tid, "traducao_pt_br": True, "provider": "oficial"},
+                    "Esse jogo já tem português do Brasil OFICIAL. Configurei para ele abrir em português "
+                    "(só ele; os outros continuam como estavam). Está na aba \"Em português\".", True)
+        romfs = switch.find_romfs(tid)
+        how = "pasta extraída"
         if not romfs:
-            return {"title_id": tid}, (
-                "Preciso dos arquivos do jogo extraídos (RomFS). No modo desktop: Ryujinx → botão direito no jogo → "
-                f"Extrair dados → RomFS → escolha a pasta ~/Emulation/romfs/{tid}. Depois mande /traduzir de novo."), False
+            try:  # 2) extrai sozinho só os textos (base + atualização) com as chaves do Ryujinx
+                romfs, how = extract.extract_texts(rom, tid, syncer.rom_roots(), cfg["idioma_origem"])
+            except nca.NcaError as e:
+                gba = _gba_inside(rom, tid, syncer.rom_roots())
+                if gba:
+                    return _translate_gba_inside(paths, job, g, tid, gba, progress, should_pause)
+                romfs = switch.extract_with_hactool(rom, tid)
+                if not romfs and ("prod.keys" in str(e) or "ausente" in str(e)):
+                    return {"title_id": tid}, (
+                        f"Não consegui abrir o jogo: {e}. Abra qualquer jogo no Ryujinx uma vez (ele guarda as chaves), "
+                        f"ou extraia os arquivos: Ryujinx → botão direito no jogo → Extrair dados → RomFS → "
+                        f"~/Emulation/romfs/{tid}. Depois mande /traduzir de novo."), False
+                if not romfs:
+                    return {"title_id": tid}, (
+                        f"Não dá para traduzir este jogo automaticamente: {e}. Os textos dele não estão no formato "
+                        "padrão da Nintendo (MSBT), e mexer em formato desconhecido poderia quebrar o jogo."), False
+        job["extracao"] = how
         if not job["args"].get("aprovado"):
             rep0 = switch.Report(tid)
             files, _ = switch.scan(romfs, rep0, cfg["idioma_origem"])
@@ -212,6 +292,8 @@ def _dispatch(paths, store, job, cfg, progress, should_pause) -> tuple[dict, str
                 return {"estimate": est}, need, False
         rep = switch.translate_game(paths, tid, romfs, g.get("title", ""), force_font=job["args"].get("forcar", False),
                                     progress=progress, should_pause=should_pause)
+        if rep.applied:
+            _refresh_tabs(paths)
         result = {"traducao_pt_br": rep.applied, "provider": rep.provider, "modelo": cfg["providers"].get(
             rep.provider, {}).get("modelo", ""), "msbt_count": rep.msbt_count, "strings": rep.strings,
             "translated": rep.translated, "flagged": rep.flagged, "fontes_bitmap": rep.font,

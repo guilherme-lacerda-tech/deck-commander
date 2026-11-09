@@ -22,6 +22,8 @@ ORDER = ["ps2", "psx", "switch", "switch2", "gc", "wii", "psp", "n64", "snes", "
 
 
 COLLECTION_IDS: dict[str, str] = {}  # título -> id da coleção do Steam (preenchido por apply())
+PT_TITLE = "Em português"
+PT_GIDS: set[str] = set()  # jogos em português (preenchido por write_collections a partir de dc.traducao.portugues)
 
 
 def _tab(tid: str, title: str, pos: int, appids: list[int]) -> dict:
@@ -48,6 +50,7 @@ def groups(shortcuts: list[dict], launch_map: dict, plugin_done: dict | None = N
 def build(tabs: dict, shortcuts: list[dict], launch_map: dict, _ids_only: bool = False) -> dict:
     by_console: dict[str, list[int]] = {c: [] for c in ORDER}
     emus: list[int] = []
+    pt: list[int] = []
     stores: dict[str, list[int]] = {}
     for r in shortcuts:
         appid = (r.get("appid") or 0) & 0xFFFFFFFF
@@ -61,6 +64,8 @@ def build(tabs: dict, shortcuts: list[dict], launch_map: dict, _ids_only: bool =
             entry = launch_map.get(r.get("LaunchOptions", ""))
             if entry and entry["console"] in by_console:
                 by_console[entry["console"]].append(appid)
+            if r.get("LaunchOptions", "") in PT_GIDS:
+                pt.append(appid)
         elif any(h in exe or h in (r.get("LaunchOptions") or "").lower() for h in EMULATOR_HINTS) \
                 and "unifideck" not in exe:
             emus.append(appid)
@@ -74,6 +79,7 @@ def build(tabs: dict, shortcuts: list[dict], launch_map: dict, _ids_only: bool =
     pos = 0
     for t in head:
         out[t["id"]] = {**t, "position": pos}; pos += 1
+    out["dc-portugues"] = _tab("dc-portugues", PT_TITLE, pos, pt); pos += 1  # só os jogos em português
     for store in sorted(stores):  # uma aba por loja, logo depois dos Favoritos
         title = STORE_TITLES.get(store.lower(), store)
         out[f"dc-loja-{store.lower()}"] = _tab(f"dc-loja-{store.lower()}", title, pos, stores[store]); pos += 1
@@ -85,6 +91,7 @@ def build(tabs: dict, shortcuts: list[dict], launch_map: dict, _ids_only: bool =
     if _ids_only:
         apps = {f"dc-{c}": by_console[c] for c in ORDER}
         apps["dc-emuladores"] = emus
+        apps["dc-portugues"] = pt
         apps.update({f"dc-loja-{s.lower()}": v for s, v in stores.items()})
         return {k: {"title": v["title"], "_apps": sorted(set(apps[k]))} for k, v in out.items() if k in apps}
     return out
@@ -96,9 +103,16 @@ def write_collections(data_dir: Path, shortcuts: list[dict], launch_map: dict) -
         done = json.loads((data_dir / "plugin-done.json").read_text("utf-8"))
     except (OSError, ValueError):
         done = {}
+    try:
+        from .traducao import portugues
+        PT_GIDS.clear()
+        PT_GIDS.update(portugues.pt_gids(data_dir, launch_map))
+    except Exception:  # noqa: BLE001 — a aba é conforto; nunca impede as outras
+        pass
     # consoles e Emuladores sempre existem (mesmo vazios) para as abas acompanharem ao vivo; lojas só se houver jogos
     spec = {k: v for k, v in groups(shortcuts, launch_map, done).items()
-            if v or k in {CONSOLES[c]["label"] for c in ORDER} | {"Emuladores"}}
+            if v or k in {CONSOLES[c]["label"] for c in ORDER} | {"Emuladores", PT_TITLE}}
+    spec["__exato__"] = [PT_TITLE]  # o plugin também TIRA dessa coleção o que deixou de estar em português
     tmp = data_dir / "collections.json.tmp"
     tmp.write_text(json.dumps(spec, ensure_ascii=False, indent=1), "utf-8")
     os.replace(tmp, data_dir / "collections.json")

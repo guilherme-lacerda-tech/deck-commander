@@ -159,8 +159,10 @@ async function processRemovals() {
 // Coleções do Steam por console/loja. Só ACRESCENTA jogos; nunca remove nada de coleção nenhuma.
 async function syncCollections() {
     const spec = (await call("get_collections")) || {};
+    const exact = new Set(spec.__exato__ || []);  // coleções que espelham a lista exatamente (ex.: "Em português")
     const ids = {};
     for (const [name, appids] of Object.entries(spec)) {
+        if (name.startsWith("__")) continue;
         let col = collectionStore.GetUserCollectionsByName(name)[0];
         if (!col) {
             col = collectionStore.NewUnsavedCollection(name, undefined, []);
@@ -173,6 +175,15 @@ async function syncCollections() {
             col.AsDragDropCollection().AddApps(missing);
             await col.Save();
             note(name + ": +" + missing.length);
+        }
+        if (exact.has(name)) {
+            const want = new Set(appids);
+            const extra = [...col.apps.keys()].filter((a) => !want.has(a)).map((a) => appStore.GetAppOverviewByAppID(a)).filter(Boolean);
+            if (extra.length) {
+                col.AsDragDropCollection().RemoveApps(extra);
+                await col.Save();
+                note(name + ": -" + extra.length);
+            }
         }
         ids[name] = col.id;
     }
