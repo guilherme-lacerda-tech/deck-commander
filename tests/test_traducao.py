@@ -132,6 +132,13 @@ def test_chain_skips_providers_without_key(tmp_path):
     assert ia.mask("ghp_123456789") == "ghp_…89"
 
 
+def test_ollama_down_is_skipped_quickly(tmp_path, monkeypatch):
+    paths = get_paths(tmp_path).ensure()
+    monkeypatch.setattr(ia, "_ollama_up", lambda spec: "11435" not in spec.get("url", ""))  # PC desligado
+    cfg = cfg_with(paths, provider="index_translate", fallback=["ollama_pc", "ollama"])
+    assert [p.name for p in ia.build_chain(paths, cfg)] == ["index_translate", "ollama"]
+
+
 # ============================================================ formatos do Switch
 def test_msbt_roundtrip_byte_identical_and_edit():
     raw = make_msbt([["Hello ", tag(), "!"], ["Second line"], [""]], ["L0", "L1", "L2"])

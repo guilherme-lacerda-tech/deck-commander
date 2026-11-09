@@ -109,6 +109,44 @@ def spawn(paths: Paths, op: str) -> None:
                      start_new_session=True, env={**os.environ, "PYTHONPATH": str(repo)})
 
 
+def auto_queue(paths: Paths, store: Store, game_ids: list[str]) -> list[str]:
+    """Download novo que não está em português => tradução automática na fila (traducao.toml:
+    auto_traduzir = true, padrão). Devolve linhas para a mensagem do bot."""
+    cfg = ia.load_cfg(paths)
+    if not cfg.get("auto_traduzir", True) or not game_ids:
+        return []
+    from . import portugues, rts
+    try:
+        lm = json.loads((paths.data / "launch-map.json").read_text("utf-8"))
+    except (OSError, ValueError):
+        return []
+    idi = portugues.load_idiomas(paths.data)
+    out = []
+    for gid in game_ids:
+        g = lm.get(gid)
+        if not g or g.get("removed"):
+            continue
+        st = portugues.status(gid, g, idi)
+        if st:
+            out.append(f"🇧🇷 {g['title']}: já está em português ({'oficial' if st == 'oficial' else 'traduzido'}).")
+            continue
+        if g["console"] == "switch":
+            kind = "translate_switch"
+        else:
+            okc, _why = rts.supported(g["console"], Path(g.get("rom", "")))
+            if not okc:
+                continue
+            kind = "translate_retro"
+        if already_translated(store, gid, kind) or any(j.get("game_id") == gid and j.get("status") in
+                                                         ("na fila", "rodando", "aguardando tomada")
+                                                         for j in all_jobs(paths)):
+            continue
+        job = create(paths, store, kind, gid, g["title"], {"auto": True})
+        spawn(paths, job["op"])
+        out.append(f"🈯 {g['title']}: não está em português — traduzindo sozinho; aviso quando ficar pronto.")
+    return out
+
+
 def already_translated(store: Store, game_id: str, kind: str) -> bool:
     for o in store.list(("done",), limit=500):
         if o.type == kind and (o.params or {}).get("game_id") == game_id:

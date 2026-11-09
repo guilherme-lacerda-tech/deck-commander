@@ -126,3 +126,20 @@ def test_converter_diagnose_and_undo(b):
     assert "nada a fazer" in b.handle(1, 1, "/converter jogo")
     assert "não tem mod" in b.handle(1, 1, "/traduzir desfazer jogo")
     assert "só para jogos de Switch" in b.handle(1, 1, "/converter hercules")
+
+
+def test_auto_queue_translates_new_downloads_not_in_portuguese(b, monkeypatch, tmp_path):
+    lm = json.loads((b.paths.data / "launch-map.json").read_text())
+    iso = tmp_path / "roms/ps2/Okami/Okami.iso"
+    iso.parent.mkdir(parents=True); iso.write_bytes(b"x")
+    lm["ps2-okami"] = {"title": "Okami", "console": "ps2", "rom": str(iso)}
+    lm["ps2-gow"] = {"title": "God of War (Dublado)", "console": "ps2", "rom": str(iso.with_name("gow.iso"))}
+    (b.paths.data / "launch-map.json").write_text(json.dumps(lm))
+    lines = run.auto_queue(b.paths, b.store, ["ps2-okami", "ps2-gow", "psx-hercules"])
+    assert any("Okami" in l and "traduzindo sozinho" in l for l in lines)
+    assert any("God of War" in l and "já está em português" in l for l in lines)
+    assert not any("Hercules" in l for l in lines)  # .chd: não dá, não incomoda
+    assert len(b.spawned) == 1
+    assert run.auto_queue(b.paths, b.store, ["ps2-okami"]) == [] and len(b.spawned) == 1  # sem fila dupla
+    (b.paths.config / "traducao.toml").write_text("auto_traduzir = false\n")
+    assert run.auto_queue(b.paths, b.store, ["ps2-okami"]) == []

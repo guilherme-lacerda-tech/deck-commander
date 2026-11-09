@@ -32,7 +32,7 @@ _PH = re.compile(r"⟦(\d+)⟧")
 
 DEFAULT_CFG = {
     "provider": "index_translate",   # testado 2026-11-09: rápido, grátis, mantém os marcadores
-    "fallback": ["ollama", "github_models"],
+    "fallback": ["ollama_pc", "ollama", "github_models"],
     "modelo": "translategemma:4b",
     "idioma": "pt-BR",
     "idioma_origem": "en",
@@ -44,7 +44,9 @@ DEFAULT_CFG = {
     "lote": 20,                       # frases por chamada (modelos "unitários" ignoram)
     "providers": {
         "ollama": {"tipo": "ollama", "url": "http://127.0.0.1:11434", "modelo": "translategemma:4b", "gratis": True},
-        "ollama_pc": {"tipo": "ollama", "url": "", "modelo": "translategemma:12b", "gratis": True},
+        # IA do seu PC (placa de vídeo) chegando pelo túnel SSH que o PC abre (tools/pc/tunel-ia.ps1)
+        "ollama_pc": {"tipo": "ollama", "url": "http://127.0.0.1:11435", "modelo": "qwen2.5:7b", "gratis": True,
+                      "lote": 12},
         "index_translate": {"tipo": "openai", "url": "https://index-translate.bilibili.com/v1",
                             "modelo": "Index-Translate-9B", "chave": "", "gratis": True, "lote": 8},
         "github_models": {"tipo": "openai", "url": "https://models.github.ai/inference",
@@ -240,8 +242,23 @@ def build_chain(paths: Paths, cfg: dict, http: HttpFn = _http) -> list[Provider]
         key = secret(paths, spec["segredo"]) if spec.get("segredo") else spec.get("chave", "")
         if spec.get("segredo") and not key:
             continue  # provedor que precisa de chave e você não configurou: pula
+        if spec.get("tipo") == "ollama" and http is _http and not _ollama_up(spec):
+            continue  # PC desligado / IA local não instalada: pula na hora, sem esperar
         out.append(Provider(name, spec, key, http))
     return out
+
+
+def _ollama_up(spec: dict) -> bool:
+    url = (spec.get("url") or "").rstrip("/")
+    if not url:
+        return False
+    try:
+        with urllib.request.urlopen(url + "/api/tags", timeout=3) as r:
+            models = [m.get("name", "") for m in json.loads(r.read()).get("models", [])]
+    except (OSError, ValueError):
+        return False
+    want = spec.get("modelo", "")
+    return not want or want in models or f"{want}:latest" in models
 
 
 # ----------------------------------------------------------------------------- tradução

@@ -144,7 +144,7 @@ def run_sync(paths: Paths, store: Store, qbt: Qbt | None, confirm_many: bool = F
     op = store.enqueue("sync", {"confirm_many": confirm_many})
     store.claim(op)
     t0 = time.monotonic()
-    lines, added_files, arrived = [], 0, set()
+    lines, added_files, arrived, arrived_files = [], 0, set(), set()
     try:
         with OperationLock(paths.lock, op, "sync", is_running=store.is_running):
             torrents = qbt.torrents() if qbt else []
@@ -181,6 +181,7 @@ def run_sync(paths: Paths, store: Store, qbt: Qbt | None, confirm_many: bool = F
                                       " VALUES(?,?,?,?,?,?)", (f, s.st_size, s.st_mtime, "torrent", t["hash"], item.integrity))
                     added_files += len(item.files)
                     arrived |= {library.clean_title(Path(f).stem).casefold() for f in item.files}
+                    arrived_files.update(item.files)
                     lines.append(f"✅ {t['name']} → {item.console}" + (f" ({item.note})" if item.note else "")
                                  + " · não verificado (sem referência de hash)")
                 elif item.status == "ask_console":
@@ -199,6 +200,14 @@ def run_sync(paths: Paths, store: Store, qbt: Qbt | None, confirm_many: bool = F
         st["last_sync"] = datetime.now(timezone.utc).isoformat()
         _save_state(paths, st)
         store.finish(op, True, result={"files": added_files, "shortcuts": len(new)})
+        if arrived_files:  # chegou jogo novo: se não estiver em português, já vai para a tradução automática
+            try:
+                from .traducao import run as trad_run
+                lm = json.loads((paths.data / "launch-map.json").read_text("utf-8"))
+                gids = [g for g, e in lm.items() if e.get("rom") in arrived_files]
+                lines += trad_run.auto_queue(paths, store, gids)
+            except Exception as e:  # noqa: BLE001 — a tradução automática nunca atrapalha o /sync
+                lines.append(f"(tradução automática não começou: {e})")
         head = f"{len(new)} jogo(s) novo(s) no Steam" + (": " + ", ".join(new[:10]) if new else "")
         fresh = [c for c in LAST_CONFLICTS if c.casefold() in arrived]
         for c in fresh:
