@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.0 — 2026-11-09 — baixou, chega traduzido
+- **RomTranslate Studio** (compilado no Deck num contêiner) integrado: PS1, PS2, PSP, GBA, SNES, NES, N64, GC, DS.
+  Só frases de verdade vão para a IA (a varredura genérica acha muito lixo), com o limite de espaço informado e
+  encurtamento; sem acento onde o jogo não tem; `.cue` novo para PS1.
+- **Tradução automática** de downloads que não estão em português (`auto_traduzir`).
+- **IA do PC** pela rede (túnel SSH reverso; pulada na hora se o PC estiver desligado).
+- IA mais robusta: erro passageiro não abandona o provedor rápido; teto de resposta; aspas de diálogo preservadas.
+- Tarefas de tradução rodam como serviço próprio do systemd (não morrem se o bot reiniciar).
+- FireRed (Switch) traduzido de ponta a ponta: 2.332 frases, 0 problemas.
+
 ## 0.5.1 — 2026-11-09 — "Em português" sem duplicar a biblioteca
 - Aba/coleção **"Em português"**: só os jogos que você pode jogar em português (PT-BR oficial do Switch,
   tradução do Deck Commander, ROMs traduzidas/dubladas pelo nome). Atualiza ao vivo; sai da aba o que deixar de estar.

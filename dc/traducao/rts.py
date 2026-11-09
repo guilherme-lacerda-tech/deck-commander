@@ -78,23 +78,54 @@ def supported(console: str, rom: Path) -> tuple[bool, str]:
     return True, ""
 
 
+COMMON_WORDS = set("""a an the and or but if of to in on at by for from with without into out up down over under
+again here there this that these those it its is are was were be been being am do does did done have has had will
+would can could shall should may might must not no yes you your yours we our us me my mine he him his she her they
+them their what which who whom whose when where why how all any some each every more most other such only own same
+so than too very just now then also get got go goes going gone come came take took make made see saw look find found
+give gave tell told say said ask know knew think want need use used try press start select pause continue game play
+player save load new quit exit menu options option level stage world area time score lives life points item items
+key door open close back next ok cancel please insert memory card data file controller battle attack fight defeat
+win lose won lost good great well done let lets ready come welcome thank thanks hello help sorry one two three
+first last left right up down move jump run walk talk visit return leave enter""".split())
+
+
+SYSTEM_TEXT = re.compile(r"Sony Computer Entertainment|Licensed by|PS-X EXE|Nintendo of America|SEGA ENTERPRISES", re.I)
+
+
 def is_sentence(text: str) -> bool:
-    """Frase que alguém lê no jogo (não nome de arquivo, código, depuração ou bytes que parecem letras)."""
+    """Frase que alguém lê no jogo. Bem rígido de propósito: a varredura genérica acha muito lixo (bytes de
+    dados que parecem letras, como 'VDD33Ce'), e gravar tradução em cima de dado quebra o jogo."""
     t = text.strip()
-    words = re.findall(r"[A-Za-z]{2,}", t)
-    if len(words) < 2 or len(t) < 6:
+    if SYSTEM_TEXT.search(t):
+        return False  # licença/cabeçalho do console: não se mexe
+    if len(t) < 5 or re.search(r"[_\\/|{}=<>@#$^~`%*]|\.(bin|dat|tim|str|xa|exe|ovl|bmp|vab)\b", t, re.I):
         return False
-    if not re.search(r"[aeiouAEIOU]", t) or re.search(r"[_\\/|{}=<>@#$^~`]|\.(bin|dat|tim|str|xa|exe)\b", t, re.I):
+    words = [w.strip(".,!?'\":;()-") for w in t.split()]
+    words = [w for w in words if w]
+    if len(words) < 2:
         return False
-    if re.search(r"%[0-9sdx]|0x[0-9a-f]", t, re.I) and len(words) < 4:
+    alpha = [w for w in words if w.isalpha()]
+    if len(alpha) < max(2, int(0.75 * len(words) + 0.5)):
         return False
-    sane = sum(c.isalpha() or c in " ,.!?'\"-:;()\n" or c.isdigit() for c in t) / len(t)
-    if sane < 0.9:
-        return False
-    if re.search(r"(.)\1{3,}", t) or re.search(r"[A-Z][a-z]+[A-Z]{2}", t):
-        return False
-    vowels = sum(c in "aeiouAEIOU" for c in t if c.isalpha()) / max(1, sum(c.isalpha() for c in t))
-    return 0.2 <= vowels <= 0.7
+    for w in alpha:  # forma de palavra: minúscula, Capitalizada ou TODA MAIÚSCULA; com vogal; tamanho normal
+        if not (w.islower() or w.isupper() or (w[0].isupper() and w[1:].islower())) or len(w) > 16:
+            return False
+        vowel = re.search(r"[aeiouyAEIOUY]", w)
+        if len(w) == 2 and not vowel and not w.isupper():
+            return False  # "nq" (sigla como "CD" pode)
+        if len(w) >= 3 and (not vowel or not re.search(r"[^aeiouAEIOU]", w)):
+            return False  # sem vogal ("Bh4") ou só vogais ("EAI")
+    long_ = [w for w in alpha if len(w) >= 2]
+    if len(long_) < 2 or sum(map(len, long_)) < 6:
+        return False  # "on Tu"
+    if len(long_) <= 3 and any(w.isupper() for w in long_) and any(w.islower() for w in long_):
+        return False  # trecho curto misturando "nq NO", "yb SO": texto de jogo não faz isso
+    low = [w.lower() for w in long_]
+    if sum(w in COMMON_WORDS for w in low) >= (1 if len(low) <= 4 else 2):
+        return True
+    # título/menu em maiúsculas ("VISIT TO THEBES", "BATTLE OF TITANS")
+    return all(w.isupper() for w in alpha) and sum(len(w) >= 3 for w in alpha) >= 2
 
 
 def strip_accents(s: str) -> str:

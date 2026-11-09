@@ -4,8 +4,34 @@
 | Adição | Comando | Como funciona | Estado |
 |---|---|---|---|
 | A2 — tradução de Switch | `/traduzir <jogo>` | Os textos do jogo (MSBT) são traduzidos e instalados como **mod** do Ryujinx. O jogo nunca é alterado. | ✅ validado com arquivos reais de um jogo da Nintendo (552 MSBT, 12.742 frases, tags idênticas) e com IA real |
-| A1 — tradução retrô | `/traduzir <jogo>` | Pokémon de GBA: o Meowth extrai e regrava o texto, a nossa IA traduz e sai uma ROM nova "(PT-BR)" + patch `.bps` | ⏳ código e testes prontos; falta testar com uma ROM real (S12) |
+| A1 — tradução retrô | `/traduzir <jogo>` (ou automático ao baixar) | PS1, PS2, PSP, GBA, SNES, NES, N64, GameCube, DS pelo **RomTranslate Studio**; Pokémon de GBA pelo **Meowth**. Sai "<jogo> (PT-BR)" + patch `.bps`, e o original some da biblioteca | ✅ FireRed traduzido de ponta a ponta (2.332 frases, 0 problemas) |
 | A3 — conversão de Switch | `/converter <jogo> [organizar\|descompactar]` | Confere, organiza atualização e DLC numa pasta por jogo e descompacta NSZ/XCZ | ✅ diagnóstico validado na biblioteca real; descompactar depende do `nsz` |
+
+## Automático: baixou, chega traduzido
+Quando um download entra na biblioteca e o jogo **não** está em português, o bot já coloca a tradução na fila
+e avisa ("traduzindo sozinho"). Quando termina, o jogo aparece na aba "Em português", sem duplicar.
+Desligar: `auto_traduzir = false` em `~/.config/deck-commander/traducao.toml`.
+
+Ordem de preferência:
+1. **Já em português**: a versão baixada já traduzida ou dublada, ou o português oficial do Switch. Nada a fazer.
+2. **Tradução da comunidade**: quando existe um patch publicado e conferível (hoje: o acervo aberto `romhack_db`
+   para SNES/NES/GB). O romhacking.net bloqueia acesso automático, e o acervo dele no Internet Archive exige login.
+3. **IA**, na cadeia abaixo.
+
+## IA: Index-Translate → seu PC → o Deck
+| Provedor | Quando |
+|---|---|
+| Index-Translate-9B (grátis, na internet) | primeiro: rápido (~60 frases por minuto) |
+| **Seu PC** (Ollama + placa de vídeo, `qwen2.5:7b`) | se o Index falhar; o PC empresta a IA pela rede por um túnel SSH (nada é aberto no firewall) |
+| Ollama no Deck (`translategemma:4b`) | sem internet e sem PC; lento |
+
+Erro passageiro (o servidor recusa resposta longa, limite de uso) não derruba o provedor rápido: a tradução tenta de novo
+com lotes menores e volta ao principal. Se a tradução passar do espaço do jogo, a IA recebe o limite e é pedida uma
+versão mais curta.
+**Ligar a IA do PC** (uma vez, no PC, em PowerShell):
+```
+powershell -ExecutionPolicy Bypass -File C:\dev\deck-commander\tools\pc\instalar-tunel-ia.ps1
+```
 
 ## Aba "Em português" (jogar sem se perder)
 A biblioteca **não é duplicada**:
@@ -26,9 +52,12 @@ A aba **"Em português"** mostra só o que dá para jogar em português:
 |---|---|
 | Super Mario Galaxy, Galaxy 2, Castlevania Belmont's Curse | ✅ PT-BR oficial: abrem em português |
 | 13 de PS2 + Final Fantasy Tactics (PS1) | ✅ já traduzidos/dublados (pelo nome) |
-| FireRed / LeafGreen (Switch) | ⏳ trazem uma ROM de GBA dentro: traduzíveis com o Meowth (`./setup-deck.sh --modules A1`) |
-| Luigi's Mansion 3, Pokémon Legends Z-A | ❌ textos em formato próprio do estúdio (`.data`, `.trpfs`): não dá com segurança |
-| Shadow of the Colossus (versão inglesa), Hercules | ❌ PS1/PS2: sem extrator de texto confiável |
+| FireRed (Switch) | ✅ a ROM de GBA de dentro foi traduzida (2.332 frases) e entrou como mod. O Meowth aumenta a ROM para 32 MB: confira se abre; se não, `/traduzir desfazer firered` |
+| LeafGreen e versões espanholas | ⏳ na fila (mesmo caminho do FireRed) |
+| Luigi's Mansion 3 | 🔬 formato próprio (`.dict`/`.data` com blocos zlib). Não é cifrado, mas falta mapear onde ficam as falas (uma equipe russa já traduziu, então é possível) |
+| Pokémon Legends Z-A | 🔬 arquivo `.trpfs` comprimido com Oodle (biblioteca fechada); as ferramentas da comunidade são só para Windows |
+| Hercules (PS1) | RomTranslate: o jogo quase não tem texto comum (nomes de fase e mensagens do sistema; as falas são voz/imagem) |
+| Shadow of the Colossus (inglês) | você já tem a versão dublada |
 | Donkey Kong Bananza, Pokopia | ❌ Switch 2 (Lichii): ainda sem suporte |
 
 ## Como traduzir um jogo de Switch
