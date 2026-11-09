@@ -103,32 +103,54 @@ def _extra_volume(f: Path, files: list[Path]) -> bool:
     return any(g.name.lower() == f.stem.lower() + ".rar" and g.parent == f.parent for g in files)
 
 
-def _mds_tracks(mds: Path) -> int:
-    """Quantas faixas a imagem do Alcohol tem (0 = não deu para ler)."""
+def mds_tracks(mds: Path) -> list[dict]:
+    """Faixas de uma imagem do Alcohol 120% (.mds): tipo, tamanho do setor, setor inicial e posição no .mdf.
+    Lista vazia = não deu para ler (formato desconhecido)."""
     try:
         b = mds.read_bytes()
         if not b.startswith(b"MEDIA DESCRIPTOR"):
-            return 0
-        off = int.from_bytes(b[0x50:0x54], "little")
-        total, extra = b[off + 10], b[off + 11]
-        return total - extra
+            return []
+        u16 = lambda o: int.from_bytes(b[o:o + 2], "little")
+        u32 = lambda o: int.from_bytes(b[o:o + 4], "little")
+        sess = u32(0x50)
+        total, blocks = b[sess + 10], u32(sess + 20)
+        out = []
+        for i in range(total):
+            o = blocks + 80 * i
+            point = b[o + 4]
+            if not 1 <= point <= 99:
+                continue  # A0/A1/A2 = blocos de controle, não faixas
+            low = b[o] & 0x0F
+            kind = "AUDIO" if low == 9 else "MODE1/2352" if low == 0xA else "MODE2/2352"
+            out.append({"track": point, "kind": kind, "sector": u16(o + 16), "start": u32(o + 36),
+                        "offset": int.from_bytes(b[o + 40:o + 48], "little")})
+        return sorted(out, key=lambda x: x["track"])
     except (OSError, IndexError):
-        return 0
+        return []
+
+
+def _msf(sector: int) -> str:
+    return f"{sector // 4500:02d}:{sector // 75 % 60:02d}:{sector % 75:02d}"
 
 
 _SERIAL = re.compile(r"^[A-Z]{4}[_-]?\d{3}\.?\d{2}$", re.I)  # SLES_005.24, SLUS-00067…
 
 
 def mdf_to_cue(mdf: Path, title: str = "") -> Optional[Path]:
-    """CD de PS1 em .mdf com uma faixa só vira .bin + .cue (o DuckStation e o tradutor abrem). Setores de 2352
-    bytes = já é um .bin; de 2448 (2352 + 96 de subcanal, dump feito com subcanal) tira o subcanal.
-    Com várias faixas (áudio CD) deixa como está: o DuckStation abre o .mds direto."""
-    size = mdf.stat().st_size
-    sector = 2352 if size % 2352 == 0 else 2448 if size % 2448 == 0 else 0
-    if not sector:
-        return None
+    """CD de PS1 em .mdf/.mds (Alcohol 120%) vira .bin + .cue, que o DuckStation e o tradutor abrem. Lê as faixas
+    do .mds (dados + áudio); setores de 2448 bytes (2352 + 96 de subcanal) perdem o subcanal."""
     mds = mdf.with_suffix(".mds")
-    if mds.exists() and _mds_tracks(mds) not in (0, 1):
+    tracks = mds_tracks(mds) if mds.exists() else []
+    size = mdf.stat().st_size
+    if tracks:
+        sizes = {t["sector"] for t in tracks}
+        if len(sizes) != 1 or sizes.pop() not in (2352, 2448):
+            return None
+        sector = tracks[0]["sector"]
+    else:
+        sector = 2352 if size % 2352 == 0 else 2448 if size % 2448 == 0 else 0
+        tracks = [{"track": 1, "kind": "MODE2/2352", "sector": sector, "start": 0, "offset": 0}]
+    if not sector or size % sector:
         return None
     stem = mdf.stem
     if title and _SERIAL.match(stem):  # nome do arquivo é o código do disco: usa o nome do download
@@ -146,10 +168,17 @@ def mdf_to_cue(mdf: Path, title: str = "") -> Optional[Path]:
                 dst.write(b"".join(chunk[i:i + 2352] for i in range(0, len(chunk), 2448)))
         os.replace(tmp, bin_)
         mdf.unlink()
+    lines = [f'FILE "{bin_.name}" BINARY']
+    for tr in tracks:
+        lines.append(f"  TRACK {tr['track']:02d} {tr['kind']}")
+        in_file = tr["offset"] // sector  # o pregap (2 s) costuma estar gravado antes do início da faixa
+        if tr["track"] > 1 and in_file < tr["start"]:
+            lines.append(f"    INDEX 00 {_msf(in_file)}")
+        lines.append(f"    INDEX 01 {_msf(tr['start'])}")
+    cue = bin_.with_suffix(".cue")
+    cue.write_text(chr(10).join(lines) + chr(10), "utf-8")
     if mds.exists():
         mds.unlink()
-    cue = bin_.with_suffix(".cue")
-    cue.write_text(f'FILE "{bin_.name}" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n', "utf-8")
     return cue
 
 
