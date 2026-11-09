@@ -168,7 +168,9 @@ Os textos não são MSBT: ficam dentro de `arc/data.trpfs`, em pacotes FlatBuffe
   sem esses arquivos na lista. Assim o jogo lê os soltos (mesma técnica do Trinity Mod Loader).
 - **Versão:** o mod é feito da versão que o Ryujinx **carrega** (`games/<tid>/updates.json`; sem ele, a versão base).
   Um `data.trpfd` de outra versão aponta para pacotes errados e o jogo trava ao abrir (aconteceu no 1º piloto).
-  Se você ligar/trocar a atualização no Ryujinx, rode `/traduzir <jogo> --forcar` de novo.
+  Se você ligar/trocar a atualização no Ryujinx, rode `/traduzir <jogo> --forcar` de novo. Até lá o `dc-launch`
+  desliga sozinho o mod de outra versão (vai para `traducao/mods-desligados`) e o jogo abre em inglês, sem travar.
+- Testes de abertura no Deck: só com **um** Ryujinx aberto por vez (dois juntos fizeram o Z-A travar no teste).
 - **Testado no Deck (Ryujinx 1.3.3, versão base):** com o mod, o jogo abre e roda; o log de acesso a arquivos mostra o
   jogo lendo os `.dat` soltos do RomFS (27 abertos só até a tela inicial). Se o jogo não abrir: `/traduzir desfazer z-a`.
 - Tradução completa: ~63 mil frases (versão base). Com o Index-Translate, ~125 frases/min: cerca de 7 h (retoma de onde parou).
