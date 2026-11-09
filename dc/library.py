@@ -81,6 +81,11 @@ def scan(roots: Iterable[Path]) -> tuple[list[Game], list[str]]:
                         title = clean_title(main.parent.parent.parent.name)
                         games.setdefault(f"{console}-{slug(title)}", Game(f"{console}-{slug(title)}", title, console, str(main)))
                 continue
+            if spec.get("eboot"):  # PS3 em pasta: <jogo>/PS3_GAME/USRDIR/EBOOT.BIN
+                for eb in sorted(d.rglob("EBOOT.BIN")):
+                    if eb.parent.name == "USRDIR" and eb.parent.parent.name == "PS3_GAME":
+                        title = clean_title(eb.parent.parent.parent.name)
+                        games.setdefault(f"{console}-{slug(title)}", Game(f"{console}-{slug(title)}", title, console, str(eb)))
             files = sorted(f for f in d.rglob("*") if f.is_file() and f.suffix.lower() in spec["exts"])
             for f in files:
                 if console == "switch":

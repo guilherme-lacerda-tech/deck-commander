@@ -25,6 +25,18 @@ PENDING_TTL = 600  # "Switch 1" vale para o próximo arquivo nos próximos 10 mi
 
 # Texto livre -> console. "switch 2" é reconhecido para responder que não é suportado.
 ALIASES = [
+    (r"3ds|n3ds|nintendo\s*3ds|new\s*3ds", "n3ds"),
+    (r"wii\s*u|wiiu", "wiiu"),
+    (r"ps\s*3|playstation\s*3|play\s*3", "ps3"),
+    (r"xbox(\s*cl[aá]ssico|\s*original)?", "xbox"),
+    (r"dreamcast|\bdc\b", "dc"),
+    (r"sega\s*cd|mega\s*cd|segacd", "segacd"),
+    (r"saturn|sega\s*saturn", "saturn"),
+    (r"master\s*system|\bsms\b", "sms"),
+    (r"game\s*gear|\bgg\b", "gg"),
+    (r"mega\s*drive|megadrive|genesis|\bmd\b", "genesis"),
+    (r"pc\s*engine|turbo\s*grafx|\bpce\b", "pce"),
+    (r"arcade|fbneo|neo\s*geo|mame|cps\s*[123]", "arcade"),
     (r"switch\s*2|nsw\s*2|sw2", "switch2"),
     (r"switch(\s*1)?|nsw|nintendo switch", "switch"),
     (r"ps\s*2|playstation\s*2|play\s*2", "ps2"),
@@ -33,6 +45,9 @@ ALIASES = [
     (r"n64|nintendo\s*64", "n64"), (r"snes|super\s*nintendo|super\s*nes", "snes"),
     (r"gba|game\s*boy\s*advance", "gba"),
     (r"nds|nintendo\s*ds|ds|dsi", "nds"),
+    (r"game\s*boy\s*colou?r|gbc", "gbc"),
+    (r"game\s*boy|\bgb\b", "gb"),
+    (r"\bnes\b|nintendinho|famicom|nintendo\s*8", "nes"),
 ]
 
 
@@ -285,8 +300,9 @@ class Bot:
         import re as _re
         if _re.fullmatch(r"\s*[\w .+-]{1,24}\s*", text) and len(text.split()) <= 3 and not _re.search(
                 r"(?i)\b(ok|oi|ol[aá]|valeu|obrigad[oa]|blz|beleza|sim|n[aã]o|bom dia|boa (tarde|noite)|kk+|haha)\b", text):
-            return (f"Não conheço o console \"{text.strip()}\". Uso: Switch, PS2, PS1, PSP, DS, GameCube, Wii, "
-                    "SNES, N64, GBA — mande o nome e depois o .torrent ou magnet.")
+            return (f"Não conheço o console \"{text.strip()}\". Uso: Switch, 3DS, DS, Wii U, Wii, GameCube, N64, SNES, "
+                    "NES, GBA, Game Boy, PS1, PS2, PS3, PSP, Xbox, Dreamcast, Saturn, Mega Drive, Master System, "
+                    "Game Gear, Sega CD, PC Engine, Arcade — mande o nome e depois o .torrent ou magnet.")
         return None  # conversa comum: ignora
 
     # -- energia ------------------------------------------------------------------

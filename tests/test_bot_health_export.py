@@ -186,10 +186,10 @@ def test_nintendo_ds_and_unknown_console(b):
     from dc.bot import parse_console
     from dc import content
     assert parse_console("DS") == "nds" and parse_console("Nintendo DS") == "nds" and parse_console("nds") == "nds"
-    assert parse_console("3DS") is None  # 3DS não é DS
+    assert parse_console("3DS") == "n3ds"  # 3DS não é confundido com DS
     assert content.classify("Pokemon Black (USA).nds") == "nds"
     b.cfg["allowed"] = [1]
     msg = lambda **k: {"from": {"id": 1}, "chat": {"id": 9}, **k}
     assert "próximo" in b.handle_message(msg(text="DS")) and b.cfg["pending_console"]["1"]["console"] == "nds"
-    assert "Não conheço o console" in b.handle_message(msg(text="3DS"))
+    assert "Não conheço o console" in b.handle_message(msg(text="PS9"))
     assert b.handle_message(msg(text="valeu")) is None  # conversa comum continua ignorada

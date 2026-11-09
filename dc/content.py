@@ -27,7 +27,9 @@ NAME_HINTS = [(re.compile(p, re.I), c) for p, c in (
     (r"\bps2\b|playstation 2", "ps2"), (r"\bpsx\b|\bps1\b|playstation(?! [2-9])", "psx"),
     (r"gamecube|\bngc\b", "gc"), (r"\bwii\b", "wii"), (r"\bpsp\b", "psp"), (r"\bswitch\b|\bnsw\b", "switch"),
     (r"\bsnes\b|super nintendo", "snes"), (r"\bn64\b|nintendo 64", "n64"), (r"\bgba\b|game boy advance", "gba"),
-    (r"\bnds\b|nintendo ds\b|\(ds\)|\[ds\]", "nds"))]
+    (r"\bnds\b|nintendo ds\b|\(ds\)|\[ds\]", "nds"), (r"\b3ds\b|nintendo 3ds", "n3ds"),
+    (r"\bwii ?u\b", "wiiu"), (r"\bps3\b|playstation 3", "ps3"), (r"\bxbox\b", "xbox"), (r"dreamcast", "dc"),
+    (r"\bsaturn\b", "saturn"), (r"sega ?cd|mega ?cd", "segacd"), (r"mega ?drive|genesis", "genesis"))]
 
 
 def _link_or_copy(src: Path, dst: Path) -> None:
@@ -58,6 +60,8 @@ def is_translation(name: str) -> bool:
 def playable(files: list[Path], console: str) -> list[Path]:
     exts = CONSOLES[console]["exts"]
     out = [f for f in files if f.suffix.lower() in exts and f.suffix.lower() != ".zip"]
+    if CONSOLES[console].get("eboot"):  # PS3 em pasta
+        out += [f for f in files if f.name == "EBOOT.BIN" and f.parent.name == "USRDIR" and f.parent.parent.name == "PS3_GAME"]
     if console == "switch":
         from .library import switch_kind
         out = [f for f in out if switch_kind(f.name) in ("base", "unknown")]

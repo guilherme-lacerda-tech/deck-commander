@@ -39,6 +39,37 @@ CONSOLES = {
                "cmd": [FLATPAK, "run", "net.kuribo64.melonDS", "-f", "{rom}"]},
     "psp":    {"label": "PSP", "exts": [".chd", ".cso", ".iso", ".pbp"],
                "cmd": [FLATPAK, "run", "org.ppsspp.PPSSPP", "--fullscreen", "{rom}"]},
+    "n3ds":   {"label": "Nintendo 3DS", "exts": [".3ds", ".cci", ".cxi", ".z3ds", ".zcci", ".zcxi", ".3dsx"],
+               "cmd": [FLATPAK, "run", "org.azahar_emu.Azahar", "-f", "{rom}"]},
+    "wiiu":   {"label": "Wii U", "exts": [".wua", ".wux", ".wud", ".rpx"],
+               "cmd": [FLATPAK, "run", "info.cemu.Cemu", "-f", "-g", "{rom}"]},
+    # PS3: ISO ou jogo em pasta (PS3_GAME/USRDIR/EBOOT.BIN); firmware oficial instalada uma vez no RPCS3
+    "ps3":    {"label": "PlayStation 3", "exts": [".iso"], "eboot": True,
+               "cmd": [FLATPAK, "run", "net.rpcs3.RPCS3", "--no-gui", "--fullscreen", "{rom}"]},
+    "xbox":   {"label": "Xbox", "exts": [".xiso", ".iso"],
+               "cmd": [FLATPAK, "run", "app.xemu.xemu", "-full-screen", "-dvd_path", "{rom}"]},
+    "dc":     {"label": "Dreamcast", "exts": [".chd", ".gdi", ".cdi"],
+               "cmd": [FLATPAK, "run", "org.flycast.Flycast", "-config", "window:fullscreen=yes", "{rom}"]},
+    "nes":    {"label": "NES", "exts": [".nes", ".fds", ".zip"],
+               "cmd": [FLATPAK, "run", "org.libretro.RetroArch", "-f", "-L", str(RA_CORES / "nestopia_libretro.so"), "{rom}"]},
+    "gb":     {"label": "Game Boy", "exts": [".gb", ".zip"],
+               "cmd": [FLATPAK, "run", "org.libretro.RetroArch", "-f", "-L", str(RA_CORES / "gambatte_libretro.so"), "{rom}"]},
+    "gbc":    {"label": "Game Boy Color", "exts": [".gbc", ".zip"],
+               "cmd": [FLATPAK, "run", "org.libretro.RetroArch", "-f", "-L", str(RA_CORES / "gambatte_libretro.so"), "{rom}"]},
+    "genesis": {"label": "Mega Drive", "exts": [".md", ".gen", ".smd", ".bin", ".zip"],
+                "cmd": [FLATPAK, "run", "org.libretro.RetroArch", "-f", "-L", str(RA_CORES / "genesis_plus_gx_libretro.so"), "{rom}"]},
+    "sms":    {"label": "Master System", "exts": [".sms", ".zip"],
+               "cmd": [FLATPAK, "run", "org.libretro.RetroArch", "-f", "-L", str(RA_CORES / "genesis_plus_gx_libretro.so"), "{rom}"]},
+    "gg":     {"label": "Game Gear", "exts": [".gg", ".zip"],
+               "cmd": [FLATPAK, "run", "org.libretro.RetroArch", "-f", "-L", str(RA_CORES / "genesis_plus_gx_libretro.so"), "{rom}"]},
+    "segacd": {"label": "Sega CD", "exts": [".chd", ".cue"],
+               "cmd": [FLATPAK, "run", "org.libretro.RetroArch", "-f", "-L", str(RA_CORES / "genesis_plus_gx_libretro.so"), "{rom}"]},
+    "saturn": {"label": "Sega Saturn", "exts": [".chd", ".cue"],
+               "cmd": [FLATPAK, "run", "org.libretro.RetroArch", "-f", "-L", str(RA_CORES / "mednafen_saturn_libretro.so"), "{rom}"]},
+    "pce":    {"label": "PC Engine", "exts": [".pce", ".chd", ".cue", ".zip"],
+               "cmd": [FLATPAK, "run", "org.libretro.RetroArch", "-f", "-L", str(RA_CORES / "mednafen_pce_fast_libretro.so"), "{rom}"]},
+    "arcade": {"label": "Arcade", "exts": [".zip", ".7z"],
+               "cmd": [FLATPAK, "run", "org.libretro.RetroArch", "-f", "-L", str(RA_CORES / "fbneo_libretro.so"), "{rom}"]},
     "switch": {"label": "Nintendo Switch", "exts": [".xci", ".nsp", ".nsz", ".xcz"],
                "cmd": [str(H / "Downloads/publish/Ryujinx"), "--fullscreen", "{rom}"]},
     # Switch 2 (experimental): dumps extraídos <jogo>/base/exefs/main, abertos pelo Lichii como o usuário já fazia
@@ -80,10 +111,20 @@ def detect(home: Path = H, check_flatpak: bool = True) -> dict[str, list[str]]:
     return out
 
 
-RA_CORE_FILES = ["snes9x_libretro.so", "mupen64plus_next_libretro.so", "mgba_libretro.so"]
+RA_CORE_FILES = ["snes9x_libretro.so", "mupen64plus_next_libretro.so", "mgba_libretro.so", "nestopia_libretro.so",
+                 "gambatte_libretro.so", "genesis_plus_gx_libretro.so", "mednafen_saturn_libretro.so",
+                 "mednafen_pce_fast_libretro.so", "fbneo_libretro.so"]
 RA_CORE_URL = "https://buildbot.libretro.com/nightly/linux/x86_64/latest/{core}.zip"
 FLATPAK_IDS = ["net.pcsx2.PCSX2", "org.DolphinEmu.dolphin-emu", "org.libretro.RetroArch", "org.ppsspp.PPSSPP",
-               "net.kuribo64.melonDS"]
+               "net.kuribo64.melonDS", "org.azahar_emu.Azahar", "info.cemu.Cemu", "net.rpcs3.RPCS3", "app.xemu.xemu",
+               "org.flycast.Flycast"]
+# O que cada console precisa que VOCÊ coloque (o Deck Commander nunca baixa BIOS/firmware/chaves)
+NEEDS = {"ps3": "firmware oficial do PS3 (PS3UPDAT.PUP) instalada uma vez no RPCS3",
+         "xbox": "BIOS, MCPX e imagem de HD do Xbox configurados uma vez no xemu",
+         "saturn": "BIOS do Saturn (sega_101.bin / mpr-17933.bin) em ~/Emulation/bios",
+         "segacd": "BIOS do Sega CD (bios_CD_U.bin etc.) em ~/Emulation/bios",
+         "n3ds": "jogos de 3DS DESCRIPTOGRAFADOS (o GodMode9 tem a opção de dump decriptado)",
+         "wiiu": "chaves do Wii U (keys.txt) no Cemu para .wud/.wux"}
 
 # Perfil "equilibrado" (v5.1 M3.1) para os emuladores sem ajuste manual.
 # Dolphin tem UM valor global para GC e Wii: 2x (spec pede GC 3x / Wii 2x; 2x é o que cabe nos dois).

@@ -58,7 +58,7 @@ DEFAULT_CFG = {
                    "modelo": "gemini-2.5-flash", "segredo": "ia_api.key"},
     },
 }
-LANG_NAMES = {"pt-BR": "Brazilian Portuguese", "en": "English", "es": "Spanish", "fr": "French", "de": "German",
+LANG_NAMES = {"pt-BR": "Brazilian Portuguese", "en": "English", "ru": "Russian", "es": "Spanish", "fr": "French", "de": "German",
               "it": "Italian", "ja": "Japanese", "zh": "Chinese"}
 
 

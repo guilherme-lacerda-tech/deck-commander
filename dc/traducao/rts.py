@@ -26,7 +26,8 @@ from . import ia
 
 H = Path.home()
 BIN_CANDIDATES = [H / ".local/share/deck-commander/bin/romtranslate"]
-SUPPORTED = {"psx", "ps2", "psp", "gba", "snes", "n64", "gc", "nds", "nes", "gb", "gbc", "genesis"}
+SUPPORTED = {"psx", "ps2", "psp", "gba", "snes", "n64", "gc", "nds", "nes", "gb", "gbc", "genesis", "sms", "gg",
+             "segacd", "saturn", "pce"}
 UNSUPPORTED_EXT = {".chd": "CHD (comprimido)", ".cso": "CSO (comprimido)", ".rvz": "RVZ (comprimido)",
                    ".pbp": "PBP (comprimido)", ".m3u": "lista de discos (.m3u)", ".zip": "ZIP", ".7z": "7z"}
 NO_ACCENT_ENCODINGS = {"ascii", "table", "tbl", "pcs"}
@@ -47,13 +48,17 @@ class RtsReport:
     output: str = ""
     patch: str = ""
     errors: list[str] = field(default_factory=list)
+    source_lang: str = ""
+    encoding: str = ""
 
     def text(self) -> str:
         L = [f"trechos achados: {self.found} · frases de verdade: {self.candidates} · traduzidas e gravadas: "
              f"{self.translated}",
              f"ficaram no original: {self.flagged} (não coube no espaço / IA errou)"
              + (f" + {self.skipped_multiline} com várias linhas" if self.skipped_multiline else ""),
-             f"IA: {self.provider or '-'}"]
+             f"IA: {self.provider or '-'}"
+             + (f" · idioma original: {self.source_lang}" if self.source_lang else "")
+             + (f" · codificação: {self.encoding}" if self.encoding and self.encoding != "padrão" else "")]
         if self.audit_left is not None:
             L.append(f"conferência na cópia gravada: {self.audit_left} trecho(s) ainda em inglês")
         L += [f"⚠️ {e}" for e in self.errors[:5]]
@@ -78,54 +83,12 @@ def supported(console: str, rom: Path) -> tuple[bool, str]:
     return True, ""
 
 
-COMMON_WORDS = set("""a an the and or but if of to in on at by for from with without into out up down over under
-again here there this that these those it its is are was were be been being am do does did done have has had will
-would can could shall should may might must not no yes you your yours we our us me my mine he him his she her they
-them their what which who whom whose when where why how all any some each every more most other such only own same
-so than too very just now then also get got go goes going gone come came take took make made see saw look find found
-give gave tell told say said ask know knew think want need use used try press start select pause continue game play
-player save load new quit exit menu options option level stage world area time score lives life points item items
-key door open close back next ok cancel please insert memory card data file controller battle attack fight defeat
-win lose won lost good great well done let lets ready come welcome thank thanks hello help sorry one two three
-first last left right up down move jump run walk talk visit return leave enter""".split())
-
-
-SYSTEM_TEXT = re.compile(r"Sony Computer Entertainment|Licensed by|PS-X EXE|Nintendo of America|SEGA ENTERPRISES", re.I)
-
-
 def is_sentence(text: str) -> bool:
-    """Frase que alguém lê no jogo. Bem rígido de propósito: a varredura genérica acha muito lixo (bytes de
-    dados que parecem letras, como 'VDD33Ce'), e gravar tradução em cima de dado quebra o jogo."""
-    t = text.strip()
-    if SYSTEM_TEXT.search(t):
-        return False  # licença/cabeçalho do console: não se mexe
-    if len(t) < 5 or re.search(r"[_\\/|{}=<>@#$^~`%*]|\.(bin|dat|tim|str|xa|exe|ovl|bmp|vab)\b", t, re.I):
-        return False
-    words = [w.strip(".,!?'\":;()-") for w in t.split()]
-    words = [w for w in words if w]
-    if len(words) < 2:
-        return False
-    alpha = [w for w in words if w.isalpha()]
-    if len(alpha) < max(2, int(0.75 * len(words) + 0.5)):
-        return False
-    for w in alpha:  # forma de palavra: minúscula, Capitalizada ou TODA MAIÚSCULA; com vogal; tamanho normal
-        if not (w.islower() or w.isupper() or (w[0].isupper() and w[1:].islower())) or len(w) > 16:
-            return False
-        vowel = re.search(r"[aeiouyAEIOUY]", w)
-        if len(w) == 2 and not vowel and not w.isupper():
-            return False  # "nq" (sigla como "CD" pode)
-        if len(w) >= 3 and (not vowel or not re.search(r"[^aeiouAEIOU]", w)):
-            return False  # sem vogal ("Bh4") ou só vogais ("EAI")
-    long_ = [w for w in alpha if len(w) >= 2]
-    if len(long_) < 2 or sum(map(len, long_)) < 6:
-        return False  # "on Tu"
-    if len(long_) <= 3 and any(w.isupper() for w in long_) and any(w.islower() for w in long_):
-        return False  # trecho curto misturando "nq NO", "yb SO": texto de jogo não faz isso
-    low = [w.lower() for w in long_]
-    if sum(w in COMMON_WORDS for w in low) >= (1 if len(low) <= 4 else 2):
-        return True
-    # título/menu em maiúsculas ("VISIT TO THEBES", "BATTLE OF TITANS")
-    return all(w.isupper() for w in alpha) and sum(len(w) >= 3 for w in alpha) >= 2
+    """Frase que alguém lê no jogo, em qualquer língua (regras em dc.traducao.idioma). Rígido de propósito:
+    a varredura genérica acha muito lixo (bytes de dados que parecem letras), e gravar tradução em cima de
+    dado quebra o jogo."""
+    from .idioma import is_sentence as _s
+    return _s(text)
 
 
 def strip_accents(s: str) -> str:
@@ -161,6 +124,56 @@ def _write_cue(orig_cue: Path, data_bin: str, new_bin: Path) -> Path:
     return out
 
 
+def _project(paths: Paths, rom: Path, tag: str) -> Path:
+    proj = paths.data / "traducao" / "rts" / (re.sub(r"\W+", "_", rom.stem)[:60] + (f".{tag}" if tag else "") + ".rtsproj")
+    if not proj.exists():
+        proj.parent.mkdir(parents=True, exist_ok=True)
+        _run(["create", str(rom), str(proj), "--target", "pt-BR", "--source", "en-US"])
+    return proj
+
+
+def _export(proj: Path) -> list[dict]:
+    exp = proj / "exports" / "deck-commander.json"
+    _run(["export", str(proj), str(exp), "--format", "json"])
+    return json.loads(exp.read_text("utf-8"))
+
+
+def _pick(entries: list[dict]) -> list[dict]:
+    return [e for e in entries if e.get("sourceText") and is_sentence(e["sourceText"]) and e.get("status") != "not_text"]
+
+
+def _best_extraction(paths: Paths, rom: Path, log=lambda s: None) -> tuple[Path, list, list, str]:
+    """Extração estruturada do RomTranslate; se achar pouca frase, tenta outras codificações (UTF-8, UTF-16 e
+    tabelas cirílicas CP1251/CP866/KOI8-R — versões russas de jogos de PlayStation costumam usar uma delas),
+    cada uma em projeto separado, e fica com a que tiver mais frases de verdade."""
+    from . import idioma
+    proj = _project(paths, rom, "")
+    ex = _run(["extract", str(proj)])
+    if not ex.get("saved"):
+        _run(["scan", str(proj), "--only-text"])
+    entries = _export(proj)
+    best = (proj, entries, _pick(entries), "padrão")
+    if len(best[2]) >= 50:
+        return best
+    tries = [("utf8", ["--encoding", "utf8"]), ("utf16le", ["--encoding", "utf16_le"])]
+    for codec in idioma.CYRILLIC_CODECS:
+        tbl = idioma.write_tbl(paths.data / "traducao" / "tbl" / f"{codec}.tbl", codec)
+        tries.append((codec, ["--encoding", "table", "--tbl", str(tbl)]))
+    for tag, args in tries:
+        try:
+            p = _project(paths, rom, tag)
+            _run(["scan", str(p), "--only-text", *args], timeout=3 * 3600)
+            ents = _export(p)
+        except (RuntimeError, ValueError, OSError) as e:
+            log(f"varredura {tag}: {e}")
+            continue
+        picked = _pick(ents)
+        log(f"varredura {tag}: {len(picked)} frases")
+        if len(picked) > len(best[2]):
+            best = (p, ents, picked, tag)
+    return best
+
+
 def translate_rom(paths: Paths, rom: Path, console: str, title: str = "", chain=None,
                   progress=lambda d, t: None, should_pause=lambda: False,
                   log: Callable[[str], None] = lambda s: None) -> RtsReport:
@@ -170,27 +183,20 @@ def translate_rom(paths: Paths, rom: Path, console: str, title: str = "", chain=
     if not ok:
         rep.errors.append(why)
         return rep
-    proj = paths.data / "traducao" / "rts" / (re.sub(r"\W+", "_", rom.stem)[:60] + ".rtsproj")
-    if not proj.exists():
-        proj.parent.mkdir(parents=True, exist_ok=True)
-        _run(["create", str(rom), str(proj), "--target", "pt-BR", "--source", "en-US"])
-    ex = _run(["extract", str(proj)])
-    if not ex.get("saved"):
-        _run(["scan", str(proj), "--only-text"])
-    exp = proj / "exports" / "deck-commander.json"
-    _run(["export", str(proj), str(exp), "--format", "json"])
-    entries = json.loads(exp.read_text("utf-8"))
+    proj, entries, picked, enc_used = _best_extraction(paths, rom, log)
     rep.found = len(entries)
-    picked = [e for e in entries if e.get("sourceText") and is_sentence(e["sourceText"])
-              and e.get("status") != "not_text"]
     multi = [e for e in picked if "\n" in e["sourceText"]]
     picked = [e for e in picked if "\n" not in e["sourceText"]]  # o "apply" do RomTranslate é uma frase por linha
     rep.skipped_multiline = len(multi)
     rep.candidates = len(picked)
     if rep.candidates < MIN_SENTENCES:
-        rep.errors.append("quase não há texto comum neste jogo (falas em voz/imagem ou texto comprimido); "
-                          "nada foi alterado")
+        rep.errors.append("quase não há texto comum neste jogo (falas em voz/imagem, texto comprimido ou "
+                          "codificação desconhecida); nada foi alterado")
         return rep
+    from . import idioma
+    src = idioma.dominant_language([e["sourceText"] for e in picked]) or "en"
+    cfg["idioma_origem"] = src  # traduz a partir da língua em que o jogo veio (russo, japonês, inglês…)
+    rep.source_lang, rep.encoding = src, enc_used
     items, codes, enc = [], {}, {}
     for e in picked:
         prot, cs = ia.protect(e["sourceText"], RETRO_CODES)
