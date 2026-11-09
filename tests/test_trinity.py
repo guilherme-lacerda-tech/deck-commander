@@ -321,6 +321,26 @@ def test_versao_igual_a_do_ryujinx(tmp_path, monkeypatch):
     assert tg.ryujinx_update("0100F43008C44000") is None          # atualização desmarcada
 
 
+def test_guard_desliga_mod_de_outra_versao(tmp_path, monkeypatch):
+    from dc.traducao import switch
+    ryu = tmp_path / "Ryujinx"
+    monkeypatch.setattr(switch, "RYU_DIRS", [ryu])
+    tid = "0100F43008C44000"
+    mod = switch.mod_target(tid)
+    (mod / "romfs/arc").mkdir(parents=True)
+    (mod / tg.MARKER).write_text(json.dumps({"update": None}), "utf-8")
+    assert tg.guard_version(tid, tmp_path / "park") is None              # base com base: fica
+    upd = tmp_path / "Z-A [v393216].nsp"
+    upd.write_bytes(b"x")
+    g = ryu / "games" / tid.lower()
+    g.mkdir(parents=True)
+    (g / "updates.json").write_text(json.dumps({"selected": str(upd)}), "utf-8")
+    msg = tg.guard_version(tid, tmp_path / "park")                       # atualização ligada depois
+    assert msg and "inglês" in msg and not mod.exists()
+    assert (tmp_path / "park" / f"{tid}-base" / "romfs/arc").is_dir()
+    assert tg.guard_version(tid, tmp_path / "park") is None              # sem mod: nada a fazer
+
+
 def test_unmark_formato(tmp_path):
     from dc.traducao import portugues
     portugues.mark(tmp_path, "g1", formato="fechado", langs=["AmericanEnglish"])

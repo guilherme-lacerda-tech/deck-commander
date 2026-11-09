@@ -47,6 +47,16 @@ def main(argv: list[str]) -> None:
              f"{title}: arquivo do jogo não encontrado" + (" — o cartão SD está colocado?" if sd else "."))
     if not Path(cmd[0]).exists():
         fail(f"erro: emulador não encontrado {cmd[0]}", f"{title}: emulador não encontrado ({Path(cmd[0]).name}).")
+    if launch_map[game_id].get("console") == "switch":
+        try:  # mod de tradução Trinity (Pokémon Z-A) de outra versão trava o jogo: desliga antes de abrir
+            from .dedup import base_title_id
+            from .traducao import trinity_game
+            tid = base_title_id(Path(cmd[-1]).name)
+            gmsg = tid and trinity_game.guard_version(tid, paths.data / "traducao" / "mods-desligados")
+            if gmsg:
+                say(gmsg)
+        except Exception as e:  # noqa: BLE001 — a conferência nunca impede o jogo de abrir
+            say(f"conferência da tradução: ignorada ({e})")
     from . import quality
     try:
         msg = quality.restore(paths)  # sobra de um jogo anterior fechado à força

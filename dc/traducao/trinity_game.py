@@ -361,9 +361,40 @@ def write_mod(paths: Paths, rep, src_dir: Path, dats: dict[str, tm.MsgDat], cfg:
     rep.mod_dir = str(stage.parent)
     blocking = [e for e in rep.errors if "podem sair da caixa" not in e]
     if rep.translated and rep.pct_flagged() <= threshold and not blocking:
-        rep.mod_dir = str(switch.install_mod(rep.title_id, stage.parent))
+        mod = switch.install_mod(rep.title_id, stage.parent)
+        try:
+            upd = json.loads((src_dir / "extraido.json").read_text("utf-8")).get("update")
+        except (OSError, ValueError):
+            upd = None
+        (mod / MARKER).write_text(json.dumps({"update": upd}, ensure_ascii=False), "utf-8")
+        rep.mod_dir = str(mod)
         rep.applied = True
     return rep
+
+
+MARKER = "deck-commander-trinity.json"
+
+
+def guard_version(tid: str, parking: Path) -> Optional[str]:
+    """Antes de abrir o jogo: se o mod Trinity foi feito para outra versão do que o Ryujinx vai carregar agora
+    (ex.: a atualização foi ligada depois), tira o mod do caminho (para `parking`) — com o índice de outra
+    versão o jogo trava na tela de carregamento. Devolve a mensagem ou None."""
+    from . import switch
+    mod = switch.mod_target(tid)
+    try:
+        made_for = json.loads((mod / MARKER).read_text("utf-8")).get("update")
+    except (OSError, ValueError, AttributeError):
+        return None
+    upd = ryujinx_update(tid)
+    now = upd.name if upd else None
+    if made_for == now:
+        return None
+    parking.mkdir(parents=True, exist_ok=True)
+    dst = parking / f"{tid.upper()}-{made_for or 'base'}"
+    shutil.rmtree(dst, ignore_errors=True)
+    shutil.move(str(mod), str(dst))
+    return (f"tradução desligada: foi feita para {made_for or 'a versão base'}, mas o Ryujinx vai abrir "
+            f"{now or 'a versão base'}. O jogo abre em inglês; rode /traduzir <jogo> --forcar para refazer.")
 
 
 def find_rom_files(rom: Path, tid: str, roots: list[Path]) -> Optional[dict]:
