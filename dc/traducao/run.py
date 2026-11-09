@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -91,6 +92,16 @@ def spawn(paths: Paths, op: str) -> None:
     """Lança o executor desacoplado do bot (sobrevive a reinício do bot)."""
     repo = Path(__file__).resolve().parents[2]
     cmd = [sys.executable, "-m", "dc.traducao.run", op]
+    sdr = shutil.which("systemd-run")
+    if sdr:
+        # serviço próprio do systemd: não morre se o bot reiniciar (atualização) nem se a sessão fechar
+        r = subprocess.run([sdr, "--user", "--collect", "--quiet", f"--unit=deck-commander-traducao-{op}",
+                            f"--working-directory={repo}", f"--setenv=PYTHONPATH={repo}",
+                            "--property=Nice=15", f"--property=StandardOutput=append:{paths.logs / 'traducao.log'}",
+                            f"--property=StandardError=append:{paths.logs / 'traducao.log'}", *cmd],
+                           capture_output=True, text=True, timeout=30)
+        if r.returncode == 0:
+            return
     if os.name == "posix" and os.path.exists("/usr/bin/nice"):
         cmd = ["/usr/bin/nice", "-n", "15"] + cmd
     log = open(paths.logs / "traducao.log", "a", encoding="utf-8")
