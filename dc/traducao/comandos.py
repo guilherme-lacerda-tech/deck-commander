@@ -9,7 +9,7 @@ from .. import ops
 from . import ia, run
 
 HELP = """/traduzir <jogo> — traduz para pt-BR com IA (Switch: vira mod; GBA Pokémon: ROM nova "(PT-BR)")
-/traduzir status · config · revisar <op> · aplicar <op> · aprovar <op> · retomar <op> · desfazer <jogo>
+/traduzir lista · status · config · revisar <op> · aplicar <op> · aprovar <op> · retomar <op> · desfazer <jogo>
 /converter <jogo> [organizar|descompactar] — Switch: confere/organiza update e DLC, descompacta NSZ"""
 
 
@@ -44,6 +44,8 @@ def traduzir(bot, args: list[str]) -> str:
         return {"revisar": _review, "aplicar": _apply, "aprovar": _approve, "retomar": _resume}[sub](bot, job)
     if sub == "desfazer" and len(args) > 1:
         return _undo(bot, " ".join(args[1:]))
+    if sub == "lista":
+        return _lista(bot)
     force = "--forcar" in args
     query = " ".join(a for a in args if not a.startswith("--"))
     gid, g, err = _find(bot, query)
@@ -51,6 +53,13 @@ def traduzir(bot, args: list[str]) -> str:
         return err
     if ops.in_safe_mode(P):
         return "Safe-mode ativo."
+    from . import portugues
+    st = portugues.status(gid, g, portugues.load_idiomas(P.data))
+    if st and not force:
+        why = {"oficial": "tem português do Brasil oficial (abre em português sozinho)",
+               "mod": "já tem a tradução do Deck Commander instalada",
+               "traduzido": "já é uma versão traduzida/dublada"}[st]
+        return f"{g['title']} {why}. Está na aba \"Em português\". (Para traduzir mesmo assim: --forcar)"
     if g["console"] == "switch":
         kind = "translate_switch"
     elif g["console"] == "switch2":
@@ -97,6 +106,30 @@ def converter(bot, args: list[str]) -> str:
     job = run.create(bot.paths, bot.store, "convert_switch", gid, g["title"], {"acao": action})
     run.spawn(bot.paths, job["op"])
     return f"🔧 {action.capitalize()} {g['title']} ({job['op']}). Aviso quando terminar."
+
+
+def _lista(bot) -> str:
+    from . import portugues
+    lm = bot._map()
+    idi = portugues.load_idiomas(bot.paths.data)
+    pt, can, cant = [], [], []
+    for gid, g in sorted(lm.items(), key=lambda kv: (kv[1].get("console", ""), kv[1].get("title", ""))):
+        if g.get("removed"):
+            continue
+        st = portugues.status(gid, g, idi)
+        label = f"{g['title']} ({g['console']})"
+        if st:
+            pt.append(f"• {label} — {dict(oficial='oficial', mod='tradução DC', traduzido='traduzido/dublado')[st]}")
+        elif g["console"] == "switch" or g["console"] == "gba":
+            can.append(f"• {label}")
+        else:
+            cant.append(f"• {label}")
+    out = [f"🇧🇷 Em português ({len(pt)}) — aba \"Em português\":", *pt]
+    if can:
+        out += ["", f"Pode tentar /traduzir ({len(can)}):", *can]
+    if cant:
+        out += ["", f"Sem tradução automática ({len(cant)}) — PS1/PS2/etc. não têm extrator de texto confiável:", *cant]
+    return "\n".join(out)
 
 
 def _config(P) -> str:

@@ -51,6 +51,22 @@ def test_pt_tab_and_collection(tmp_path, monkeypatch):
     assert t["dc-portugues"]["title"] == "Em português"
 
 
+def test_hide_original_keeps_files_and_can_come_back(tmp_path, monkeypatch):
+    from dc import remove
+    paths = get_paths(tmp_path / "dc").ensure()
+    rom = tmp_path / "Fire Red.gba"
+    rom.write_bytes(b"x")
+    (paths.data / "launch-map.json").write_text(json.dumps({"gba-fr": {"title": "Fire Red", "console": "gba", "rom": str(rom)}}))
+    (paths.data / "plugin-done.json").write_text(json.dumps({"gba-fr": {"appid": 3000000005, "error": ""}}))
+    monkeypatch.setattr(remove.plugin_bridge, "installed", lambda *a: True)
+    remove.hide(paths, "gba-fr", "substituído pela versão traduzida")
+    assert rom.exists()
+    assert json.loads((paths.data / "plugin-remove.json").read_text()) == [{"game_id": "gba-fr", "appid": 3000000005}]
+    assert "gba-fr" in remove.removed_games(paths)  # aparece no /devolver
+    assert remove.bring_back(paths, "gba-fr") == "Fire Red"
+    assert not json.loads((paths.data / "launch-map.json").read_text())["gba-fr"].get("removed")
+
+
 def test_aes_fips197_and_ctr_roundtrip():
     a = nca.AES(bytes(range(16)))
     ct = a.encrypt(bytes.fromhex("00112233445566778899aabbccddeeff"))

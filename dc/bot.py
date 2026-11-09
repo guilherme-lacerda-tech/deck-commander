@@ -56,7 +56,7 @@ Aviso aqui quando o download terminar.
 /baixar — baixa mesmo assim um download que parecia repetido
 /devolver <nome> — traz de volta um jogo que você tirou pelo Steam
 /bateria sim|nao — baixar também fora da tomada (padrão: só na tomada)
-/traduzir <jogo> — tradução pt-BR com IA (Switch e Pokémon GBA) · /traduzir status | config
+/traduzir <jogo> — tradução pt-BR com IA (Switch e Pokémon GBA) · /traduzir lista | status | config
 /converter <jogo> [organizar|descompactar] — Switch: update/DLC e NSZ
 /status · /queue · /disk · /diagnostico
 /pause · /resume — downloads

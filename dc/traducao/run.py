@@ -307,11 +307,16 @@ def _dispatch(paths, store, job, cfg, progress, should_pause) -> tuple[dict, str
                         "(hoje: Pokémon de GBA via Meowth)."), False
         rep = retro.translate_rom(paths, rom, g.get("title", ""), progress=progress, should_pause=should_pause)
         ok = bool(rep.output) and Path(rep.output).parent == rom.parent
-        if ok:  # ROM "(PT-BR)" entra na biblioteca como jogo novo (o original fica)
+        if ok:  # ROM "(PT-BR)" entra na biblioteca e SUBSTITUI o atalho do original (sem duplicar)
             op2 = store.enqueue("library-add", {"from": job["op"]})
             store.claim(op2)
             syncer.add_to_steam(paths, store, op2)
             store.finish(op2, True)
+            from ..remove import hide
+            hide(paths, job["game_id"], "substituído pela versão traduzida (PT-BR)")
+            rep.errors.append("o original saiu da biblioteca (arquivo guardado); para ter os dois: "
+                              f"/devolver {g.get('title', '')}")
+            _refresh_tabs(paths)
         from .. import backup
         result = {"traducao_pt_br": ok, "provider": rep.provider, "strings": rep.strings, "translated": rep.translated,
                   "flagged": rep.flagged, "patch": rep.patch, "patch_hash": backup.sha256_file(Path(rep.patch))

@@ -169,6 +169,28 @@ def effective_map(paths: Paths) -> dict:
     return lm
 
 
+def hide(paths: Paths, game_id: str, reason: str) -> str:
+    """Tira SÓ o atalho da biblioteca (os arquivos ficam). Usado quando a versão traduzida substitui a
+    original, para a biblioteca não ficar duplicada. Volta com /devolver."""
+    done = _load(plugin_bridge.done_path(paths), {})
+    appid = done.get(game_id, {}).get("appid")
+    if appid and plugin_bridge.installed():
+        rq_p = paths.data / "plugin-remove.json"
+        _save(rq_p, _load(rq_p, []) + [{"game_id": game_id, "appid": appid}])
+    done[game_id] = {"appid": 0, "error": "", "removed": True, "motivo": reason}
+    _save(plugin_bridge.done_path(paths), done)
+    items_p = paths.data / "plugin-items.json"
+    items = _load(items_p, {})
+    if items.pop(game_id, None) is not None:
+        _save(items_p, items)
+    lm_p = paths.data / "launch-map.json"
+    lm = _load(lm_p, {})
+    if game_id in lm:
+        lm[game_id]["removed"] = True
+        _save(lm_p, lm)
+    return lm.get(game_id, {}).get("title", game_id)
+
+
 def removed_games(paths: Paths) -> dict:
     """Jogos removidos cujos arquivos ainda estão no lugar (podem voltar com /devolver)."""
     return {g: e for g, e in effective_map(paths).items() if e.get("removed") and Path(e.get("rom", "")).exists()}
