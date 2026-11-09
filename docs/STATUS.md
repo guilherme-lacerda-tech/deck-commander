@@ -1,4 +1,4 @@
-# Estado do projeto (v0.5.1)
+# Estado do projeto (v0.6.0)
 
 Validado num Steam Deck LCD (SteamOS 3.9.5). 180+ testes automatizados (CI no GitHub + timer semanal no Deck) e teste de ponta a ponta no próprio aparelho (`tools/e2e_local.py`: download → biblioteca ao vivo → duplicata → remoção).
 
@@ -19,7 +19,7 @@ Validado num Steam Deck LCD (SteamOS 3.9.5). 180+ testes automatizados (CI no Gi
 | M10 Status/testes | ✅ parcial | /status, painel local, testes semanais + relatório HTML. E2E no aparelho (`tools/e2e_local.py`). Benchmark (exige MangoHud e cenário fixo): pendente |
 | M11/M12/M15/M16/M17 | ✅ | versão, updates (só avisa), instalador por módulo, uninstall com confirmação, recuperação, export sem segredos |
 | A2 Tradução Switch (IA) | ✅ | mod LayeredFS + extração automática (NSP/NCA/esparso/BKTR em Python puro) + PT-BR oficial por jogo; validado nos 9 jogos de teste; nenhum dos 9 tinha MSBT traduzível (3 têm PT-BR oficial, 2 formato fechado, 4 são GBA) |
-| A1 Tradução retrô (IA) | ⏳ | Pokémon GBA via Meowth; código e testes prontos, falta ROM real (S12) |
+| A1 Tradução retrô (IA) | ✅ | RomTranslate Studio (PS1/PS2/PSP/GBA/SNES/NES/N64/GC/DS) + Meowth (Pokémon GBA); FireRed traduzido de ponta a ponta; filtro rígido de frase (testado com lixo real do Hercules); automático ao baixar |
 | A3 Conversão Switch | ✅ parcial | diagnóstico/organizar validados na biblioteca real; descompactar depende do nsz |
 | M8 Proton Pulse | ⛔ | plugin opcional não instalado no Deck de teste |
 | M9 Fork do Panel | ⛔ | depende do repositório oficial do Panel de Control |
