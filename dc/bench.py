@@ -1,0 +1,80 @@
+"""Benchmark sem jogar: abre o jogo pelo Steam, deixa rodar a abertura/demonstração e fecha.
+
+A medição é a mesma de uma partida normal (dc.perf, gravada pelo dc-launch). Não é igual à jogatina
+(a abertura costuma ser mais leve ou mais pesada que o jogo), mas mostra se a resolução aguenta e quanto
+consome. O resultado fica marcado como "simulação" no histórico.
+
+    python3 -m dc x bench <game_id> [segundos]      (padrão 120 s; recusa se houver jogo aberto)
+"""
+from __future__ import annotations
+
+import json
+import os
+import signal
+import subprocess
+import time
+from pathlib import Path
+
+from . import perf
+from .paths import Paths
+
+
+def steam_gameid(appid: int) -> int:
+    """ID que o steam:// usa para atalho não-Steam."""
+    return ((int(appid) & 0xFFFFFFFF) << 32) | 0x02000000
+
+
+def launcher_pids(game_id: str | None = None) -> list[int]:
+    """Processos dc-launch rodando (de um jogo, ou de qualquer um)."""
+    out = []
+    for d in Path("/proc").iterdir():
+        if not d.name.isdigit():
+            continue
+        try:
+            args = (d / "cmdline").read_bytes().split(b"\0")
+        except OSError:
+            continue
+        if any(a.endswith(b"dc-launch") for a in args[:2]) and (game_id is None or game_id.encode() in args):
+            out.append(int(d.name))
+    return out
+
+
+def run(paths: Paths, game_id: str, seconds: int = 120, log=print) -> dict | None:
+    if launcher_pids():
+        log("Tem um jogo aberto agora; o benchmark só roda com o Deck livre.")
+        return None
+    done = json.loads((paths.data / "plugin-done.json").read_text("utf-8"))
+    appid = (done.get(game_id) or {}).get("appid")
+    if not appid:
+        log(f"{game_id} não tem atalho no Steam ainda.")
+        return None
+    before = (paths.data / "perf-last.json").stat().st_mtime if (paths.data / "perf-last.json").exists() else 0
+    subprocess.run(["steam", f"steam://rungameid/{steam_gameid(appid)}"], check=False,
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
+    t0 = time.time()
+    while time.time() - t0 < 40 and not launcher_pids(game_id):
+        time.sleep(1)
+    if not launcher_pids(game_id):
+        log("O jogo não abriu pelo Steam (o Deck está no modo jogo?).")
+        return None
+    log(f"rodando {seconds} s…")
+    time.sleep(seconds)
+    for pid in launcher_pids(game_id):
+        os.kill(pid, signal.SIGTERM)  # o dc-launch fecha o emulador e grava a medição
+    for _ in range(30):
+        last = paths.data / "perf-last.json"
+        if last.exists() and last.stat().st_mtime > before:
+            break
+        time.sleep(1)
+    else:
+        log("O jogo fechou mas a medição não apareceu (veja logs/launch.log).")
+        return None
+    d = json.loads(last.read_text("utf-8"))
+    d["simulacao"] = True
+    hist = perf.history(paths.state, game_id)
+    if hist:
+        hist[-1]["simulacao"] = True
+        f = paths.state / "perf" / f"{game_id}.json"
+        f.write_text(json.dumps(hist, ensure_ascii=False, indent=1), "utf-8")
+    log(perf.describe(d))
+    return d

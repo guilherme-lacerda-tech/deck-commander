@@ -151,3 +151,8 @@ def test_pending_message_once(tmp_path):
     m = perf.pending_message(p)
     assert "SotC" in m and "27 fps" in m and "15.2 W" in m and "2.6 h" in m and "/qualidade" in m
     assert perf.pending_message(p) is None
+
+
+def test_bench_gameid():
+    from dc import bench
+    assert bench.steam_gameid(-1732342533) == (((-1732342533) & 0xFFFFFFFF) << 32) | 0x02000000
