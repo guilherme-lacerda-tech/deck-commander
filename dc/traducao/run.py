@@ -223,7 +223,12 @@ def _translate_gba_inside(paths, job, g, tid, inner, progress, should_pause):
             h.close()
     if not src.read_bytes()[0xAC:0xB0].isalnum():  # código do jogo no cabeçalho do GBA (ex.: BPRE)
         return {"title_id": tid}, "o arquivo .gba dentro do jogo não parece uma ROM de GBA", False
-    rep = retro.translate_rom(paths, src, g.get("title", ""), progress=progress, should_pause=should_pause)
+    from . import portugues
+    langs = portugues.load_idiomas(paths.data).get(job["game_id"], {}).get("langs", [])
+    english = any("English" in l for l in langs)
+    source = None if english or not langs else ("es" if any("Spanish" in l for l in langs) else None)
+    rep = retro.translate_rom(paths, src, g.get("title", ""), progress=progress, should_pause=should_pause,
+                              source=source)
     if not rep.output or Path(rep.output).parent != src.parent:
         return {"title_id": tid}, rep.text(), False
     dst = switch.mod_target(tid) / "romfs" / inner

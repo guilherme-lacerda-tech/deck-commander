@@ -113,8 +113,10 @@ def output_paths(rom: Path) -> tuple[Path, Path]:
 
 def translate_rom(paths: Paths, rom: Path, game_name: str = "", chain=None,
                   progress=lambda d, t: None, should_pause=lambda: False,
-                  log: Callable[[str], None] = lambda s: None) -> RetroReport:
+                  log: Callable[[str], None] = lambda s: None, source: Optional[str] = None) -> RetroReport:
     cfg = ia.load_cfg(paths)
+    if source:  # ex.: versão espanhola de um jogo: traduz do espanhol
+        cfg["idioma_origem"] = source
     rep = RetroReport(str(rom))
     work = paths.data / "traducao" / "work" / re.sub(r"\W+", "_", rom.stem)
     shutil.rmtree(work, ignore_errors=True)
