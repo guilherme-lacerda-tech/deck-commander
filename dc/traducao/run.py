@@ -289,6 +289,35 @@ def _translate_gba_inside(paths, job, g, tid, inner, progress, should_pause):
             rep.text() + f"\n✅ mod ativo: a ROM de GBA dentro do jogo foi trocada pela traduzida ({inner}).", True)
 
 
+def _translate_lm3(paths, job, g, tid, rom, cfg, progress, should_pause):
+    """Luigi's Mansion 3: copia o init.patch (base + atualização), traduz as tabelas em inglês e grava o mod."""
+    from .. import syncer
+    from . import lm3, nca, nlg, portugues
+    try:
+        patch = lm3.fetch_patch(rom, tid, syncer.rom_roots())
+    except (nca.NcaError, OSError) as e:
+        return {"title_id": tid}, f"Não consegui abrir o Luigi's Mansion 3: {e}", False
+    job["extracao"] = str(patch)
+    portugues.mark(paths.data, job["game_id"], formato=None)  # formato próprio do LM3 agora é suportado
+    if not job["args"].get("aprovado"):
+        try:
+            est = ia.estimate_tokens(nlg.get_table(nlg.read_patch(patch.read_bytes()), lm3.LOCALES[0]).strings)
+        except (nlg.PatchError, nlg.TableError, IndexError):
+            est = 0
+        need = _approval_needed(paths, cfg, est, job)
+        if need:
+            job["status"] = "aguardando aprovação"
+            return {"estimate": est}, need, False
+    rep = lm3.translate_game(paths, tid, patch, g.get("title", ""), progress=progress, should_pause=should_pause)
+    if rep.applied:
+        _refresh_tabs(paths)
+    result = {"traducao_pt_br": rep.applied, "provider": rep.provider, "strings": rep.strings,
+              "translated": rep.translated, "flagged": rep.flagged, "sem_espaco": rep.reverted_space,
+              "linha_extra": rep.extra_line, "mod": rep.mod_dir, "title_id": tid, "formato": "nlg init.patch",
+              "data": datetime.now(timezone.utc).isoformat()}
+    return result, rep.text(), rep.translated > 0 and not (rep.errors and not rep.applied)
+
+
 def _approval_needed(paths: Paths, cfg: dict, texts_estimate: int, job: dict) -> str | None:
     chain = ia.build_chain(paths, cfg)
     if not chain or chain[0].free or job["args"].get("aprovado") or not cfg.get("estimativa_antes_de_iniciar", True):
@@ -316,6 +345,9 @@ def _dispatch(paths, store, job, cfg, progress, should_pause) -> tuple[dict, str
             return ({"title_id": tid, "traducao_pt_br": True, "provider": "oficial"},
                     "Esse jogo já tem português do Brasil OFICIAL. Configurei para ele abrir em português "
                     "(só ele; os outros continuam como estavam). Está na aba \"Em português\".", True)
+        from . import lm3
+        if lm3.supported(tid):  # Luigi's Mansion 3: textos no init.patch da Next Level Games (não é MSBT)
+            return _translate_lm3(paths, job, g, tid, rom, cfg, progress, should_pause)
         romfs = switch.find_romfs(tid)
         how = "pasta extraída"
         if not romfs:
