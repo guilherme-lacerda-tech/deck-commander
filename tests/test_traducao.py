@@ -321,3 +321,23 @@ def test_converter_decompress_without_tool_explains(tmp_path, monkeypatch):
     monkeypatch.setattr(converter, "nsz_bin", lambda: None)
     paths = get_paths(tmp_path / "dc").ensure()
     assert "nsz não está instalada" in converter.decompress(paths, converter.TitleFiles("X"))[0]
+
+
+def test_transient_error_keeps_fast_provider_and_quotes_survive(tmp_path):
+    paths = get_paths(tmp_path).ensure()
+    cfg = cfg_with(paths, provider="index_translate", fallback=["ollama"])
+
+    class Flaky(FakeAI):
+        def __call__(self, url, body, headers, timeout):
+            self.calls += 1
+            if self.calls == 1:
+                raise ia.ProviderError("HTTP 504")  # uma falha passageira
+            d = json.loads(body["messages"][-1]["content"])
+            return {"choices": [{"message": {"content": json.dumps({k: "PT " + v for k, v in d.items()}, ensure_ascii=False)}}]}
+    fast, slow = Flaky(), FakeAI()
+    chain = [ia.Provider("index_translate", cfg["providers"]["index_translate"], "", fast),
+             ia.Provider("ollama", {**cfg["providers"]["ollama"], "modelo": "qwen"}, "", slow)]
+    items = [ia.Item(str(i), f'"Hello {i}!"') for i in range(5)]
+    res = ia.translate(paths, cfg, items, "flaky", chain=chain)
+    assert slow.calls == 0 and res.provider_used == "index_translate"  # não abandonou o rápido
+    assert res.translated["0"] == 'PT "Hello 0!"'  # as aspas do diálogo continuam

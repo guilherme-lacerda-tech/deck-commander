@@ -27,6 +27,7 @@ from typing import Callable, Optional
 from ..paths import Paths
 
 PH_OPEN, PH_CLOSE = "⟦", "⟧"
+RETRY_WAIT = 5  # segundos (vezes o nº da tentativa) antes de tentar de novo o mesmo provedor
 _PH = re.compile(r"⟦(\d+)⟧")
 
 DEFAULT_CFG = {
@@ -333,7 +334,9 @@ def translate(paths: Paths, cfg: dict, items: list[Item], job: str, glossary: Op
         os.replace(tmp, cp)
 
     def accept(it: Item, out: str) -> None:
-        out = out.strip().strip('"')
+        out = out.strip()
+        if not it.text.lstrip().startswith('"') and len(out) > 1 and out[0] == out[-1] == '"':
+            out = out[1:-1]  # a IA embrulhou em aspas; diálogo que JÁ tinha aspas fica como está
         if not placeholders_ok(it.text, out):
             res.flagged[it.id] = "a IA perdeu/inventou códigos do jogo — mantido o original"
             return
@@ -350,20 +353,28 @@ def translate(paths: Paths, cfg: dict, items: list[Item], job: str, glossary: Op
             res.review[it.id] = g  # traduzido, mas vale uma olhada
 
     i = 0
+    fails = 0               # falhas seguidas no provedor atual
+    shrink = 1              # divisor do lote depois de erro (respostas longas demais dão 504)
+    since_fallback = 0      # frases feitas no reserva desde que saiu do principal
+    dead: set[int] = set()  # provedores que pararam de vez nesta tradução (ex.: limite de tokens)
     while i < len(todo):
         while should_pause():
             time.sleep(30)
-        if prov_i >= len(chain):
+        if prov_i >= len(chain) or len(dead) >= len(chain):
             for it in todo[i:]:
                 res.flagged[it.id] = "nenhum provedor respondeu"
             res.errors.append("todos os provedores falharam")
             break
+        # no reserva há um tempo? tenta o principal de novo (o erro dele costuma ser passageiro)
+        if prov_i > 0 and since_fallback >= 60 and 0 not in dead:
+            prov_i, since_fallback, fails, shrink = 0, 0, 0, 1
         prov = chain[prov_i]
         if not prov.free and limit and tokens_today(paths) >= limit:
             res.errors.append(f"limite diário de tokens atingido ({limit}) no {prov.name}")
+            dead.add(prov_i)
             prov_i += 1
             continue
-        size = 1 if prov.single else int(prov.spec.get("lote", cfg.get("lote", 20)))
+        size = 1 if prov.single else max(1, int(prov.spec.get("lote", cfg.get("lote", 20))) // shrink)
         batch = todo[i:i + size]
         rel_ex = _relevant_examples(examples or [], batch)
         try:
@@ -393,11 +404,20 @@ def translate(paths: Paths, cfg: dict, items: list[Item], job: str, glossary: Op
                 add_tokens(paths, tok)
             i += len(batch)
             done += len(batch)
+            fails = 0
+            if prov_i > 0:
+                since_fallback += len(batch)
             progress(done, total)
             save_cache()
         except ProviderError as e:
-            res.errors.append(f"{prov.name}: {e}")
-            prov_i += 1  # próximo da cadeia; a mesma frase é tentada de novo
+            fails += 1
+            if fails < 3:  # erro passageiro (504, 429, rede): espera, diminui o lote e tenta de novo
+                shrink = min(shrink * 2, 8)
+                time.sleep(RETRY_WAIT * fails)
+                continue
+            if len(res.errors) < 30:
+                res.errors.append(f"{prov.name}: {e}")
+            prov_i, fails, shrink, since_fallback = prov_i + 1, 0, 1, 0  # próximo da cadeia; a frase é tentada de novo
     save_cache()
     return res
 
