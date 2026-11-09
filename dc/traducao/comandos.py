@@ -65,10 +65,11 @@ def traduzir(bot, args: list[str]) -> str:
     elif g["console"] == "switch2":
         return "Switch 2 ainda não tem tradução (os jogos são dumps extraídos, sem MSBT padrão conferido)."
     else:
-        from .retro import supported
-        if not supported(g["console"]):
-            return (f"{g['console'].upper()}: ainda não há extrator de texto confiável para traduzir sozinho. "
-                    "Hoje funciona: jogos de Switch e Pokémon de GBA.")
+        from pathlib import Path as _P
+        from .rts import supported
+        okc, why = supported(g["console"], _P(g["rom"]))
+        if not okc:
+            return f"{g['title']}: não dá para traduzir automaticamente — {why}."
         kind = "translate_retro"
     if run.already_translated(S, gid, kind) and not force:
         return f"{g['title']} já foi traduzido. Para traduzir de novo: /traduzir {query} --forcar"
@@ -122,15 +123,20 @@ def _lista(bot) -> str:
             pt.append(f"• {label} — {dict(oficial='oficial', mod='tradução DC', traduzido='traduzido/dublado')[st]}")
         elif idi.get(gid, {}).get("formato") == "fechado":
             cant.append(f"• {label} — textos em formato próprio do jogo")
-        elif g["console"] == "switch" or g["console"] == "gba":
+        elif idi.get(gid, {}).get("pouco_texto"):
+            cant.append(f"• {label} — quase não tem texto comum (voz/imagem)")
+        elif g["console"] == "switch":
             can.append(f"• {label}")
         else:
-            cant.append(f"• {label}")
+            from pathlib import Path as _P
+            from .rts import supported
+            okc, why = supported(g["console"], _P(g.get("rom", "")))
+            (can if okc else cant).append(f"• {label}" + ("" if okc else f" — {why}"))
     out = [f"🇧🇷 Em português ({len(pt)}) — aba \"Em português\":", *pt]
     if can:
         out += ["", f"Pode tentar /traduzir ({len(can)}):", *can]
     if cant:
-        out += ["", f"Sem tradução automática ({len(cant)}) — PS1/PS2 e formatos próprios não têm extrator confiável:", *cant]
+        out += ["", f"Sem tradução automática ({len(cant)}):", *cant]
     return "\n".join(out)
 
 

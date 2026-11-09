@@ -318,11 +318,19 @@ def _dispatch(paths, store, job, cfg, progress, should_pause) -> tuple[dict, str
             "title_id": tid, "data": datetime.now(timezone.utc).isoformat()}
         return result, rep.text(), rep.translated > 0 and not (rep.errors and not rep.applied)
     if job["type"] == "translate_retro":
-        from . import retro
-        if not retro.supported(g["console"]):
-            return {}, (f"Tradução automática de {g['console'].upper()} ainda não tem extrator confiável "
-                        "(hoje: Pokémon de GBA via Meowth)."), False
-        rep = retro.translate_rom(paths, rom, g.get("title", ""), progress=progress, should_pause=should_pause)
+        from . import retro, rts
+        if g["console"] == "gba" and retro.is_pokemon_gba(rom) and retro.meowth_bin():
+            rep = retro.translate_rom(paths, rom, g.get("title", ""), progress=progress, should_pause=should_pause)
+        else:  # todo o resto do retrô: RomTranslate Studio
+            okc, why = rts.supported(g["console"], rom)
+            if not okc:
+                return {}, f"Não dá para traduzir: {why}.", False
+            rep = rts.translate_rom(paths, rom, g["console"], g.get("title", ""), progress=progress,
+                                    should_pause=should_pause)
+            rep.strings = rep.candidates
+            if rep.candidates < rts.MIN_SENTENCES:
+                from . import portugues
+                portugues.mark(paths.data, job["game_id"], pouco_texto=True)
         ok = bool(rep.output) and Path(rep.output).parent == rom.parent
         if ok:  # ROM "(PT-BR)" entra na biblioteca e SUBSTITUI o atalho do original (sem duplicar)
             op2 = store.enqueue("library-add", {"from": job["op"]})

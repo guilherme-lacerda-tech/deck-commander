@@ -262,6 +262,16 @@ class Result:
     errors: list[str] = field(default_factory=list)
 
 
+def _limits_note(items: list) -> str:
+    lim = {it.id: it.max_len for it in items if it.max_len}
+    if not lim:
+        return ""
+    if len(items) == 1:
+        return f"\nThe translation MUST have at most {lim[items[0].id]} characters (it replaces text in a fixed space)."
+    return ("\nEach translation MUST fit its maximum number of characters (fixed space in the game): "
+            + json.dumps(lim) + ". Prefer shorter words and abbreviations when needed.")
+
+
 def _system_prompt(cfg: dict, glossary: dict, examples: list[tuple[str, str]], batch: bool) -> str:
     src = LANG_NAMES.get(cfg["idioma_origem"], cfg["idioma_origem"])
     dst = LANG_NAMES.get(cfg["idioma"], cfg["idioma"])
@@ -344,8 +354,10 @@ def translate(paths: Paths, cfg: dict, items: list[Item], job: str, glossary: Op
             res.flagged[it.id] = "resposta vazia — mantido o original"
             return
         if it.max_len and len(out) > it.max_len:
+            too_long[it.id] = out  # tenta encurtar logo depois (uma vez)
             res.flagged[it.id] = f"ficou maior que o espaço ({len(out)} > {it.max_len}) — mantido o original"
             return
+        res.flagged.pop(it.id, None)
         res.translated[it.id] = out
         cache[_h(it.text)] = out
         g = apply_glossary_check(it.text, out, glossary)
@@ -377,12 +389,14 @@ def translate(paths: Paths, cfg: dict, items: list[Item], job: str, glossary: Op
         size = 1 if prov.single else max(1, int(prov.spec.get("lote", cfg.get("lote", 20))) // shrink)
         batch = todo[i:i + size]
         rel_ex = _relevant_examples(examples or [], batch)
+        too_long: dict[str, str] = {}
         try:
             if size == 1:
-                raw, tok = prov.chat(_system_prompt(cfg, _gloss_for(glossary, batch), rel_ex, False), batch[0].text)
+                raw, tok = prov.chat(_system_prompt(cfg, _gloss_for(glossary, batch), rel_ex, False)
+                                     + _limits_note(batch), batch[0].text)
                 accept(batch[0], raw)
             else:
-                raw, tok = prov.chat(_system_prompt(cfg, _gloss_for(glossary, batch), rel_ex, True),
+                raw, tok = prov.chat(_system_prompt(cfg, _gloss_for(glossary, batch), rel_ex, True) + _limits_note(batch),
                                      json.dumps({it.id: it.text for it in batch}, ensure_ascii=False))
                 try:
                     got = _parse_batch(raw)
@@ -398,6 +412,18 @@ def translate(paths: Paths, cfg: dict, items: list[Item], job: str, glossary: Op
                             accept(it, r1)
                         except ProviderError as e:
                             res.flagged[it.id] = f"falha na IA: {e}"
+            for it in [x for x in batch if x.id in too_long]:  # passou do espaço: pede versão mais curta
+                try:
+                    dst = LANG_NAMES.get(cfg["idioma"], cfg["idioma"])
+                    r2, t2 = prov.chat(f"Rewrite this {dst} video game text with at most {it.max_len} characters, "
+                                       "same meaning, keep every ⟦n⟧ marker exactly. Answer only with the text.",
+                                       too_long[it.id])
+                    tok += t2
+                    too_long.pop(it.id, None)
+                    accept(it, r2)
+                    too_long.pop(it.id, None)
+                except ProviderError:
+                    pass
             res.tokens += tok
             res.provider_used = res.provider_used or prov.name
             if not prov.free:

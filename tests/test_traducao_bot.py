@@ -23,7 +23,7 @@ def b(tmp_path, monkeypatch):
     rom.write_bytes(b"PFS0" + b"\x00" * 60)
     (paths.data / "launch-map.json").write_text(json.dumps({
         "switch-jogo": {"title": "Jogo", "console": "switch", "rom": str(rom)},
-        "psx-hercules": {"title": "Hercules", "console": "psx", "rom": str(tmp_path / "h.cue")}}))
+        "psx-hercules": {"title": "Hercules", "console": "psx", "rom": str(tmp_path / "h.chd")}}))
     from dc import syncer
     monkeypatch.setattr(syncer, "rom_roots", lambda: [tmp_path / "roms"])
     spawned = []
@@ -33,7 +33,7 @@ def b(tmp_path, monkeypatch):
 
 
 def test_traduzir_queues_job_and_unsupported_console(b):
-    assert "PSX" in b.handle(1, 1, "/traduzir hercules")
+    assert "CHD" in b.handle(1, 1, "/traduzir hercules")
     r = b.handle(1, 1, "/traduzir jogo")
     assert "na fila" in r and len(b.spawned) == 1
     job = run.load_job(b.paths, b.spawned[0])

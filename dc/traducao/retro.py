@@ -71,6 +71,19 @@ def supported(console: str) -> bool:
     return console in SUPPORTED
 
 
+POKEMON_GBA_CODES = ("BPR", "BPG", "BPE", "AXV", "AXP")  # FireRed, LeafGreen, Emerald, Ruby, Sapphire (e hacks deles)
+
+
+def is_pokemon_gba(rom: Path) -> bool:
+    try:
+        with open(rom, "rb") as f:
+            f.seek(0xAC)
+            code = f.read(4).decode("ascii", "replace")
+        return code[:3] in POKEMON_GBA_CODES
+    except OSError:
+        return False
+
+
 def _entries(data: dict) -> list[dict]:
     """Todas as entradas do JSON do Meowth (formato com tabelas ou plano)."""
     out = []
