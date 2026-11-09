@@ -119,6 +119,8 @@ def finish(p: Prepared, translated: str) -> tuple[str, bool]:
     fits = True
     if p.width:
         body, fits = wrap(body, p.width, p.lines)
+        # a pausa "[tp:x] [/tp]" já tem o espaço; o [p] que virou espaço não pode duplicar
+        body = re.sub(r"(\[tp:[^\]]*\] \[/tp\]) (?=\S)", r"\1", body)
     return p.prefix + body + p.suffix, fits
 
 
@@ -259,6 +261,7 @@ def translate_game(paths, title_id: str, patch_file: Path, game_name: str = "", 
             by_core[it.text] = res.translated[it.id]
     rep.flagged = sum(1 for it in items if it.id in res.flagged)
     rep.flagged_samples = [f"{it.text[:60]} → {res.flagged[it.id]}" for it in items if it.id in res.flagged][:20]
+    bad_out: set[str] = set()
     for loc, t in tables.items():
         originals = list(t.strings)
         new: dict[int, str] = {}
@@ -269,7 +272,8 @@ def translate_game(paths, title_id: str, patch_file: Path, game_name: str = "", 
             if out is None or out == pr.core:
                 continue
             s, fits = finish(pr, out)
-            if "\x00" in s:
+            if "\x00" in s or "⟦" in s or "⟧" in s or s.count("[") != s.count("]"):
+                bad_out.add(pr.core)  # marcador inventado/quebrado pela IA: fica o inglês
                 continue
             new[i] = s
             extra += 0 if fits else 1
@@ -282,6 +286,8 @@ def translate_game(paths, title_id: str, patch_file: Path, game_name: str = "", 
         if loc == LOCALES[0]:
             rep.translated = sum(1 for i in t.order if t.strings[i] != originals[i])
             rep.reverted_space, rep.extra_line = reverted, extra
+    rep.flagged += len(bad_out)
+    rep.flagged_samples += [f"{c[:60]} → marcador inventado pela IA" for c in sorted(bad_out)][:5]
     out = nlg.write_patch(p)
     # conferência: o arquivo novo abre, tem as mesmas 13 tabelas nos mesmos lugares e só a seção de texto mudou
     q = nlg.read_patch(out)

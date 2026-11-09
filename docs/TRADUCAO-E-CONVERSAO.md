@@ -54,7 +54,7 @@ A aba **"Em português"** mostra só o que dá para jogar em português:
 | 13 de PS2 + Final Fantasy Tactics (PS1) | ✅ já traduzidos/dublados (pelo nome) |
 | FireRed (Switch) | ✅ a ROM de GBA de dentro foi traduzida (2.332 frases) e entrou como mod. O Meowth aumenta a ROM para 32 MB: confira se abre; se não, `/traduzir desfazer firered` |
 | LeafGreen e versões espanholas | ⏳ na fila (mesmo caminho do FireRed) |
-| Luigi's Mansion 3 | 🔬 formato próprio (`.dict`/`.data` com blocos zlib). Não é cifrado, mas falta mapear onde ficam as falas (uma equipe russa já traduziu, então é possível) |
+| Luigi's Mansion 3 | 🟡 traduzido e instalado como mod (1.314 de 1.612 frases; o resto ficou em inglês). Arquivo conferido byte a byte; **falta conferir no jogo** (ver "Luigi's Mansion 3" abaixo) |
 | Pokémon Legends Z-A | 🔬 arquivo `.trpfs` comprimido com Oodle (biblioteca fechada); as ferramentas da comunidade são só para Windows |
 | Hercules (PS1) | RomTranslate: o jogo quase não tem texto comum (nomes de fase e mensagens do sistema; as falas são voz/imagem) |
 | Shadow of the Colossus (inglês) | você já tem a versão dublada |
@@ -71,6 +71,22 @@ A aba **"Em português"** mostra só o que dá para jogar em português:
    Para voltar ao inglês: `/traduzir desfazer <jogo>`.
 
 O idioma traduzido é o **inglês** do jogo, porque o Ryujinx do Deck está em inglês. Os outros idiomas não são tocados.
+
+## Luigi's Mansion 3
+Os textos não são MSBT: ficam no `init.patch` da atualização 1.4 (formato da Next Level Games, lido em Python puro).
+- Dentro dele há um bloco zlib com 13 tabelas de texto, uma por idioma. São traduzidos o **inglês dos EUA** (o que
+  o Ryujinx em inglês mostra) e o inglês europeu. Os outros 11 idiomas ficam iguais.
+- O mod é um único arquivo: `mods/contents/0100dca0064a6000/Deck Commander PT-BR/romfs/init.patch`.
+- **Precisa da atualização** (1.4, `[v327680]`). Sem ela o bot avisa e não faz nada.
+- Antes de traduzir, o `init.patch` é lido e regravado sem mudar um byte (as 13 tabelas e o arquivo).
+- O jogo guarda o tamanho de cada tabela em vários lugares, então a tabela traduzida tem **exatamente o tamanho
+  da original** (o que sobra vira zeros). A IA recebe um limite por frase; frase que passar fica em inglês.
+- `[p]` (quebra de linha) é refeito na largura do original; quebra depois de ponto final fica onde estava.
+- Fonte: á é í ó ú â ô à ç aparecem nos textos oficiais (espanhol/francês). **ã e õ não aparecem em nenhum texto
+  oficial**: a fonte tem a posição dessas letras (a tradução russa as usa), mas ainda não foi visto na tela.
+- Resultado (2026-11-09, Index-Translate): 1.314 de 1.612 frases traduzidas; 81 ficaram em inglês (passaram do
+  espaço ou a IA estragou um código); 30 frases ficaram com uma linha a mais que o original.
+- Fora da fila do bot: `python3 tools/lm3_traduzir.py [--sem-instalar]` (mesmo código e mesmo cache do `/traduzir`).
 
 ## Segurança (o que nunca acontece)
 - O arquivo do jogo (NSP/XCI) e a ROM original **nunca** são alterados.

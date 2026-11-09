@@ -141,6 +141,8 @@ def _fake_http(url, body, headers, timeout):
     user = body["messages"][-1]["content"]
 
     def tr(v):
+        if v == "OK":
+            return "Certo ⟦n⟧"  # marcador inventado: precisa ficar o inglês
         return v.replace("Welcome", "Bem-vindo").replace("Hurry up", "Corra").replace("Save", "Salvar").replace("Are you ready to check in?", "Pronto?")
     try:
         content = json.dumps({k: tr(v) for k, v in json.loads(user).items()}, ensure_ascii=False)
@@ -166,6 +168,7 @@ def test_traducao_ponta_a_ponta(tmp_path):
     assert any("Bem-vindo" in s for s in t0.strings) and any("Bem-vindo" in s for s in nlg.get_table(q, 9).strings)
     assert t1.strings == JA  # outros idiomas intocados
     assert len(q.blob) == len(nlg.read_patch(raw).blob)
+    assert "OK" in t0.strings and not any("⟦" in s for s in t0.strings) and rep.flagged >= 1
     for s in t0.strings:  # códigos do jogo preservados
         assert s.count("[clr:") == s.count("[/clr]")
 
