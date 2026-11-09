@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.0 — 2026-11-09 — Tradução com IA e conversão de Switch (adições A1/A2/A3)
+- `/traduzir <jogo>`: Switch vira **mod LayeredFS** do Ryujinx (jogo nunca alterado); Pokémon de GBA via
+  Meowth vira ROM "(PT-BR)" + patch BPS. Validado com 552 MSBT reais (12.742 frases, 8.614 tags) lidos e
+  regravados byte a byte, e tradução real com tags preservadas.
+- IA em cadeia: Index-Translate-9B (padrão, grátis) → Ollama no Deck → GitHub Models → pagos (com estimativa
+  e aprovação). Glossário, referências (memória de tradução + few-shot), cache para retomar, limite diário.
+- Executor em segundo plano: fila, pausa na bateria e com jogo aberto, aviso no Telegram, `retomar`.
+- `/converter <jogo>`: diagnóstico, `organizar` update/DLC, `descompactar` NSZ/XCZ (nsz).
+- Leitores próprios sem dependências: MSBT, SARC, Yaz0, zstd (Python 3.14), BFFNT.
+- Correção: o `/sync` pegava "a próxima operação da fila" em vez da sua (`store.claim`).
+- `./setup-deck.sh --modules A1,A2,A3`: Ollama no $HOME + modelo, Meowth e nsz em ambientes isolados.
+
 ## 0.4.2 — 2026-11-07 (revisão para uso longe do PC)
 - **Safe-mode nunca derruba o bot** (antes, entrar em safe-mode desligava o próprio bot e o `/sos off` ficava
   impossível de longe) e o `/sos off` religa exatamente o que desligou — antes o qBittorrent ficava parado.

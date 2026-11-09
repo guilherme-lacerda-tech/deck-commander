@@ -27,6 +27,16 @@ Tudo roda a partir de `~/deck-commander` (Konsole no modo Desktop, ou SSH).
 | `python3 -m dc x patch <rom> <patch>` | aplica tradução IPS/BPS/UPS numa cópia "(patch)" |
 | `python3 -m dc x steam-restart` | reinicia o Steam (recusa se houver jogo aberto; só necessário sem o plugin) |
 
+## Tradução e conversão (A1/A2/A3) — pelo Telegram
+| Comando | O que faz |
+|---|---|
+| `/traduzir <jogo> [--forcar]` | traduz para pt-BR com IA (Switch: mod; Pokémon GBA: ROM "(PT-BR)") |
+| `/traduzir status \| config` | tarefas e cadeia de IA |
+| `/traduzir revisar\|aplicar\|aprovar\|retomar <op>` | relatório, aplicar guardado, aprovar provedor pago, continuar |
+| `/traduzir desfazer <jogo>` | remove o mod de tradução |
+| `/converter <jogo> [organizar\|descompactar]` | Switch: diagnóstico, pasta por jogo, NSZ/XCZ |
+| `./setup-deck.sh --modules A1,A2,A3` | instala Ollama local + modelo, Meowth e nsz |
+
 ## Conteúdo (M4) — pelo Telegram: `/help`
 | Comando | O que faz |
 |---|---|
