@@ -59,7 +59,19 @@ def rom_roots() -> list[Path]:
 
 
 def add_to_steam(paths: Paths, store: Store, op: str) -> list[str]:
-    """Acrescenta atalhos para jogos novos (idempotente). Retorna os nomes adicionados."""
+    """Acrescenta atalhos para jogos novos (idempotente). Retorna os nomes adicionados.
+    Depois, confere quais jogos de Switch têm português oficial (só os novos/atualizados são lidos)."""
+    names = _add_to_steam(paths, store, op)
+    try:
+        from .traducao import portugues
+        lm = json.loads((paths.data / "launch-map.json").read_text("utf-8"))
+        portugues.detect_switch(paths, lm, rom_roots())
+    except Exception:  # noqa: BLE001 — a detecção de idioma nunca atrapalha o /sync
+        pass
+    return names
+
+
+def _add_to_steam(paths: Paths, store: Store, op: str) -> list[str]:
     games, _ = library.scan(rom_roots())
     ops.index_files(store, games)
     sc = shortcuts_path()

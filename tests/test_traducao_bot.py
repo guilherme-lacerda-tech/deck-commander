@@ -43,14 +43,40 @@ def test_traduzir_queues_job_and_unsupported_console(b):
     assert (b.paths.config / "traducao.toml").exists()
 
 
-def test_runner_switch_without_romfs_explains_extraction(b, monkeypatch):
+def _no_keys(monkeypatch, msg="o Ryujinx ainda não tem prod.keys (abra um jogo nele uma vez)"):
+    from dc.traducao import extract, nca, portugues
+
+    def boom(*a, **k):
+        raise nca.NcaError(msg)
     monkeypatch.setattr(switch, "find_romfs", lambda tid: None)
     monkeypatch.setattr(switch, "extract_with_hactool", lambda rom, tid: None)
+    monkeypatch.setattr(extract, "extract_texts", boom)
+    monkeypatch.setattr(portugues, "detect_switch", lambda *a, **k: {})
+    monkeypatch.setattr(run, "_gba_inside", lambda *a: None)
+
+
+def test_runner_switch_without_keys_explains_extraction(b, monkeypatch):
+    _no_keys(monkeypatch)
     b.handle(1, 1, "/traduzir jogo")
     job = run.run(b.paths, b.spawned[0])
     assert job["status"] == "falhou" and "Extrair dados" in job["report"]
     comandos.notify(b); comandos.notify(b)
     assert len(b.sent) == 1 and "não deu certo" in b.sent[0]  # avisa uma vez só
+
+
+def test_runner_switch_unknown_format_is_refused(b, monkeypatch):
+    _no_keys(monkeypatch, "nenhum arquivo de texto reconhecido no jogo")
+    b.handle(1, 1, "/traduzir jogo")
+    job = run.run(b.paths, b.spawned[0])
+    assert job["status"] == "falhou" and "formato padrão da Nintendo" in job["report"]
+
+
+def test_runner_switch_official_ptbr_needs_no_ai(b, monkeypatch):
+    from dc.traducao import portugues
+    monkeypatch.setattr(portugues, "detect_switch", lambda paths, lm, roots: {k: {"ptbr": "oficial"} for k in lm})
+    b.handle(1, 1, "/traduzir jogo")
+    job = run.run(b.paths, b.spawned[0])
+    assert job["status"] == "concluido" and "OFICIAL" in job["report"] and job["result"]["provider"] == "oficial"
 
 
 def test_runner_switch_success_registers_and_blocks_repeat(b, monkeypatch, tmp_path):
