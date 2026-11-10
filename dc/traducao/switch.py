@@ -62,6 +62,9 @@ class Report:
     errors: list[str] = field(default_factory=list)
     version: Optional[dict] = None  # de qual versão do jogo o mod foi feito ({'base':…, 'update': nome|None})
     flagged_samples: list[str] = field(default_factory=list)
+    rescued: int = 0      # 2ª chance: códigos remontados
+    by_pieces: int = 0    # ... dessas, traduzidas por pedaços
+    shortened: int = 0    # 2ª chance: encurtadas para caber na caixa
 
     def pct_flagged(self) -> float:
         return 100.0 * self.flagged / max(1, self.strings)
@@ -70,6 +73,10 @@ class Report:
         L = [f"MSBT: {self.msbt_count} · frases: {self.strings} · traduzidas: {self.translated}",
              f"com problema (original mantido): {self.flagged} ({self.pct_flagged():.1f}%) · para revisar: {self.review}",
              f"fonte: {self.font}", f"IA: {self.provider or '-'} · tokens: {self.tokens}"]
+        if self.rescued or self.shortened:
+            L.append(f"2ª chance: {self.rescued} frases com códigos refeitas"
+                     + (f" ({self.by_pieces} por pedaços)" if self.by_pieces else "")
+                     + f" · {self.shortened} encurtadas para caber na caixa")
         if self.compression:
             L.append("compressão: " + ", ".join(sorted(self.compression)))
         if self.similarity is not None:

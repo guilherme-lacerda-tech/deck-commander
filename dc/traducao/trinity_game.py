@@ -190,6 +190,25 @@ def _visible_len(s: str) -> int:
     return len(ia._PH.sub("", s))
 
 
+def _box_size(segs: list[str]) -> tuple[int, int]:
+    """(letras por linha, linhas por caixa) medidos no texto original."""
+    lines = [ln for s in segs for ln in s.strip("\n").split("\n")]
+    return max(30, max(len(ln) for ln in lines)), max(2, max(len(s.strip("\n").split("\n")) for s in segs))
+
+
+def box_size(src_text: str, src_codes: list) -> tuple[int, int]:
+    segs, cur, k = [], [], 0
+    for ch in src_text:
+        if ch == "\x00":
+            if _is_box(src_codes[k]):
+                segs.append("".join(cur)); cur = []
+            k += 1
+        else:
+            cur.append(ch)
+    segs.append("".join(cur))
+    return _box_size(segs)
+
+
 def layout(src_text: str, src_codes: list, marked: str) -> tuple[str, list, bool]:
     """Reajusta as quebras de linha do texto traduzido (com ⟦n⟧) à largura do original.
     Só mexe em texto de várias linhas. Devolve (texto marcado, códigos, cabe_na_caixa)."""
@@ -204,9 +223,7 @@ def layout(src_text: str, src_codes: list, marked: str) -> tuple[str, list, bool
         else:
             cur.append(ch)
     segs.append("".join(cur))
-    lines = [ln for s in segs for ln in s.strip("\n").split("\n")]
-    width = max(30, max(len(ln) for ln in lines))
-    per_box = max(2, max(len(s.strip("\n").split("\n")) for s in segs))
+    width, per_box = _box_size(segs)
     dialog = any(_is_box(c) for c in src_codes)
     # divide o traduzido nas quebras de caixa que a IA manteve
     parts = re.split(r"(⟦\d+⟧)", marked)
@@ -249,6 +266,67 @@ def layout(src_text: str, src_codes: list, marked: str) -> tuple[str, list, bool
         if bi < len(seps):
             out.append(seps[bi] + "\n")
     return "".join(out), codes, fits
+
+
+def second_chance(paths: Paths, cfg: dict, items: list, all_texts: dict, res, rep, glossary, chain, job: str) -> None:
+    """Depois da tradução principal:
+    1) frase em que a IA perdeu/trocou os códigos (nome do Pokémon, número) → refaz explicando que pode mover
+       os códigos; se ainda falhar, traduz os pedaços entre os códigos e remonta;
+    2) frase que não coube na caixa (descrição/menu) → pede versão mais curta que caiba.
+    Resultados guardados em cache próprio: refazer a tradução não paga de novo."""
+    if not cfg.get("segunda_chance", True):
+        return
+    import json as _json
+    cp = paths.data / "traducao" / "cache" / f"{job}-segunda-chance.json"
+    try:
+        memo = _json.loads(cp.read_text("utf-8"))
+    except (OSError, ValueError):
+        memo = {}
+
+    def fits(iid: str, marked: str) -> bool:
+        _rel, _i, text, codes = all_texts[iid]
+        try:
+            m2, c2, ok = layout(text, codes, marked)
+            from_marked(m2, c2)
+        except tm.MsgError:
+            return False
+        return ok
+
+    lost = [it for it in items if res.flagged.get(it.id, "").startswith("a IA perdeu")]
+    todo = []
+    for it in lost:
+        k = "c" + ia._h(it.text)
+        if k in memo:
+            res.translated[it.id] = memo[k]
+            res.flagged.pop(it.id, None)
+        else:
+            todo.append(it)
+    fixed, how = ia.fix_codes(paths, cfg, todo, glossary, chain=chain) if todo else ({}, {})
+    for it in todo:
+        if it.id in fixed:
+            res.translated[it.id] = memo["c" + ia._h(it.text)] = fixed[it.id]
+            res.flagged.pop(it.id, None)
+    rep.rescued = len(lost) - len([it for it in lost if it.id in res.flagged])
+    rep.by_pieces = sum(1 for v in how.values() if v == "pedaços")
+
+    big = []
+    for iid, new in list(res.translated.items()):
+        if iid not in all_texts or new == to_marked(all_texts[iid][2]) or fits(iid, new):
+            continue
+        k = "s" + ia._h(new)
+        if k in memo and fits(iid, memo[k]):
+            res.translated[iid] = memo[k]
+            continue
+        _rel, _i, text, codes = all_texts[iid]
+        width, lines = box_size(text, codes)
+        big.append((iid, new, lines, width))
+    short = ia.shorten(paths, cfg, big, fits, chain=chain) if big else {}
+    for iid, new, _l, _w in big:
+        if iid in short:
+            res.translated[iid] = memo["s" + ia._h(new)] = short[iid]
+    rep.shortened = len(short)
+    cp.parent.mkdir(parents=True, exist_ok=True)
+    cp.write_text(_json.dumps(memo, ensure_ascii=False), "utf-8")
 
 
 # ============================================================================ pipeline
@@ -297,6 +375,7 @@ def translate_game(paths: Paths, tid: str, rom: Path, roots: list[Path], game_na
     res = ia.translate(paths, cfg, items, f"switch-{tid}", glossary, [], chain=chain,
                        progress=progress, should_pause=should_pause)
     rep.provider, rep.tokens, rep.errors = res.provider_used, res.tokens, rep.errors + res.errors
+    second_chance(paths, cfg, items, all_texts, res, rep, glossary, chain, f"switch-{tid}")
     rep.flagged, rep.review = len(res.flagged), len(res.review)
     rep.flagged_samples = [f"{to_marked(all_texts[k][2])[:60]} → {v}" for k, v in list(res.flagged.items())[:20]]
     changed: set[str] = set()
@@ -306,14 +385,14 @@ def translate_game(paths: Paths, tid: str, rom: Path, roots: list[Path], game_na
         if new is None or new == to_marked(text):
             continue
         try:
-            marked, codes2, fits = layout(text, codes, new)
+            marked, codes2, fits_box = layout(text, codes, new)
             words = from_marked(marked, codes2)
         except tm.MsgError as e:
             rep.flagged += 1
             if len(rep.flagged_samples) < 20:
                 rep.flagged_samples.append(f"{text[:60]} → {e}")
             continue
-        overflow += not fits
+        overflow += not fits_box
         dats[rel].lines[i].words = words
         changed.add(rel)
         rep.translated += 1

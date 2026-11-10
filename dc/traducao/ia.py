@@ -621,3 +621,79 @@ def load_glossary(paths: Paths, name: str = "") -> dict:
             if sec != "geral" and isinstance(terms, dict) and sec.lower() in name.lower():
                 out.update(terms)
     return out
+
+
+# ----------------------------------------------------------------------------- segunda chance
+def _instructable(p: Provider) -> bool:
+    """IA que segue instrução (não só traduz): serve para remontar códigos e encurtar."""
+    return not p.single and "index-translate" not in (p.spec.get("url") or "")
+
+
+def _ask(chain: list[Provider], system: str, user: str, ok: Callable[[str], bool]) -> Optional[str]:
+    for p in chain:
+        try:
+            raw, _tok = p.chat(system, user, timeout=120)
+        except ProviderError:
+            continue
+        raw = raw.strip()
+        if len(raw) > 1 and raw[0] == raw[-1] == '"' and not user.lstrip().startswith('"'):
+            raw = raw[1:-1]
+        if raw and ok(raw):
+            return raw
+    return None
+
+
+def fix_codes(paths: Paths, cfg: dict, items: list[Item], glossary: Optional[dict] = None,
+              chain: Optional[list[Provider]] = None) -> tuple[dict[str, str], dict[str, str]]:
+    """Frases em que a IA perdeu/trocou os códigos ⟦n⟧ (nome do Pokémon, número…).
+    1ª tentativa: uma a uma, numa IA que segue instrução, explicando que pode MOVER os códigos.
+    2ª: traduz só os pedaços de texto entre os códigos e remonta na mesma ordem (sempre válida; pode ficar
+    menos natural). Devolve (traduções, como: "ia" | "pedaços")."""
+    chain = chain if chain is not None else build_chain(paths, cfg)
+    smart = [p for p in chain if _instructable(p)]
+    system = (_system_prompt(cfg, glossary or {}, [], False) +
+              "\nEach ⟦n⟧ is a value the game inserts (a name, a number, a color). Every marker in the input must "
+              "appear EXACTLY once in your answer. You may move markers to where the grammar needs them.")
+    seg_system = _system_prompt(cfg, glossary or {}, [], False) + \
+        "\nThis is a fragment of a sentence (game values go between fragments). Translate only the fragment."
+    out: dict[str, str] = {}
+    how: dict[str, str] = {}
+    for it in items:
+        got = _ask(smart, system, it.text, lambda r, s=it.text: placeholders_ok(s, r))
+        if got is not None:
+            out[it.id], how[it.id] = got, "ia"
+            continue
+        parts = re.split(r"(⟦\d+⟧)", it.text)
+        okp = True
+        for i, s in enumerate(parts):
+            core = s.strip()
+            if _PH.fullmatch(s) or not re.search(r"[^\W\d_]{2}", core):
+                continue
+            t = _ask(chain, seg_system, core, lambda r: not _PH.search(r))
+            if t is None:
+                okp = False
+                break
+            parts[i] = s[:len(s) - len(s.lstrip())] + t + s[len(s.rstrip()):]
+        if okp:
+            out[it.id], how[it.id] = "".join(parts), "pedaços"
+    return out, how
+
+
+def shorten(paths: Paths, cfg: dict, items: list[tuple[str, str, int, int]],
+            fits: Callable[[str, str], bool], chain: Optional[list[Provider]] = None) -> dict[str, str]:
+    """Tradução que não coube na caixa: pede uma versão mais curta (mesmo sentido, mesmos códigos).
+    items: (id, texto traduzido, linhas, letras por linha). `fits(id, texto)` confere de verdade."""
+    chain = chain if chain is not None else build_chain(paths, cfg)
+    smart = [p for p in chain if _instructable(p)]
+    dst = LANG_NAMES.get(cfg["idioma"], cfg["idioma"])
+    out: dict[str, str] = {}
+    for iid, text, lines, width in items:
+        flat = text.replace("\n", " ")
+        system = (f"You shorten {dst} video game texts so they fit a small text box: at most {lines} line(s) "
+                  f"of {width} characters, {lines * width} characters in total (each ⟦n⟧ marker counts as 8). "
+                  "Keep the meaning and the tone; use shorter words, drop filler words, abbreviate if needed. "
+                  "Keep every ⟦n⟧ marker exactly once. Answer only with the text, in one line.")
+        got = _ask(smart, system, flat, lambda r, s=flat, i=iid: placeholders_ok(s, r) and fits(i, r))
+        if got is not None:
+            out[iid] = got
+    return out
