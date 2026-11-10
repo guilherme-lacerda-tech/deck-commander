@@ -114,3 +114,14 @@ def test_engine_no_keeps_game(b, monkeypatch):  # noqa: F811
     run.save_job(b.paths, job)
     assert "fica como está" in b.handle(1, 1, f"/traduzir motor {job['op']} nao")
     assert run.load_job(b.paths, job["op"])["status"] == "recusado" and b.spawned == []
+
+
+def test_translate_keeps_leading_and_trailing_space(monkeypatch):
+    col = motores.Coleta([motores.Texto("a", "  Just like I will stop Him.
+")], lambda tr: {"/x": tr})
+    monkeypatch.setattr(ia, "translate", lambda paths, cfg, items, job, glossary=None, **k: types.SimpleNamespace(
+        translated={i.id: "Assim como eu vou detê-Lo." for i in items}))
+    monkeypatch.setattr(ia, "load_glossary", lambda *a: {})
+    files, _r, n = motores.translate(None, {}, col, "j", "T")
+    assert files["/x"]["a"] == "  Assim como eu vou detê-Lo.
+"

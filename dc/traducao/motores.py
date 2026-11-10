@@ -111,6 +111,9 @@ def translate(paths, cfg: dict, col: Coleta, job: str, title: str, chain=None,
         t = res.translated.get(key)
         if t:
             new = ia.restore(t, codes)
+            # espaço/quebra no começo e no fim faz parte do layout do jogo (a IA costuma comer): devolve igual
+            lead, trail = s[:len(s) - len(s.lstrip())], s[len(s.rstrip()):]
+            new = lead + new.strip() + trail
             if new != s:
                 for x in uniq[s]:
                     by_id[x.id] = new
