@@ -143,10 +143,13 @@ async function processRemovals() {
     let list;
     try { list = (await call("get_removals")) || []; } catch (e) { return; } // backend antigo
     for (const r of list) {
-        const ov = appStore.GetAppOverviewByAppID(r.appid);
+        const id = Number(r.appid) >>> 0;  // o AppID pode ter sido guardado com sinal (negativo): normaliza
+        let ov = appStore.GetAppOverviewByAppID(id);
+        if (!ov && r.name) ov = appStore.allApps.find((a) => a.display_name === r.name && a.app_type === 1073741824) || null;
         try {
-            if (ov) SteamClient.Apps.RemoveShortcut(r.appid);
-            seenThisSession.delete(r.appid);
+            if (!ov) { note("não achei o atalho de " + r.game_id + " para remover (fica na fila)"); continue; }
+            SteamClient.Apps.RemoveShortcut(ov.appid);
+            seenThisSession.delete(ov.appid);
             await call("removal_done", r.game_id, r.appid);
             note("removido: " + (ov ? ov.display_name : r.game_id));
             if (ov) toaster.toast({ title: "Deck Commander", body: ov.display_name + " removido da biblioteca" });
