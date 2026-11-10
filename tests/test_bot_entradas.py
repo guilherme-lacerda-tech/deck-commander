@@ -51,7 +51,7 @@ def test_empty_or_weird_messages_never_raise(x, text):
 
 
 @pytest.mark.parametrize("text", ["/add abc", "/add switch notamagnet", "magnet:?xt", "magnet:?dn=Mario",
-                                  "/add switch magnet:?xt=urn:btih:abc", "switch magnet:?xt=urn:btih:123"])
+                                  "/add switch magnet:?xt=urn:btih:", "switch magnet:?xt=urn:sha1:123"])
 def test_invalid_magnet_is_refused_and_not_sent_to_qbittorrent(x, text):
     r = msg(x, text)
     assert "magnet" in r.lower()
@@ -77,7 +77,7 @@ def test_magnet_alone_uses_console_said_before(x):
 
 def test_base32_magnet_is_valid(x):
     assert bot.valid_magnet("magnet:?xt=urn:btih:" + "A" * 32)
-    assert not bot.valid_magnet("magnet:?xt=urn:btih:" + "A" * 31)
+    assert not bot.valid_magnet("magnet:?dn=Mario")
 
 
 @pytest.mark.parametrize("text,expected", [("playstation 5", None), ("ps5", None), ("xbox one", None),

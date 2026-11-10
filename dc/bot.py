@@ -64,13 +64,13 @@ MAGNET_RX = re.compile(r"magnet:\?\S+", re.I)
 
 
 def valid_magnet(m: str) -> bool:
-    """Magnet de verdade: tem o código do torrent (btih com 40 hex ou 32 base32, ou btmh v2)."""
-    return bool(re.search(r"(?i)xt=urn:(?:btih:(?:[0-9a-f]{40}|[a-z2-7]{32})(?![0-9a-z])|btmh:[0-9a-f]{20,})", m or ""))
+    """Magnet de verdade: tem o código do torrent (xt=urn:btih:… ou btmh). O qBittorrent confere o resto."""
+    return bool(re.search(r"(?i)xt=urn:bt(?:ih|mh):[0-9a-z]+", m or ""))
 
 
 def looks_like_torrent(data: bytes) -> bool:
-    """Arquivo .torrent é um dicionário bencode com a chave 'info' (página HTML/zip renomeado não é)."""
-    return bool(data) and data[:1] == b"d" and b"4:info" in data[:1 << 20]
+    """Arquivo .torrent é um dicionário bencode (começa com 'd' e 'N:chave'); página HTML/zip renomeado não é."""
+    return bool(data) and data[:1] == b"d" and b":" in data[:64]
 
 
 BAD_MAGNET = ("Esse magnet está incompleto ou inválido (falta o código do torrent, \"xt=urn:btih:…\"). "
@@ -235,9 +235,11 @@ class Bot:
         if cmd == "/add":
             if not args:
                 return "Uso: /add [console] <magnet>"
+            if ops.in_safe_mode(P):
+                return "Safe-mode ativo."
             mg = next((a for a in args if a.lower().startswith("magnet:")), None)
             if not mg:
-                return BAD_MAGNET if any("magnet" in a.lower() for a in args) else                     "Uso: /add [console] <magnet>  (o magnet começa com magnet:?xt=…)"
+                return BAD_MAGNET if any("magnet" in a.lower() for a in args) else                     "Link inválido: o /add precisa de um magnet (começa com magnet:?xt=…). Uso: /add [console] <magnet>"
             if not valid_magnet(mg):
                 return BAD_MAGNET
             rest = " ".join(a for a in args if a is not mg)
