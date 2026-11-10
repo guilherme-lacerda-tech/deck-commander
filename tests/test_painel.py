@@ -319,3 +319,36 @@ def test_falha_de_formato_nao_oferece_retomar(tmp_path):
     finally:
         r.library_plan = orig
     assert not t["pode_retomar"] and "formato" in t["linha"]
+
+
+def test_limpar_historicos(tmp_path):
+    import json
+    from dc import painel
+    from dc.paths import get_paths
+    from dc.traducao import run
+    paths = get_paths(tmp_path / "dc").ensure()
+    d = run.jobs_dir(paths)
+    for op, st in (("c1", "concluido"), ("f1", "falhou"), ("r1", "rodando"), ("q1", "aguardando ok")):
+        (d / f"{op}.json").write_text(json.dumps({"op": op, "status": st, "game_id": op}), "utf-8")
+
+    class Q:
+        apagados = []
+
+        def torrents(self):
+            return [{"hash": "h1", "state": "stalledUP"}, {"hash": "h2", "state": "downloading"},
+                    {"hash": "h3", "state": "pausedUP"}]
+
+        def delete(self, h, delete_files=False):
+            assert delete_files is False
+            self.apagados.append(h)
+    (paths.state / "sync-state.json").write_text(json.dumps({"ingested": {"h1": {}, "h2": {}}}), "utf-8")
+
+    class P:
+        pass
+    p = P(); p.paths = paths; p.qbt = Q()
+    out = painel.traducao_limpar(p, {})
+    assert "2 tarefa" in out["texto"]
+    assert sorted(x.stem for x in d.glob("*.json")) == ["q1", "r1"]
+    assert sorted(x.stem for x in (d / "arquivo").glob("*.json")) == ["c1", "f1"]
+    out = painel.downloads_limpar(p, {})
+    assert p.qbt.apagados == ["h1"] and "1 download" in out["texto"]  # h3 concluído mas não está na biblioteca

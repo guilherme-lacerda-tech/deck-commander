@@ -422,7 +422,10 @@ function TelaInicio({ ir }) {
             d.perguntas ? Txt("❓ Tem pergunta de tradução esperando você: abra Tradução.", { color: "#ffb74d" }) : null,
             Txt("💾 Espaço livre: " + d.espaco.map((e) => e.livre_gb + " GB " + e.onde).join(" · ")
                 + (d.bateria !== null && d.bateria !== undefined ? "   🔋 " + d.bateria + "%" : "")),
-            Bt(diag === "carregando" ? "Verificando… (até 1 min)" : "🩺 Diagnóstico: o que falta fazer?", async () => {
+            !diag ? Txt("🩺 O Diagnóstico confere se está tudo funcionando (backup, BIOS, emuladores, controles, "
+                + "plugins, biblioteca) e lista o que ainda precisa da sua mão, com o que fazer. Ele só olha: não muda nada.",
+                { opacity: 0.85 }, "dgx") : null,
+            Bt(diag === "carregando" ? "Verificando… (até 1 min)" : "🩺 Verificar se está tudo certo", async () => {
                 setDiag("carregando");
                 setDiag(await painel("diagnostico"));
             }, { disabled: diag === "carregando" }),
@@ -512,6 +515,9 @@ function TelaDownloads() {
         out.push(Bt("⏸ Pausar todos", () => fazer("downloads_pausar"), { disabled: ocupado }));
         out.push(Bt("▶ Retomar todos", () => fazer("downloads_retomar"), { disabled: ocupado }));
     }
+    if (d.downloads.some((x) => x.concluido)) out.push(Bt("🧹 Limpar concluídos da lista", () => confirmar(
+        "Limpar a lista de downloads?", "Tira da lista os downloads que já terminaram e já estão na biblioteca. "
+        + "Os jogos NÃO são apagados.", "Limpar", () => fazer("downloads_limpar")), { disabled: ocupado }, "limpar"));
     out.push(Toggle("Baixar fora da tomada", d.bateria_permitida, (v) => fazer("bateria", { permitir: v }),
         "Abaixo de " + d.bateria_minima + "% sempre pausa"));
     out.push(Msg(msg));
@@ -538,7 +544,10 @@ function TelaTraducao() {
         t.pode_parar ? Bt("⏹ Parar " + t.titulo, () => confirmar("Parar a tradução?", "O que já foi traduzido fica guardado; "
             + "dá para retomar depois de onde parou.", "Parar", () => fazer("traducao_parar", { op: t.op })), { disabled: ocupado }, "p" + t.op) : null,
         t.pode_retomar ? Bt("▶ Retomar " + t.titulo, () => fazer("traducao_retomar", { op: t.op }), { disabled: ocupado }, "r" + t.op) : null,
-    ]) : Txt("Nenhuma tradução ainda."));
+    ]).concat([Bt("🧹 Limpar histórico", () => confirmar("Limpar o histórico de traduções?",
+        "Tira da lista as tarefas que já acabaram (concluídas, falhas, recusadas). As traduções instaladas continuam "
+        + "e nada que esteja rodando ou esperando você é tocado.", "Limpar", () => fazer("traducao_limpar")),
+        { disabled: ocupado }, "limpar")]) : Txt("Nenhuma tradução ainda."));
     const jogos = Sec("Não traduzidos", d.nao_traduzidos.length
         ? d.nao_traduzidos.map((j) => Bt("Traduzir: " + j.titulo + " (" + j.console + ")", () => fazer("traduzir", { gid: j.gid }),
             { disabled: ocupado }, j.gid))

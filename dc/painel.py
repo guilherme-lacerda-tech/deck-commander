@@ -238,6 +238,44 @@ def _pausar(p: Ponte, a: dict, pausar: bool) -> dict:
     return {"texto": f"{len(hs)} download(s) {'pausado(s)' if pausar else 'retomado(s)'}."}
 
 
+def downloads_limpar(p: Ponte, a: dict) -> dict:
+    """Tira da lista os downloads que já terminaram E já estão na biblioteca. Os arquivos do jogo ficam."""
+    from .qbt import DONE_STATES
+    from .syncer import _state
+    no_jogo = _state(p.paths).get("ingested", {})
+    try:
+        feitos = [t for t in p.qbt.torrents() if t.get("state") in DONE_STATES and t["hash"] in no_jogo]
+        for t in feitos:
+            p.qbt.delete(t["hash"], delete_files=False)  # só a linha da lista; o jogo continua no Deck
+    except QbtError:
+        raise Erro("O programa de downloads (qBittorrent) não está respondendo agora. Tente daqui a pouco.")
+    if not feitos:
+        return {"texto": "Nada para limpar: nenhum download concluído que já esteja na biblioteca."}
+    return {"texto": f"{len(feitos)} download(s) concluído(s) saíram da lista. Os jogos continuam na biblioteca."}
+
+
+def traducao_limpar(p: Ponte, a: dict) -> dict:
+    """Arquiva o histórico de traduções que já acabaram (concluídas, falhas, recusadas). Traduções instaladas
+    ficam; tarefas rodando ou esperando você não são tocadas. Nada é apagado: vai para traducao/arquivo/."""
+    from .traducao import run
+    manter = set(run.ATIVOS_FILA) | {"aguardando aprovação", "aguardando análise"}
+    arq = run.jobs_dir(p.paths) / "arquivo"
+    n = 0
+    for f in sorted(run.jobs_dir(p.paths).glob("*.json")):
+        try:
+            j = json.loads(f.read_text("utf-8"))
+        except (OSError, ValueError):
+            continue
+        if j.get("status") in manter or (j.get("pid") and run._alive(j.get("pid"))):
+            continue
+        arq.mkdir(exist_ok=True)
+        f.replace(arq / f.name)
+        n += 1
+    if not n:
+        return {"texto": "Nada para limpar: só há tarefas rodando ou esperando você."}
+    return {"texto": f"{n} tarefa(s) antiga(s) saíram do histórico. As traduções instaladas continuam."}
+
+
 def bateria(p: Ponte, a: dict) -> dict:
     return {"texto": p._battery(["sim" if a.get("permitir") else "nao"])}
 
@@ -547,7 +585,7 @@ ACOES = {f.__name__: f for f in (
     status, diagnostico, safe_mode, telegram, telegram_botfather, telegram_token, telegram_parear, downloads,
     bateria, duplicados, remover, traducao, traducao_automatica, traduzir, traducao_parar, traducao_retomar,
     traducao_responder, pc, pc_salvar, pc_testar, pc_acordar, pc_sincronizar, transferir, transferir_preparar,
-    transferir_enviar, qualidade, qualidade_definir, controle_definir)}
+    transferir_enviar, qualidade, qualidade_definir, controle_definir, downloads_limpar, traducao_limpar)}
 ACOES["downloads_pausar"] = lambda p, a: _pausar(p, a, True)
 ACOES["downloads_retomar"] = lambda p, a: _pausar(p, a, False)
 
