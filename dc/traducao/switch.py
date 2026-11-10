@@ -60,6 +60,7 @@ class Report:
     mod_dir: str = ""
     applied: bool = False
     errors: list[str] = field(default_factory=list)
+    version: Optional[dict] = None  # de qual versão do jogo o mod foi feito ({'base':…, 'update': nome|None})
     flagged_samples: list[str] = field(default_factory=list)
 
     def pct_flagged(self) -> float:
@@ -350,6 +351,10 @@ def translate_game(paths: Paths, title_id: str, romfs: Path, game_name: str = ""
     except (OSError, ValueError):
         pass
     rep = Report(title_id)
+    try:  # carimbo da extração automática: guarda no mod de qual versão (base/atualização) os textos vieram
+        rep.version = json.loads((romfs.parent / "extraido-por-deck-commander.json").read_text("utf-8"))
+    except (OSError, ValueError):
+        rep.version = None
     files, containers = scan(romfs, rep, cfg["idioma_origem"])
     if not files:
         rep.errors.append("nenhum texto MSBT encontrado neste RomFS")
@@ -434,6 +439,8 @@ def _write_mod(paths: Paths, rep: Report, files: list[TextFile], containers: dic
         {"title_id": rep.title_id, "msbt": rep.msbt_count, "strings": rep.strings, "translated": rep.translated,
          "flagged": rep.flagged, "flagged_samples": rep.flagged_samples, "font": rep.font,
          "skipped": rep.skipped_files}, ensure_ascii=False, indent=1), "utf-8")
+    if rep.version is not None:
+        (stage.parent / "versao.json").write_text(json.dumps(rep.version, ensure_ascii=False), "utf-8")
     rep.mod_dir = str(stage.parent)
     if rep.translated and rep.pct_flagged() <= threshold and not rep.errors:
         rep.mod_dir = str((install or install_mod)(rep.title_id, stage.parent))
@@ -463,16 +470,44 @@ def uninstall_mod(title_id: str) -> bool:
     return False
 
 
-def ensure_update_selected(title_id: str, roots: list[Path]) -> Optional[str]:
-    """O mod de tradução é feito a partir da atualização mais nova do jogo. Se o Ryujinx estiver abrindo outra
-    versão (ex.: nenhuma atualização escolhida), os textos não batem e o jogo sai em inglês ou trava. Antes de
-    abrir, seleciona sozinho a mesma atualização no Ryujinx (games/<tid>/updates.json). Devolve o que fez."""
+def mod_version(title_id: str, data_dir: Optional[Path] = None) -> Optional[dict]:
+    """De qual versão o mod de tradução foi feito (None = não se sabe: mods antigos, Z-A, LM3)."""
+    if data_dir is None:
+        from ..paths import get_paths
+        data_dir = get_paths().data
+    try:
+        info = json.loads((data_dir / "traducao/mods" / title_id / "versao.json").read_text("utf-8"))
+        return info if "update" in info else None
+    except (OSError, ValueError):
+        return None
+
+
+def ensure_update_selected(title_id: str, roots: list[Path], data_dir: Optional[Path] = None) -> Optional[str]:
+    """Antes de abrir, põe o Ryujinx na MESMA versão de que o mod de tradução foi feito (games/<tid>/updates.json).
+    Versão diferente = textos que não batem (jogo em inglês ou travando — lição do LM3/Z-A). Se o mod guardou a
+    versão (versao.json), vale ela — inclusive "sem atualização"; senão (mods antigos), a atualização mais nova.
+    Devolve o que fez (ou None)."""
     if not mod_target(title_id).exists():
         return None
     from . import converter, extract
-    want = extract.latest_update(converter.collect(roots, title_id))
-    if not want:
-        return None
+    tf = converter.collect(roots, title_id)
+    info = mod_version(title_id, data_dir)
+    hint = ""
+    if info is None:
+        want = extract.latest_update(tf)
+        if not want:
+            return None
+        sel, label = str(want), f"a atualização {want.name}"
+    elif info["update"] is None:
+        sel, label = "", "a versão sem atualização"
+        if extract.latest_update(tf):
+            hint = " — para jogar com a atualização, refaça a tradução: /traduzir <jogo> --forcar"
+    else:
+        want = next((u for u in getattr(tf, "updates", []) or [] if u.name == info["update"]), None)
+        if not want:
+            return (f"⚠️ a tradução foi feita para a atualização {info['update']}, que não está mais no Deck: "
+                    "refaça com /traduzir <jogo> --forcar")
+        sel, label = str(want), f"a atualização {want.name}"
     for d in RYU_DIRS:
         f = d / "games" / title_id.lower() / "updates.json"
         if not f.parent.parent.exists():
@@ -481,13 +516,14 @@ def ensure_update_selected(title_id: str, roots: list[Path]) -> Optional[str]:
             data = json.loads(f.read_text("utf-8"))
         except (OSError, ValueError):
             data = {"selected": "", "paths": []}
-        if data.get("selected") == str(want):
+        if (data.get("selected") or "") == sel:
             return None
-        data["selected"] = str(want)
-        data["paths"] = sorted(set(data.get("paths") or []) | {str(want)})
+        data["selected"] = sel
+        if sel:
+            data["paths"] = sorted(set(data.get("paths") or []) | {sel})
         f.parent.mkdir(parents=True, exist_ok=True)
         tmp = f.with_name(f.name + ".tmp")
         tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), "utf-8")
         os.replace(tmp, f)
-        return f"tradução: selecionei a atualização {want.name} no Ryujinx (o mod foi feito para ela)"
+        return f"tradução: selecionei {label} no Ryujinx (o mod foi feito para ela){hint}"
     return None
