@@ -49,6 +49,11 @@ def traduzir(bot, args: list[str]) -> str:
         return _lista(bot)
     if sub == "biblioteca":
         return _biblioteca(bot, args[1].lower() if len(args) > 1 else "")
+    if sub == "fora" and len(args) == 3 and args[2].lower() in ("sim", "nao", "não"):
+        # resposta pelo botão da própria pergunta: vale para ESTA tarefa, mesmo com outras perguntas abertas
+        if bot.cfg.get("pergunta_op") == args[1]:
+            bot.cfg.pop("pergunta_op", None); bot.save_cfg()
+        return run.answer_generic(P, args[1], args[2].lower() == "sim")
     force = "--forcar" in args
     query = " ".join(a for a in args if not a.startswith("--"))
     gid, g, err = _find(bot, query)
@@ -395,7 +400,7 @@ def notify(bot) -> None:
                             "O texto deste jogo não está num formato conhecido. Eu procuro as frases nos arquivos, "
                             "só troco o que cabe no mesmo espaço (sem risco de quebrar o jogo) e uso só as IAs "
                             "locais do PC/Deck. Se não achar nada seguro, aviso e não mexo em nada."),
-                     buttons=["Sim", "Não"])
+                     buttons=[("Sim", f"/traduzir fora {j['op']} sim"), ("Não", f"/traduzir fora {j['op']} nao")])
             continue
         elif st == "aguardando aprovação":
             msg = f"💰 {j['title']}: {j.get('report', '')}"
