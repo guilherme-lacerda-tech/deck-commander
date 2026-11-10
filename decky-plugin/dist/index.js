@@ -630,21 +630,24 @@ const TELAS = { telegram: TelaTelegram, downloads: TelaDownloads, traducao: Tela
 
 function Panel() {
     const [tela, setTela] = SP_REACT.useState(null);
+    // Dentro de uma tela do painel, o botão B e a seta "←" do topo chamam o "fechar plugin" do próprio Decky
+    // (deckyState.closeActivePlugin). Enquanto uma tela está aberta, esse "fechar" volta ao menu do Deck
+    // Commander; no menu (ou ao sair do painel) o comportamento original do Decky volta.
+    SP_REACT.useEffect(() => {
+        const st = window.DeckyPluginLoader && window.DeckyPluginLoader.deckyState;
+        if (!st || !tela) return undefined;
+        st.closeActivePlugin = () => setTela(null);   // propriedade da instância cobre a do protótipo
+        if (st.notifyUpdate) st.notifyUpdate();       // o Decky religa os botões com a função nova
+        return () => {
+            delete st.closeActivePlugin;
+            if (st.notifyUpdate) st.notifyUpdate();
+        };
+    }, [tela]);
     if (!TEM_DFL) return h(AtalhosPanel, null);  // Decky sem os componentes: só o painel antigo
     if (!tela || !TELAS[tela]) return h(TelaInicio, { ir: setTela });
-    // Botão B do controle dentro de uma tela: volta ao menu do painel (sem isso o Steam fecha o Deck Commander)
-    const voltar = (e) => {
-        if (e && e.stopPropagation) e.stopPropagation();
-        if (e && e.preventDefault) e.preventDefault();
-        setTela(null);
-        return true;
-    };
-    const corpo = [
-        h(D.PanelSection, { key: "v" }, h(D.PanelSectionRow, null, h(D.ButtonItem, { layout: "below", onClick: () => setTela(null) }, "← Voltar"))),
-        h(TELAS[tela], { key: "t" })];
-    return D.Focusable
-        ? h(D.Focusable, { onCancelButton: voltar, "flow-children": "column" }, corpo)
-        : h("div", null, corpo);
+    return h("div", null,
+        h(D.PanelSection, null, h(D.PanelSectionRow, null, h(D.ButtonItem, { layout: "below", onClick: () => setTela(null) }, "← Voltar"))),
+        h(TELAS[tela], null));
 }
 
 var index = definePlugin(() => {

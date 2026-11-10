@@ -295,3 +295,27 @@ def test_traducao_mostra_so_a_tarefa_mais_nova_de_cada_jogo(tmp_path):
         r.library_plan = orig
     assert [t["op"] for t in out["tarefas"]] == ["a3"]
     assert not out["tarefas"][0]["pode_retomar"]
+
+
+def test_falha_de_formato_nao_oferece_retomar(tmp_path):
+    import json
+    from dc import painel
+    from dc.paths import get_paths
+    from dc.traducao import run
+    paths = get_paths(tmp_path / "dc").ensure()
+    (run.jobs_dir(paths) / "h1.json").write_text(json.dumps({
+        "op": "h1", "type": "translate_retro", "game_id": "psx-hercules", "title": "Hercules", "status": "falhou",
+        "created": "2026-11-09T18:27:00+00:00",
+        "report": "⚠️ não traduzi para não estragar o jogo: texto misturado/ilegível — precisa de engenharia reversa"}))
+
+    class P:
+        pass
+    p = P(); p.paths = paths; p.store = None; p._map = lambda: {}
+    import dc.traducao.run as r
+    orig = r.library_plan
+    r.library_plan = lambda *a, **k: {"ok": []}
+    try:
+        t = painel.traducao(p, {})["tarefas"][0]
+    finally:
+        r.library_plan = orig
+    assert not t["pode_retomar"] and "formato" in t["linha"]

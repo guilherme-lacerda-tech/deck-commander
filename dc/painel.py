@@ -314,11 +314,20 @@ def traducao(p: Ponte, a: dict) -> dict:
         if len(tarefas) >= 15:
             break
         vivo = run._alive(j.get("pid"))
+        rep = (j.get("report") or "").lower()
+        # falha de FORMATO (texto do jogo não encontrado/ilegível): tentar de novo dá o mesmo resultado
+        sem_saida = st == "falhou" and any(w in rep for w in (
+            "não traduzi para não estragar", "engenharia reversa", "não dá para traduzir", "formato fechado",
+            "nenhum arquivo de texto reconhecido", "pouco texto"))
+        linha = comandos._status_line(p.paths, j)
+        if sem_saida:
+            linha += ("\nNão dá para traduzir este jogo sozinho ainda: o texto dele está num formato que o sistema "
+                      "não lê. Tentar de novo dá o mesmo resultado; quando o sistema aprender, ele tenta sozinho.")
         tarefas.append({"op": j["op"], "titulo": j.get("title", j["op"]), "status": st,
-                        "linha": comandos._status_line(p.paths, j),
+                        "linha": linha,
                         "pode_parar": st in comandos.ATIVOS,
-                        "pode_retomar": st in ("interrompida", "falhou") or (st in comandos.ATIVOS and j.get("pid")
-                                                                             and not vivo)})
+                        "pode_retomar": not sem_saida and (st in ("interrompida", "falhou") or (
+                            st in comandos.ATIVOS and j.get("pid") and not vivo))})
     return {"automatica": bool(cfg.get("auto_traduzir", True)),
             "nao_traduzidos": [{"gid": g, "titulo": lm.get(g, {}).get("title", g), "console": lm.get(g, {}).get("console", "")}
                                for g in plan["ok"]],
