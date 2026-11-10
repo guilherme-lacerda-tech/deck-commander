@@ -173,7 +173,9 @@ def _lista(bot) -> str:
         if st:
             pt.append(f"• {label} — {dict(oficial='oficial', mod='tradução DC', traduzido='traduzido/dublado')[st]}")
         elif idi.get(gid, {}).get("formato") == "fechado":
-            cant.append(f"• {label} — textos em formato próprio do jogo")
+            m = idi[gid].get("motor")
+            cant.append(f"• {label} — formato próprio do jogo" + (f" (motor: {m})" if m else "")
+                        + " — tenta de novo sozinho quando eu aprender o formato")
         elif idi.get(gid, {}).get("pouco_texto"):
             cant.append(f"• {label} — quase não tem texto comum (voz/imagem)")
         elif g["console"] == "switch":

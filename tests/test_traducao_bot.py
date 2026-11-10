@@ -68,7 +68,7 @@ def test_runner_switch_unknown_format_is_refused(b, monkeypatch):
     _no_keys(monkeypatch, "nenhum arquivo de texto reconhecido no jogo")
     b.handle(1, 1, "/traduzir jogo")
     job = run.run(b.paths, b.spawned[0])
-    assert job["status"] == "falhou" and "formato padrão da Nintendo" in job["report"]
+    assert job["status"] == "falhou" and "Motor do jogo" in job["report"]
 
 
 def test_runner_switch_official_ptbr_needs_no_ai(b, monkeypatch):

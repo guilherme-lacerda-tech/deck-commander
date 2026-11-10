@@ -116,6 +116,8 @@ def create(paths: Paths, store: Store, kind: str, game_id: str, title: str, args
     op = store.enqueue(kind, {"game_id": game_id, **args})
     job = {"op": op, "type": kind, "game_id": game_id, "title": title, "args": args, "status": "na fila",
            "progress": [0, 0], "created": datetime.now(timezone.utc).isoformat(), "notified": False}
+    from . import motor
+    job["motor_versao"] = motor.VERSAO
     save_job(paths, job)
     return job
 
@@ -163,14 +165,17 @@ def translator_for(paths: Paths, store: Store, gid: str, g: dict, idi: dict, job
         if not okc:
             return "sem", ""
         kind = "translate_retro"
-    if idi.get(gid, {}).get("formato") == "fechado" or idi.get(gid, {}).get("pouco_texto"):
+    from . import motor
+    mark = idi.get(gid, {})
+    if mark.get("pouco_texto") or (mark.get("formato") == "fechado" and not motor.stale(mark)):
         return "sem", ""
     mine = [j for j in jobs if j.get("game_id") == gid]
     if any(j.get("status") in ATIVOS_FILA for j in mine):
         return "fila", kind
     if already_translated(store, gid, kind):
         return "feito", kind
-    if any(j.get("type") == kind and j.get("status") in ("falhou", "aguardando análise") for j in mine):
+    if any(j.get("type") == kind and j.get("status") in ("falhou", "aguardando análise")
+           and not (kind == "translate_switch" and motor.stale(j)) for j in mine):  # falhou numa versão mais antiga: o sistema aprendeu coisa nova, tenta de novo
         return "falhou", kind
     return "ok", kind
 
@@ -476,6 +481,23 @@ def _approval_needed(paths: Paths, cfg: dict, texts_estimate: int, job: dict) ->
 N3DS_TEXT = (".msbt", ".sarc", ".szs", ".arc", ".bcfnt", ".msbt.lz", ".zs")
 
 
+def _engine_of(rom: Path, tid: str) -> dict:
+    """Motor do jogo pela lista de arquivos (sem extrair nada)."""
+    from .. import syncer
+    from . import converter, extract, motor, nca, switch
+    try:
+        upd = extract.latest_update(converter.collect(syncer.rom_roots(), tid))
+        rfs, handles = nca.open_romfs(rom, nca.load_keys(switch.keys_path()), upd)
+        try:
+            return motor.identify(list(rfs.files()))
+        finally:
+            for h in handles:
+                h.close()
+    except Exception:  # noqa: BLE001 - só diagnóstico
+        return {"motor": "não identificado (jogo comprimido ou sem chaves)", "traduzo": False,
+                "caminho": "descompactar (/converter <jogo> descompactar) e tentar de novo"}
+
+
 def _translate_unreal(paths, job, g, tid, rom, cfg, progress, should_pause):
     """Jogo de Switch feito na Unreal Engine: traduz o .locres e instala um pak de mod "_P" por cima.
     Devolve None se o jogo não for Unreal (aí segue o fluxo normal)."""
@@ -706,10 +728,14 @@ def _dispatch(paths, store, job, cfg, progress, should_pause) -> tuple[dict, str
                         f"ou extraia os arquivos: Ryujinx → botão direito no jogo → Extrair dados → RomFS → "
                         f"~/Emulation/romfs/{tid}. Depois mande /traduzir de novo."), False
                 if not romfs:
-                    portugues.mark(paths.data, job["game_id"], formato="fechado")
-                    return {"title_id": tid}, (
-                        f"Não dá para traduzir este jogo automaticamente: {e}. Os textos dele não estão no formato "
-                        "padrão da Nintendo (MSBT), e mexer em formato desconhecido poderia quebrar o jogo."), False
+                    from . import motor
+                    info = _engine_of(rom, tid)
+                    portugues.mark(paths.data, job["game_id"], formato="fechado", motor_versao=motor.VERSAO,
+                                   motor=info["motor"])
+                    return {"title_id": tid, "motor": info["motor"]}, (
+                        f"Ainda não traduzo este jogo sozinho: {e}.\nMotor do jogo: {info['motor']}.\n"
+                        f"Caminho para traduzir: {info['caminho']}.\nNão é \"impossível\": quando o Deck "
+                        "Commander aprender esse formato, ele tenta de novo sozinho."), False
         job["extracao"] = how
         portugues.unmark(paths.data, job["game_id"], "formato")  # achou os textos: não é mais "formato fechado"
         if not job["args"].get("aprovado"):
