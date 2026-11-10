@@ -46,6 +46,9 @@ CONSOLES = {
     # PS3: ISO ou jogo em pasta (PS3_GAME/USRDIR/EBOOT.BIN); firmware oficial instalada uma vez no RPCS3
     "ps3":    {"label": "PlayStation 3", "exts": [".iso"], "eboot": True,
                "cmd": [FLATPAK, "run", "net.rpcs3.RPCS3", "--no-gui", "--fullscreen", "{rom}"]},
+    # Xbox 360 (Xenia Canary, nativo Linux): .iso, .xex, ou "Games on Demand" (<TitleID>/00007000/<arquivo sem extensão>)
+    "x360":   {"label": "Xbox 360", "exts": [".iso", ".xex", ".zar"], "god": True,
+               "cmd": [str(H / ".local/share/deck-commander/emus/xenia-canary/xenia_canary"), "--fullscreen=true", "{rom}"]},
     "xbox":   {"label": "Xbox", "exts": [".xiso", ".iso"],
                "cmd": [FLATPAK, "run", "app.xemu.xemu", "-full-screen", "-dvd_path", "{rom}"]},
     "dc":     {"label": "Dreamcast", "exts": [".chd", ".gdi", ".cdi"],
@@ -121,6 +124,7 @@ FLATPAK_IDS = ["net.pcsx2.PCSX2", "org.DolphinEmu.dolphin-emu", "org.libretro.Re
 # O que cada console precisa que VOCÊ coloque (o Deck Commander nunca baixa BIOS/firmware/chaves)
 NEEDS = {"ps3": "firmware oficial do PS3 (PS3UPDAT.PUP) instalada uma vez no RPCS3",
          "xbox": "BIOS, MCPX e imagem de HD do Xbox configurados uma vez no xemu",
+         "x360": "Xenia Canary (instalado pelo Deck Commander); desempenho no Deck varia muito por jogo",
          "saturn": "BIOS do Saturn (sega_101.bin / mpr-17933.bin) em ~/Emulation/bios",
          "segacd": "BIOS do Sega CD (bios_CD_U.bin etc.) em ~/Emulation/bios",
          "n3ds": "jogos de 3DS DESCRIPTOGRAFADOS (o GodMode9 tem a opção de dump decriptado)",

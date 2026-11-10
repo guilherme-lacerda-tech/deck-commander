@@ -17,10 +17,10 @@ from .emulators import CONSOLES
 SETTINGS = Path.home() / "homebrew/settings/TabMaster/settings.json"
 GAMES_AND_SOFTWARE = 1 | 2
 EMULATOR_HINTS = ("pcsx2", "duckstation", "ryujinx", "lichii", "dolphin", "retroarch", "ppsspp", "eden", "melonds",
-                  "azahar", "cemu", "rpcs3", "xemu", "flycast")
+                  "azahar", "cemu", "rpcs3", "xemu", "flycast", "xenia")
 STORE_TITLES = {"epic": "Epic Games", "gog": "GOG", "amazon": "Amazon Games", "itch": "itch.io"}
 ORDER = ["ps2", "psx", "ps3", "psp", "switch", "switch2", "n3ds", "nds", "wiiu", "wii", "gc", "n64", "snes", "nes",
-         "gba", "gbc", "gb", "xbox", "dc", "saturn", "segacd", "genesis", "sms", "gg", "pce", "arcade"]
+         "gba", "gbc", "gb", "x360", "xbox", "dc", "saturn", "segacd", "genesis", "sms", "gg", "pce", "arcade"]
 
 
 COLLECTION_IDS: dict[str, str] = {}  # título -> id da coleção do Steam (preenchido por apply())

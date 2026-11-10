@@ -86,6 +86,11 @@ def scan(roots: Iterable[Path]) -> tuple[list[Game], list[str]]:
                     if eb.parent.name == "USRDIR" and eb.parent.parent.name == "PS3_GAME":
                         title = clean_title(eb.parent.parent.parent.name)
                         games.setdefault(f"{console}-{slug(title)}", Game(f"{console}-{slug(title)}", title, console, str(eb)))
+            if spec.get("god"):  # Xbox 360 "Games on Demand": <TitleID>/00007000/<cabeçalho sem extensão>
+                for hd in sorted(d.rglob("*")):
+                    if hd.is_file() and not hd.suffix and hd.parent.name == "00007000":
+                        title = clean_title(hd.parent.parent.parent.name)
+                        games.setdefault(f"{console}-{slug(title)}", Game(f"{console}-{slug(title)}", title, console, str(hd)))
             files = sorted(f for f in d.rglob("*") if f.is_file() and f.suffix.lower() in spec["exts"])
             for f in files:
                 if console == "switch":

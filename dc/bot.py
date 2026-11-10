@@ -28,6 +28,7 @@ ALIASES = [
     (r"3ds|n3ds|nintendo\s*3ds|new\s*3ds", "n3ds"),
     (r"wii\s*u|wiiu", "wiiu"),
     (r"ps\s*3|playstation\s*3|play\s*3", "ps3"),
+    (r"xbox\s*360|x\s*360|360", "x360"),
     (r"xbox(\s*cl[aá]ssico|\s*original)?", "xbox"),
     (r"dreamcast|\bdc\b", "dc"),
     (r"sega\s*cd|mega\s*cd|segacd", "segacd"),
