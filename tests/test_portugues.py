@@ -59,8 +59,12 @@ def test_hide_original_keeps_files_and_can_come_back(tmp_path, monkeypatch):
     (paths.data / "launch-map.json").write_text(json.dumps({"gba-fr": {"title": "Fire Red", "console": "gba", "rom": str(rom)}}))
     (paths.data / "plugin-done.json").write_text(json.dumps({"gba-fr": {"appid": 3000000005, "error": ""}}))
     monkeypatch.setattr(remove.plugin_bridge, "installed", lambda *a: True)
+    from dc.store import Store
+    with Store(paths.db).tx() as c:
+        c.execute("INSERT INTO provenance VALUES(?,?,?,?)", ("3000000005", "dc", "x", "plugin:gba-fr"))
     remove.hide(paths, "gba-fr", "substituído pela versão traduzida")
     assert rom.exists()
+    assert not list(Store(paths.db).conn.execute("SELECT * FROM provenance"))  # diagnóstico não acusa atalho sumido
     assert json.loads((paths.data / "plugin-remove.json").read_text()) == [{"game_id": "gba-fr", "appid": 3000000005}]
     assert "gba-fr" in remove.removed_games(paths)  # aparece no /devolver
     assert remove.bring_back(paths, "gba-fr") == "Fire Red"

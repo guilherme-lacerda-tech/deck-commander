@@ -179,6 +179,11 @@ def hide(paths: Paths, game_id: str, reason: str) -> str:
         _save(rq_p, _load(rq_p, []) + [{"game_id": game_id, "appid": appid}])
     done[game_id] = {"appid": 0, "error": "", "removed": True, "motivo": reason}
     _save(plugin_bridge.done_path(paths), done)
+    try:  # o atalho sai do Steam: o registro "criado pelo DC" sai junto (senão o diagnóstico acusa atalho sumido)
+        with Store(paths.db).tx() as c:
+            c.execute("DELETE FROM provenance WHERE operation_id=?", (f"plugin:{game_id}",))
+    except Exception:  # noqa: BLE001 - banco ainda não criado (Deck novo): nada a limpar
+        pass
     items_p = paths.data / "plugin-items.json"
     items = _load(items_p, {})
     if items.pop(game_id, None) is not None:
