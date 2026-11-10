@@ -309,11 +309,11 @@ def setup_plugin(log: list[str]) -> None:
         "recarregado agora, sem reiniciar" if reload_plugin() else "vale no próximo reinício"))
 
 
-def reload_plugin() -> bool:
+def reload_plugin(name: str = "Deck Commander") -> bool:
     """Pede ao Decky para recarregar o plugin (frontend e backend) — mesma coisa que reiniciar, sem reiniciar.
     Usa o canal do próprio Decky dentro do Steam; se o Steam/Decky não estiver aberto, devolve False."""
     import sys
-    expr = 'window.DeckyBackend.call("loader/reload_plugin", "Deck Commander").then(() => "recarregado")'
+    expr = f'window.DeckyBackend.call("loader/reload_plugin", {json.dumps(name)}).then(() => "recarregado")'
     try:
         r = subprocess.run([sys.executable, str(REPO / "tools/cef_eval.py"), expr], capture_output=True,
                            text=True, timeout=30)

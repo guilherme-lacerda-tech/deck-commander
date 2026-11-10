@@ -713,11 +713,94 @@ def tsv(man: dict) -> str:
     return "\n".join(out) + "\n"
 
 
+# ------------------------------------------------------------------ fila (o PC busca e copia sozinho)
+# O Deck não grava no Windows; então o bot põe o pedido na fila e acorda o PC. A tarefa agendada do PC
+# ("DeckCommander Transferencias": tools/pc/transferir-fila.ps1, a cada 5 min e no logon) lê a fila por ssh,
+# copia com transferir-do-deck.ps1 e marca o resultado aqui. O bot avisa no Telegram quando termina.
+def fila_path(home=None) -> Path:
+    return _data_dir(_home(home)) / "transferir-fila.json"
+
+
+def ler_fila(home=None) -> list[dict]:
+    try:
+        return json.loads(fila_path(home).read_text("utf-8"))
+    except (OSError, ValueError):
+        return []
+
+
+def _gravar_fila(fila: list[dict], home=None) -> None:
+    p = fila_path(home)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_name(p.name + ".tmp")
+    tmp.write_text(json.dumps(fila, ensure_ascii=False, indent=1), "utf-8")
+    os.replace(tmp, p)
+
+
+def enfileirar(game_id: str, titulo: str, home=None) -> dict:
+    fila = ler_fila(home)
+    for e in fila:
+        if e["game_id"] == game_id and e["status"] in ("na fila", "copiando"):
+            return e
+    from datetime import datetime, timezone
+    e = {"id": f"{game_id}-{int(time.time())}", "game_id": game_id, "titulo": titulo, "status": "na fila",
+         "pedido": datetime.now(timezone.utc).isoformat(), "avisado": False}
+    _gravar_fila(fila + [e], home)
+    return e
+
+
+def marcar(pedido_id: str, status: str, nota: str = "", home=None) -> bool:
+    fila = ler_fila(home)
+    for e in fila:
+        if e["id"] == pedido_id:
+            e["status"] = status
+            e["nota"] = nota[-1500:]
+            if status in ("pronto", "falhou"):
+                e["avisado"] = False
+            _gravar_fila(fila, home)
+            return True
+    return False
+
+
+def notificar(bot, home=None) -> None:
+    """Chamado no laço do bot: avisa uma vez quando o PC termina (ou não consegue) uma transferência."""
+    chat = bot.cfg.get("notify_chat")
+    fila = ler_fila(home)
+    mudou = False
+    for e in fila:
+        if e["status"] in ("pronto", "falhou") and not e.get("avisado"):
+            if chat:
+                ic = "✅" if e["status"] == "pronto" else "❌"
+                bot.send(chat, f"{ic} Transferência para o PC — {e['titulo']}: {e['status']}.\n{e.get('nota', '')}".strip())
+            e["avisado"] = True
+            mudou = True
+    if mudou:
+        _gravar_fila(fila, home)
+
+
+def _acordar_pc(bot) -> str:
+    try:
+        from . import pc_remoto
+        cfg = pc_remoto.carregar_config(bot.paths)
+        if pc_remoto.online(cfg, timeout=1.5):
+            return ""
+        ok, _msg = pc_remoto.acordar(cfg)
+        return " Acordei o PC." if ok else " (O PC está dormindo e não consegui acordá-lo: ele busca quando ligar.)"
+    except Exception:  # noqa: BLE001 - sem config do PC remoto: o PC busca quando ligar
+        return ""
+
+
 def comando_transferir(bot, args: list[str]) -> str:
-    """/transferir <jogo> no bot: o que vai, tamanho, e o comando para rodar no PC (sem calcular hash)."""
+    """/transferir <jogo>: mostra o que vai (tamanho) e o botão "Enviar pro PC"; /transferir <jogo> enviar põe na
+    fila e acorda o PC; /transferir fila mostra o andamento."""
     if not args:
-        return ("Uso: /transferir <jogo> — prepara a cópia do jogo + emulador + config + saves para o PC.\n"
-                "No PC rode: " + COMANDO_PC.format(gid="<jogo>"))
+        return ("Uso: /transferir <jogo> — leva o jogo + emulador + config + saves para o PC (pergunta antes).\n"
+                "/transferir fila — o que está indo / já foi para o PC")
+    if args[0].lower() == "fila":
+        f = ler_fila()[-10:]
+        return "\n".join(f"• {e['titulo']}: {e['status']}" for e in reversed(f)) or "Nenhuma transferência pedida."
+    enviar = args[-1].lower() == "enviar"
+    if enviar:
+        args = args[:-1]
     from .remove import find
     lm = bot._map()
     hits = find(lm, " ".join(args))
@@ -726,19 +809,27 @@ def comando_transferir(bot, args: list[str]) -> str:
     if len(hits) > 1:
         return "Achei mais de um:\n" + "\n".join(f"• {lm[g]['title']} ({lm[g]['console']}) → {g}" for g in hits[:10])
     gid = hits[0]
+    if enviar:
+        e = enfileirar(gid, lm[gid].get("title", gid))
+        return (f"📦 {e['titulo']} na fila para o PC.{_acordar_pc(bot)} O PC busca em até 5 min, copia conferindo "
+                "cada arquivo e fica acordado até terminar; aviso aqui quando acabar. (/transferir fila)")
     try:
         man = preparar(gid, launch_map=lm, com_hash=False)
     except (KeyError, OSError) as ex:
         return f"Não deu para preparar: {ex}"
-    return (texto_resumo(man) + "\n\nNo PC (Windows), na pasta do Deck Commander, rode:\n"
-            + COMANDO_PC.format(gid=gid)
-            + "\n(copia com conferência sha256, retoma se cair, faz backup da config do PC antes de sobrescrever; "
-              "nada é apagado no Deck)")
+    bot.next_buttons = [("Enviar pro PC", f"/transferir {gid} enviar")]
+    return (texto_resumo(man) + "\n\nEnviar para o PC agora? O PC acorda, busca e copia sozinho: confere cada "
+            "arquivo, retoma se cair, faz backup da config do PC antes de sobrescrever; nada é apagado no Deck.")
 
 
 def main(argv: list[str]) -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
+    if argv and argv[0] == "fila-json":  # usado pela tarefa do PC
+        print(json.dumps([e for e in ler_fila() if e["status"] in ("na fila", "copiando")], ensure_ascii=False))
+        return 0
+    if argv and argv[0] == "marcar" and len(argv) >= 3:  # marcar <id> <status> [-]  (nota pela entrada padrão)
+        return 0 if marcar(argv[1], argv[2], sys.stdin.read() if argv[3:] == ["-"] else "") else 1
     if not argv or argv[0] not in ("manifesto", "resumo", "lista"):
         print("uso: python3 -m dc.transferir manifesto <jogo> [--tsv] [--sem-hash] [--sem-cache] | resumo <jogo> | lista",
               file=sys.stderr)

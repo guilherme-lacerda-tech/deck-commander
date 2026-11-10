@@ -135,7 +135,9 @@ def _extra(paths, args) -> int:
         sc = syncer.shortcuts_path()
         res = tabs.apply(vdf.read_shortcuts(sc), json.loads((paths.data / "launch-map.json").read_text("utf-8")),
                          sc.parents[1].name, data_dir=paths.data)
-        print(res or "abas já atualizadas"); print("reinicie o Deck para o TabMaster carregar")
+        print(res or "abas já atualizadas")
+        from .tabs import reload_tabmaster
+        print("abas recarregadas no Steam" if reload_tabmaster() else "abra o Steam (ou reinicie o Deck) para o TabMaster carregar")
     elif c == "profile":  # M3: perfil de qualidade em DuckStation (ps1) / PCSX2 (ps2)
         from .adapters import ManualOverride, SchemaChanged, get_adapter
         if len(r) < 2:

@@ -274,7 +274,8 @@ def test_comando_transferir(deck_switch2, monkeypatch):
     assert "Uso:" in T.comando_transferir(bot, [])
     assert "Não achei" in T.comando_transferir(bot, ["zelda"])
     r = T.comando_transferir(bot, ["donkey", "kong"])
-    assert "Donkey Kong Bananza" in r and "transferir-do-deck.bat -Jogo switch2-dkb" in r and "save:" in r
+    assert "Donkey Kong Bananza" in r and "Enviar para o PC" in r and "save:" in r
+    assert bot.next_buttons == [("Enviar pro PC", "/transferir switch2-dkb enviar")]
 
 
 def test_cli_lista_e_resumo(deck_switch2, monkeypatch, capsys):
@@ -307,3 +308,29 @@ def test_bot_routes_transferir(tmp_path, monkeypatch):
     x.cfg["allowed"] = [1]
     monkeypatch.setattr(transferir, "comando_transferir", lambda b, args: "ok " + " ".join(args))
     assert x.handle(1, 1, "/transferir donkey kong") == "ok donkey kong"
+
+
+def test_fila_enviar_marcar_e_avisar(tmp_path, monkeypatch):
+    from dc import bot, transferir
+    from dc.paths import get_paths
+    paths = get_paths(tmp_path / "dc").ensure()
+    monkeypatch.setattr(transferir, "_home", lambda home=None: tmp_path)
+    monkeypatch.setattr(transferir, "_acordar_pc", lambda b: " Acordei o PC.")
+    x = bot.Bot(paths, "T")
+    x.cfg["allowed"] = [1]
+    x.cfg["notify_chat"] = 9
+    sent = []
+    x.send = lambda chat, text, buttons=None: sent.append(text)
+    monkeypatch.setattr(x, "_map", lambda: {"psx-hercules": {"title": "Hercules", "console": "psx", "rom": "/x.cue"}})
+    r = transferir.comando_transferir(x, ["hercules", "enviar"])
+    assert "na fila" in r and "Acordei" in r
+    assert transferir.comando_transferir(x, ["hercules", "enviar"])  # repetido não duplica
+    fila = transferir.ler_fila()
+    assert len(fila) == 1 and fila[0]["status"] == "na fila"
+    assert transferir.marcar(fila[0]["id"], "copiando")
+    transferir.notificar(x)
+    assert sent == []  # copiando não avisa
+    transferir.marcar(fila[0]["id"], "pronto", "6 arquivos conferidos")
+    transferir.notificar(x); transferir.notificar(x)
+    assert len(sent) == 1 and "Hercules" in sent[0] and "pronto" in sent[0]
+    assert "Hercules: pronto" in transferir.comando_transferir(x, ["fila"])

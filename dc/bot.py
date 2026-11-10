@@ -814,6 +814,11 @@ class Bot:
                 self.notify_stalled()
             except Exception as e:  # noqa: BLE001
                 self.log(f"aviso de download parado: {e}")
+            try:
+                from . import transferir
+                transferir.notificar(self)
+            except Exception as e:  # noqa: BLE001
+                self.log(f"aviso de transferência: {e}")
             self.cfg["offset"] = offset; self.save_cfg()
 
 

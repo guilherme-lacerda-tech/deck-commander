@@ -146,4 +146,12 @@ def apply(shortcuts: list[dict], launch_map: dict, user_id: str, settings_path: 
     tmp = settings_path.with_name("settings.json.dc-tmp")
     tmp.write_text(json.dumps(data, indent=4, ensure_ascii=False), "utf-8")
     os.replace(tmp, settings_path)
+    if settings_path == SETTINGS:  # aba nova aparece na hora (o TabMaster só lê o arquivo ao iniciar)
+        reload_tabmaster()
     return {k: v["filters"][0]["type"] for k, v in new.items() if k.startswith("dc-")}
+
+
+def reload_tabmaster() -> bool:
+    """Recarrega o TabMaster pelo canal do Decky (sem reiniciar o Deck). False se o Steam/Decky não está aberto."""
+    from .setup import reload_plugin
+    return reload_plugin("TabMaster")
