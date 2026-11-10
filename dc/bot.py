@@ -22,6 +22,7 @@ from .qbt import Qbt, QbtError
 from .store import ApprovalError, Store
 
 RATE = (20, 60)  # 20 comandos por 60 s
+STALLED_AFTER = 30 * 60  # sem fontes por 30 min => avisa (uma vez)
 PENDING_TTL = 600  # "Switch 1" vale para o próximo arquivo nos próximos 10 min
 
 # Texto livre -> console. "switch 2" é reconhecido para responder que não é suportado.
@@ -687,6 +688,42 @@ class Bot:
         result = syncer.run_sync(self.paths, self.store, self.qbt, explicit=self.cfg.get("explicit"))
         self.send(chat, f"✅ Download concluído: {names}\n\n{result}")
 
+    def notify_stalled(self, now: float | None = None) -> None:
+        """Avisa UMA vez por download: sem fontes há 30 min (ninguém compartilhando) ou parado com erro
+        (disco cheio, cartão SD removido). O resto da fila segue andando (QUEUE_PREFS no qbt.py)."""
+        chat = self.cfg.get("notify_chat")
+        if not chat:
+            return
+        try:
+            ts = self.qbt.torrents()
+        except QbtError:
+            return
+        now = time.time() if now is None else now
+        seen = self.cfg.setdefault("stalled_notified", {})
+        msgs = []
+        for t in ts:
+            h, name = t.get("hash"), (t.get("name") or "download")[:60]
+            if not h or seen.get(h):
+                continue
+            st = t.get("state", "")
+            if st in ("error", "missingFiles"):
+                msgs.append(f"❌ «{name}» parou com erro no qBittorrent: disco cheio ou cartão SD removido? "
+                            "Libere espaço (/disk mostra os maiores) ou recoloque o cartão; depois mande /resume.")
+                seen[h] = "erro"
+            elif (st in ("metaDL", "stalledDL", "forcedMetaDL") and (t.get("progress") or 0) < 1
+                  and now - (t.get("added_on") or now) > STALLED_AFTER and not t.get("num_seeds")):
+                pct = (t.get("progress") or 0) * 100
+                msgs.append(f"⚠️ «{name}» está há mais de {STALLED_AFTER // 60} min sem fontes "
+                            f"(ninguém compartilhando; {pct:.0f}% baixado). Os outros downloads continuam normalmente. "
+                            "Ele segue tentando sozinho; se não andar, procure outro torrent do mesmo jogo.")
+                seen[h] = "sem-fontes"
+        live = {t.get("hash") for t in ts}
+        for h in [h for h in seen if h not in live]:  # download apagado: esquece
+            seen.pop(h)
+        if msgs:
+            self.save_cfg()
+            self.send(chat, "\n\n".join(msgs))
+
     def _retry_stuck(self, chat, ts) -> None:
         """Download concluído que não entrou na biblioteca (ex.: erro corrigido depois): tenta de novo
         a cada hora, em silêncio; avisa só se algum jogo entrar."""
@@ -762,6 +799,10 @@ class Bot:
                 self.notify_finished()
             except Exception as e:  # noqa: BLE001
                 self.log(f"aviso de download: {e}")
+            try:
+                self.notify_stalled()
+            except Exception as e:  # noqa: BLE001
+                self.log(f"aviso de download parado: {e}")
             self.cfg["offset"] = offset; self.save_cfg()
 
 
