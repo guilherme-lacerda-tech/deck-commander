@@ -174,6 +174,7 @@ def run_sync(paths: Paths, store: Store, qbt: Qbt | None, confirm_many: bool = F
                     continue
                 if item.status == "added":
                     st["ingested"][t["hash"]] = {"name": t["name"], "files": item.files}
+                    st["pending"].pop(t["hash"], None)
                     with store.tx() as c:
                         for f in item.files:
                             p = Path(f); s = p.stat()
@@ -192,6 +193,11 @@ def run_sync(paths: Paths, store: Store, qbt: Qbt | None, confirm_many: bool = F
                 elif item.status == "quarantined":
                     st["ingested"][t["hash"]] = {"name": t["name"], "quarantined": True}
                     lines.append(f"⛔ {t['name']}: quarentena — {item.note}")
+                elif item.status == "skipped":  # avisa UMA vez (não repete a cada /sync); /console refaz
+                    st["ingested"][t["hash"]] = {"name": t["name"], "skipped": item.note}
+                    st["pending"][t["hash"]] = t["name"]
+                    lines.append(f"⚠️ {t['name']}: {item.note}. Se o console estiver errado: "
+                                 f"/console {t['hash'][:8]} <console> e /sync")
                 else:
                     lines.append(f"⚠️ {t['name']}: {item.note}")
                 _save_state(paths, st)  # cada download concluído fica registrado na hora (nunca entra 2x)

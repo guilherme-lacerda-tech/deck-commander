@@ -20,15 +20,19 @@ from .emulators import CONSOLES
 from .quarantine import quarantine
 
 ARCHIVES = {".zip", ".7z", ".rar"}
-AMBIGUOUS = {".iso", ".chd", ".zip", ".bin", ".cue", ".pbp"}  # existe em vários consoles
+AMBIGUOUS = {".iso", ".chd", ".zip", ".7z", ".bin", ".cue", ".pbp"}  # existe em vários consoles
 _DISC = re.compile(r"\s*[\(\[]?\s*(disc|disco|cd)\s*([0-9]+)\s*[\)\]]?", re.I)
 _HACK = re.compile(r"\[(br|pt-?br|t[-+]?por?)\]|\((br|pt-?br|translated|traduzido)\)|\(t\s?\d", re.I)
+# A ordem importa: o mais específico vem antes ("Wii U" antes de "Wii", "Switch 2" antes de "Switch",
+# "PlayStation Portable" antes de "PlayStation"). GoD só entre parênteses/colchetes: "God of War" não é Xbox 360.
 NAME_HINTS = [(re.compile(p, re.I), c) for p, c in (
-    (r"\bps2\b|playstation 2", "ps2"), (r"\bpsx\b|\bps1\b|playstation(?! [2-9])", "psx"),
-    (r"gamecube|\bngc\b", "gc"), (r"\bwii\b", "wii"), (r"\bpsp\b", "psp"), (r"\bswitch\b|\bnsw\b", "switch"),
+    (r"\bps2\b|playstation 2", "ps2"), (r"\bpsp\b|playstation portable", "psp"),
+    (r"\bps3\b|playstation 3", "ps3"), (r"\bpsx\b|\bps1\b|playstation(?! [2-9])", "psx"),
+    (r"gamecube|\bngc\b", "gc"), (r"\bwii ?u\b", "wiiu"), (r"\bwii\b", "wii"),
+    (r"switch ?2\b|\bns2\b", "switch2"), (r"\bswitch\b|\bnsw\b", "switch"),
     (r"\bsnes\b|super nintendo", "snes"), (r"\bn64\b|nintendo 64", "n64"), (r"\bgba\b|game boy advance", "gba"),
     (r"\bnds\b|nintendo ds\b|\(ds\)|\[ds\]", "nds"), (r"\b3ds\b|nintendo 3ds", "n3ds"),
-    (r"\bwii ?u\b", "wiiu"), (r"\bps3\b|playstation 3", "ps3"), (r"xbox ?360|\bx360\b|freeboot|\bgod\b|games on demand", "x360"), (r"\bxbox\b", "xbox"), (r"dreamcast", "dc"),
+    (r"xbox ?360|\bx360\b|freeboot|[\(\[]god[\)\]]|games on demand", "x360"), (r"\bxbox\b", "xbox"), (r"dreamcast", "dc"),
     (r"\bsaturn\b", "saturn"), (r"sega ?cd|mega ?cd", "segacd"), (r"mega ?drive|genesis", "genesis"))]
 
 
@@ -41,7 +45,7 @@ def _link_or_copy(src: Path, dst: Path) -> None:
 
 
 def classify(name: str, explicit: Optional[str] = None) -> Optional[str]:
-    if explicit:
+    if explicit and explicit != "auto":  # "auto" = /add sem console: decide pelo nome
         return explicit if explicit in CONSOLES else None
     for rx, c in NAME_HINTS:
         if rx.search(name):
@@ -51,6 +55,62 @@ def classify(name: str, explicit: Optional[str] = None) -> Optional[str]:
     if len(owners) == 1 and ext not in AMBIGUOUS:
         return owners[0]
     return None  # ambíguo -> bot pergunta
+
+
+GAME_EXTS = {e for spec in CONSOLES.values() for e in spec["exts"]} | ARCHIVES | {".bin", ".mdf"}
+
+
+def _structure(files: list[Path]) -> Optional[str]:
+    """Pastas que só se reconhecem pela estrutura: PS3 (PS3_GAME/USRDIR/EBOOT.BIN), Xbox 360 GoD
+    (<TitleID>/00007000/<cabeçalho>) e dump de Switch 2 (base/exefs/main)."""
+    for f in files:
+        up = [x.upper() for x in f.parts[-3:-1]]
+        if f.name.upper() == "EBOOT.BIN" and up == ["PS3_GAME", "USRDIR"]:
+            return "ps3"
+        if not f.suffix and f.parent.name == "00007000":
+            return "x360"
+        if f.name == "main" and up == ["BASE", "EXEFS"]:
+            return "switch2"
+    return None
+
+
+def _inner_names(archive: Path) -> list[str]:
+    """Nomes dos arquivos dentro de um .zip/.7z/.rar (só lê o índice; nunca extrai)."""
+    try:
+        if archive.suffix.lower() == ".zip":
+            import zipfile
+            with zipfile.ZipFile(archive) as z:
+                return [n for n in z.namelist() if not n.endswith("/")]
+        return [f["path"] for f in safe_extract.inspect_external(archive)]
+    except Exception:  # noqa: BLE001 — arquivo estranho: segue a pergunta normal
+        return []
+
+
+def _files(content: Path) -> list[Path]:
+    return [content] if content.is_file() else sorted(f for f in content.rglob("*") if f.is_file())
+
+
+def guess_console(content: Path) -> Optional[str]:
+    """/add sem console: nome do download > estrutura da pasta > nomes dos arquivos (inclusive os de dentro
+    de .zip/.7z/.rar, só pelo índice). None = continua ambíguo (o bot pergunta)."""
+    c = classify(content.name)
+    if c:
+        return c
+    files = _files(content)
+    c = _structure(files)
+    if c:
+        return c
+    names = [f.name for f in files]
+    for f in files:
+        if f.suffix.lower() in ARCHIVES and not _extra_volume(f, files):
+            names += [Path(n).name for n in _inner_names(f)]
+    guesses = {classify(n) for n in names} - {None}
+    return guesses.pop() if len(guesses) == 1 else None
+
+
+def has_game_files(content: Path) -> bool:
+    files = _files(content)
+    return bool(_structure(files)) or any(f.suffix.lower() in GAME_EXTS or _VOLUME.search(f.name) for f in files)
 
 
 def is_translation(name: str) -> bool:
@@ -64,10 +124,18 @@ def playable(files: list[Path], console: str) -> list[Path]:
         out += [f for f in files if not f.suffix and f.parent.name == "00007000"]
     if CONSOLES[console].get("eboot"):  # PS3 em pasta
         out += [f for f in files if f.name == "EBOOT.BIN" and f.parent.name == "USRDIR" and f.parent.parent.name == "PS3_GAME"]
+    if CONSOLES[console].get("dump"):  # Switch 2: <jogo>/base/exefs/main
+        out += [f for f in files if f.name == "main" and [x.lower() for x in f.parts[-3:-1]] == ["base", "exefs"]]
     if console == "switch":
         from .library import switch_kind
         out = [f for f in out if switch_kind(f.name) in ("base", "unknown")]
     return out
+
+
+def switch_extras(files: list[Path]) -> list[Path]:
+    """Atualização/DLC de Switch (pelo Title ID no nome)."""
+    from .library import switch_kind
+    return [f for f in files if f.suffix.lower() in CONSOLES["switch"]["exts"] and switch_kind(f.name) in ("update", "dlc")]
 
 
 def make_m3u(discs: list[Path], folder: Path) -> Optional[Path]:
@@ -189,14 +257,11 @@ def ingest(content: Path, console: Optional[str], roms_root: Path, quarantine_ro
     """Leva um download concluído (arquivo ou pasta) para roms_root/<console>/<pasta>/."""
     content = Path(content)
     name = content.name
-    console = classify(name, console)
+    console = classify(name, console) if console and console != "auto" else guess_console(content)
     if console is None:
-        files = [content] if content.is_file() else [f for f in content.rglob("*") if f.is_file()]
-        guesses = {classify(f.name) for f in files} - {None}
-        if len(guesses) == 1:
-            console = guesses.pop()
-        else:
-            return SyncItem(name, None, "ask_console", note="não consegui identificar o console")
+        if not has_game_files(content):
+            return SyncItem(name, None, "skipped", note="não achei arquivo de jogo nesse download (só texto/imagem?)")
+        return SyncItem(name, None, "ask_console", note="não consegui identificar o console")
     staging = work / f"stage-{abs(hash(str(content))) % 10**8}"
     shutil.rmtree(staging, ignore_errors=True)
     staging.mkdir(parents=True)
@@ -237,9 +302,20 @@ def ingest(content: Path, console: Optional[str], roms_root: Path, quarantine_ro
                     if cue:
                         collected[i] = cue
         games = playable(collected, console)
-        if not games:
-            return SyncItem(name, console, "skipped", note="nenhum arquivo jogável para " + console)
         title = re.sub(r"\.(zip|7z|rar)$", "", name, flags=re.I)
+        if not games and console == "switch" and switch_extras(collected):
+            # atualização/DLC baixada sozinha: vai para a pasta do Switch, que o Ryujinx lê sozinho (sem atalho)
+            dest, n = roms_root / "switch" / title, 1
+            while dest.exists():
+                dest = roms_root / "switch" / f"{title} ({n})"
+                n += 1
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(staging), str(dest))
+            return SyncItem(name, console, "added", files=[],
+                            note="atualização/DLC: o Ryujinx carrega sozinho junto do jogo (sem atalho novo)")
+        if not games:
+            return SyncItem(name, console, "skipped",
+                            note="nenhum arquivo jogável para " + CONSOLES[console].get("label", console))
         if console == "psx":
             m3u = make_m3u([g for g in games if g.suffix.lower() in (".cue", ".chd", ".pbp")], staging)
             if m3u:

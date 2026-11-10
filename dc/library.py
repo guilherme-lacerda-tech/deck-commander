@@ -28,7 +28,7 @@ DEFAULT_EMULATORS = {k: v["cmd"] for k, v in CONSOLES.items()}
 
 _TITLE_ID = re.compile(r"\[([0-9A-Fa-f]{16})\]")
 _NOISE = [re.compile(p, re.I) for p in (
-    r"\(www\.[^)]*\)", r"\[[^\]]*\]", r"\(T\s?\d+(\.\d+)*\)", r"\(\d+(\.\d+)?\s*GB\)", r"\(v\d+(\.\d+)*\)")]
+    r"\(www\.[^)]*\)", r"\[[^\]]*\]", r"\(T\s?\d+(\.\d+)*\)", r"\(\d+(\.\d+)?\s*GB\)", r"\(v\d+(\.\d+)*\)", r"\((god|games on demand)\)")]
 
 
 def clean_title(stem: str) -> str:
@@ -92,7 +92,16 @@ def scan(roots: Iterable[Path]) -> tuple[list[Game], list[str]]:
                         title = clean_title(hd.parent.parent.parent.name)
                         games.setdefault(f"{console}-{slug(title)}", Game(f"{console}-{slug(title)}", title, console, str(hd)))
             files = sorted(f for f in d.rglob("*") if f.is_file() and f.suffix.lower() in spec["exts"])
+            in_m3u = set()  # discos listados num .m3u (multidisco) não viram jogos separados
+            for m in (f for f in files if f.suffix.lower() == ".m3u"):
+                try:
+                    in_m3u |= {(m.parent / ln.strip()).resolve() for ln in m.read_text("utf-8", "replace").splitlines()
+                               if ln.strip() and not ln.startswith("#")}
+                except OSError:
+                    pass
             for f in files:
+                if in_m3u and f.resolve() in in_m3u:
+                    continue
                 if console == "switch":
                     kind = switch_kind(f.name)
                     if kind != "base":

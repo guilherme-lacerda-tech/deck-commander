@@ -91,13 +91,13 @@ def test_bot_bateria_and_power_note(tmp_path, monkeypatch):
     b.cfg["allowed"] = [1]
     b.qbt = type("Q", (), {"torrents": lambda s, *a, **k: [], "add": lambda s, *a: None})()
     (paths.state / "power-state.json").write_text(json.dumps({"state": "PAUSE", "why": "na bateria", "battery": 55}))
-    assert "fica pausado" in b.handle(1, 1, "/add ps2 magnet:?xt=urn:btih:abc&dn=Rez")
+    assert "fica pausado" in b.handle(1, 1, "/add ps2 magnet:?xt=urn:btih:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&dn=Rez")
     assert "55%" in b.handle(1, 1, "/bateria")
     assert "também na bateria" in b.handle(1, 1, "/bateria sim")
     assert json.loads((paths.config / "power.json").read_text())["allow_on_battery"] is True
     assert "só baixa na tomada" in b.handle(1, 1, "/bateria nao")
     (paths.state / "power-state.json").write_text(json.dumps({"state": "RUN", "why": "no carregador"}))
-    assert "pausado" not in b.handle(1, 1, "/add ps2 magnet:?xt=urn:btih:def&dn=Ico")
+    assert "pausado" not in b.handle(1, 1, "/add ps2 magnet:?xt=urn:btih:dddddddddddddddddddddddddddddddddddddddd&dn=Ico")
 
 
 def test_bot_warns_once_when_safe_mode_turns_on(tmp_path, monkeypatch):

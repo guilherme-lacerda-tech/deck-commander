@@ -265,8 +265,13 @@ class Bot:
             h = next((k for k in st.get("pending", {}) if k.startswith(args[0])), None)
             if not h:
                 return "Não achei esse download pendente."
-            self.cfg.setdefault("explicit", {})[h] = args[1]; self.save_cfg()
-            return f"Ok, {st['pending'][h]} = {args[1]}. Rode /sync."
+            console = parse_console(args[1])
+            if not console:
+                return f"Não conheço o console \"{args[1][:30]}\".\n{UNKNOWN_CONSOLE}"
+            if st.get("ingested", {}).get(h, {}).get("skipped"):  # tinha sido pulado: deixa o /sync tentar de novo
+                st["ingested"].pop(h); syncer._save_state(P, st)
+            self.cfg.setdefault("explicit", {})[h] = console; self.save_cfg()
+            return f"Ok, {st['pending'][h]} = {console}. Rode /sync."
         if cmd == "/bateria":
             return self._battery(args)
         if cmd == "/baixar":

@@ -85,12 +85,12 @@ def b(tmp_path, monkeypatch):
 
 
 def test_bot_holds_duplicate_magnet_until_baixar(b):
-    r = b.handle(1, 1, "/add ps2 magnet:?xt=urn:btih:abc&dn=Okami+(USA)")
+    r = b.handle(1, 1, "/add ps2 magnet:?xt=urn:btih:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&dn=Okami+(USA)")
     assert "Parece repetido" in r and b.qbt.added == []
     assert "mesmo assim" in b.handle(1, 1, "/baixar") and b.qbt.added
     assert b.qbt.tags == "dc-dup-ok"  # o /sync vai aceitar esta cópia sem barrar como duplicata
     assert "Nada guardado" in b.handle(1, 1, "/baixar")
-    assert "Adicionado" in b.handle(1, 1, "/add ps2 magnet:?xt=urn:btih:def&dn=Rez")
+    assert "Adicionado" in b.handle(1, 1, "/add ps2 magnet:?xt=urn:btih:dddddddddddddddddddddddddddddddddddddddd&dn=Rez")
 
 
 # ---------------------------------------------------------------- remoção
