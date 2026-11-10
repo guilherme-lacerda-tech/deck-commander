@@ -84,12 +84,14 @@ def extract(paths: Paths, rom: Path, tid: str, roots: list[Path], source: str = 
             log: Callable[[str], None] = lambda s: None) -> tuple[Path, dict]:
     """Copia data.trpfd + mensagens do idioma de origem + diagnóstico da fonte para o cache.
     Devolve (pasta, info). Reaproveita se base/atualização/idioma não mudaram."""
-    from . import nca, switch
+    from . import converter, extract as ex, nca, switch
     kp = switch.keys_path()
     if not kp:
         raise nca.NcaError("o Ryujinx ainda não tem prod.keys (abra um jogo nele uma vez)")
     keys = nca.load_keys(kp)
-    upd = ryujinx_update(tid)
+    # mesma regra do dc-launch (switch.ensure_update_selected): o mod é da atualização mais nova e, antes de
+    # abrir, o Ryujinx passa a carregar essa mesma versão; guard_version cobre o resto (troca manual depois)
+    upd = ex.latest_update(converter.collect(roots, tid))
     lang_dir = LANG_DIR.get(source, "English")
     dest = cache_dir(paths, tid)
     stamp = dest / "extraido.json"
