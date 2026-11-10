@@ -239,7 +239,9 @@ def install_cores(log: list[str]) -> None:
 def install_flatpaks(log: list[str]) -> None:
     """Instala (modo usuário, Flathub oficial) os emuladores Flatpak que faltarem."""
     have = subprocess.run(["flatpak", "list", "--app", "--columns=application"], capture_output=True, text=True).stdout.split()
-    missing = [a for a in emulators.FLATPAK_IDS if a not in have]
+    found = emulators.detect(check_flatpak=False)
+    extra = [a for c, a in emulators.FLATPAK_IF_MISSING.items() if c not in found]
+    missing = [a for a in emulators.FLATPAK_IDS + extra if a not in have]
     if not missing:
         return
     subprocess.run(["flatpak", "remote-add", "--user", "--if-not-exists", "flathub",

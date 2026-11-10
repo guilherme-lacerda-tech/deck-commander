@@ -78,7 +78,9 @@ def decompressor(dll: Path):
 
 def main() -> None:
     tid = sys.argv[1].upper()
-    deck = sys.argv[2] if len(sys.argv) > 2 else (CFG.read_text().strip() if CFG.exists() else "deck@192.168.100.24")
+    deck = sys.argv[2] if len(sys.argv) > 2 else (CFG.read_text().strip() if CFG.exists() else "")
+    if not deck:  # nada fixo deste PC: o endereço vem do argumento ou do arquivo que o instalar-tunel-ia.ps1 grava
+        raise SystemExit(f"Diga o Deck: oodle_locres.py <TitleID> deck@<ip-do-deck>  (ou grave-o em {CFG})")
     ssh = ["ssh", "-i", str(KEY), "-o", "BatchMode=yes", deck]
     raw = subprocess.run(ssh + ["python3", "-", tid], input=DECK_SIDE.encode(), capture_output=True, check=True).stdout
     dec = decompressor(find_dll())
