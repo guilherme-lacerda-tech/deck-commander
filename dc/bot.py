@@ -699,6 +699,31 @@ class Bot:
         result = syncer.run_sync(self.paths, self.store, self.qbt, explicit=self.cfg.get("explicit"))
         self.send(chat, f"✅ Download concluído: {names}\n\n{result}")
 
+    def notify_removidos(self) -> None:
+        """Você tirou um jogo pelo próprio Steam ("Remover da biblioteca"): pergunta UMA vez se quer apagar os
+        arquivos também (como o "Desinstalar" do Steam). Originais escondidos pela versão traduzida não entram."""
+        from . import plugin_bridge, remove
+        chat = self.cfg.get("notify_chat")
+        done = json.loads(plugin_bridge.done_path(self.paths).read_text("utf-8")) \
+            if plugin_bridge.done_path(self.paths).exists() else {}
+        tirados = {g for g, e in remove.removed_games(self.paths).items()
+                   if not (done.get(g) or {}).get("motivo") and e.get("console") != "pc"}
+        if "removidos_avisados" not in self.cfg:  # 1ª vez: o que já estava tirado não vira enxurrada de perguntas
+            self.cfg["removidos_avisados"] = sorted(tirados)
+            self.save_cfg()
+            return
+        novos = sorted(tirados - set(self.cfg["removidos_avisados"]))
+        if not novos or not chat:
+            return
+        lm = remove.effective_map(self.paths)
+        for g in novos:
+            t = lm.get(g, {}).get("title", g)
+            self.send(chat, f"🗑️ Você tirou {t} da biblioteca do Steam. Os arquivos ainda estão no Deck ocupando espaço.\n"
+                            "Quer apagar também? (vão para a quarentena por 30 dias, dá para desfazer)",
+                      buttons=[("Apagar os arquivos", f"/remover {g} confirmar"), ("Trazer de volta", f"/devolver {g}")])
+        self.cfg["removidos_avisados"] = sorted(set(self.cfg["removidos_avisados"]) | set(novos))
+        self.save_cfg()
+
     def notify_stalled(self, now: float | None = None) -> None:
         """Avisa UMA vez por download: sem fontes há 30 min (ninguém compartilhando) ou parado com erro
         (disco cheio, cartão SD removido). O resto da fila segue andando (QUEUE_PREFS no qbt.py)."""
@@ -819,6 +844,10 @@ class Bot:
                 transferir.notificar(self)
             except Exception as e:  # noqa: BLE001
                 self.log(f"aviso de transferência: {e}")
+            try:
+                self.notify_removidos()
+            except Exception as e:  # noqa: BLE001
+                self.log(f"aviso de jogo tirado do Steam: {e}")
             self.cfg["offset"] = offset; self.save_cfg()
 
 

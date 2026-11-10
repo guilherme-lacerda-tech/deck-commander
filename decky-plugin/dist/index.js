@@ -400,6 +400,7 @@ function TelaInicio({ ir }) {
         Bt("🖥️ PC (jogar os jogos do PC)", () => ir("pc")),
         Bt("📦 Levar jogo para o PC", () => ir("transferir")),
         Bt("🎚️ Qualidade e controles", () => ir("qualidade")),
+        Bt("🗑️ Desinstalar jogos", () => ir("desinstalar")),
         Bt("📚 Biblioteca e desempenho", () => ir("atalhos")));
     if (!d || !d.ok) return h("div", null, Sec("Status", Carregando(d)), menu);
     const ativos = d.downloads.filter((x) => !x.concluido);
@@ -646,8 +647,42 @@ function TelaQualidade() {
             : Txt("✅ Todos os emuladores já reconhecem o controle.")));
 }
 
+// ---- 8. Desinstalar jogos (como o "Desinstalar" do Steam: sai da biblioteca e libera o espaço) ---------------
+function TelaDesinstalar() {
+    const [d, recarregar] = useDados("desinstalar_lista");
+    const [busca, setBusca] = SP_REACT.useState("");
+    const [gid, setGid] = SP_REACT.useState(null);
+    const [msg, ocupado, fazer] = useAcao(recarregar);
+    const desinstalar = async (g) => {
+        const plano = await painel("remover", { gid: g });
+        if (!plano.ok) { await fazer("remover", { gid: g }); return; }  // mostra o erro
+        confirmar("Desinstalar?", plano.texto, "Desinstalar", async () => {
+            await fazer("remover", { gid: g, confirmar: true });
+            setGid(null);
+        });
+    };
+    if (!d || !d.ok) return Sec("Desinstalar jogos", Carregando(d));
+    const achados = filtrar(d.jogos, busca);
+    const j = d.jogos.find((x) => x.gid === gid);
+    const lixo = d.tirados.filter((t) => !t.substituido);
+    return h("div", null,
+        Sec("Desinstalar jogos",
+            Txt("Tira o jogo da biblioteca e libera o espaço. Por segurança os arquivos ficam 30 dias na quarentena "
+                + "(dá para desfazer) e depois somem sozinhos.", { opacity: 0.85 }),
+            Campo("Buscar jogo", busca, setBusca, { description: achados.length + " jogo(s)" }),
+            Lista("Jogo", opcoesJogos(achados), gid, setGid),
+            j ? Bt("🗑️ Desinstalar " + j.titulo, () => desinstalar(j.gid), { disabled: ocupado }, "d") : null,
+            Msg(msg)),
+        Sec("Tirados do Steam, mas ainda ocupando espaço", lixo.length
+            ? lixo.map((t) => [
+                Txt(t.titulo + " (" + t.console + ")", null, "t" + t.gid),
+                Bt("🗑️ Apagar os arquivos", () => desinstalar(t.gid), { disabled: ocupado }, "a" + t.gid),
+                Bt("↩ Trazer de volta para a biblioteca", () => fazer("devolver", { gid: t.gid }), { disabled: ocupado }, "v" + t.gid)])
+            : Txt("Nenhum: tudo que você tirou do Steam já foi apagado.")));
+}
+
 const TELAS = { telegram: TelaTelegram, downloads: TelaDownloads, traducao: TelaTraducao, pc: TelaPC,
-    transferir: TelaTransferir, qualidade: TelaQualidade, atalhos: AtalhosPanel };
+    transferir: TelaTransferir, qualidade: TelaQualidade, desinstalar: TelaDesinstalar, atalhos: AtalhosPanel };
 
 function Panel() {
     const [tela, setTela] = SP_REACT.useState(null);

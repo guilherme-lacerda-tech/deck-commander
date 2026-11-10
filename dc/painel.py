@@ -307,6 +307,30 @@ def remover(p: Ponte, a: dict) -> dict:
     return {"texto": _sem_comandos(p._remove(args)), "feito": bool(a.get("confirmar"))}
 
 
+def desinstalar_lista(p: Ponte, a: dict) -> dict:
+    """Jogos do Deck que dá para desinstalar + os que você já tirou do Steam e ainda ocupam espaço."""
+    from . import plugin_bridge, remove
+    lm = remove.effective_map(p.paths)
+    done = json.loads(plugin_bridge.done_path(p.paths).read_text("utf-8")) if plugin_bridge.done_path(p.paths).exists() else {}
+    jogos = [{"gid": g, "titulo": e.get("title", g), "console": e.get("console", "")}
+             for g, e in sorted(lm.items(), key=lambda kv: kv[1].get("title", "").casefold())
+             if not e.get("removed") and e.get("console") != "pc"]
+    # "substituido": original escondido porque a versão traduzida entrou no lugar (não é lixo: /devolver traz)
+    tirados = [{"gid": g, "titulo": e.get("title", g), "console": e.get("console", ""),
+                "substituido": bool((done.get(g) or {}).get("motivo"))}
+               for g, e in sorted(remove.removed_games(p.paths).items(), key=lambda kv: kv[1].get("title", "").casefold())
+               if e.get("console") != "pc"]
+    return {"jogos": jogos, "tirados": tirados}
+
+
+def devolver(p: Ponte, a: dict) -> dict:
+    if not a.get("gid"):
+        raise Erro("Escolha um jogo.")
+    from . import remove
+    titulo = remove.bring_back(p.paths, a["gid"])
+    return {"texto": f"{titulo} volta para a biblioteca em instantes."}
+
+
 # ----------------------------------------------------------------------------------------------- tradução
 PERGUNTA = {"aguardando sim": "fora", "aguardando ok": "motor"}
 
@@ -585,7 +609,7 @@ ACOES = {f.__name__: f for f in (
     status, diagnostico, safe_mode, telegram, telegram_botfather, telegram_token, telegram_parear, downloads,
     bateria, duplicados, remover, traducao, traducao_automatica, traduzir, traducao_parar, traducao_retomar,
     traducao_responder, pc, pc_salvar, pc_testar, pc_acordar, pc_sincronizar, transferir, transferir_preparar,
-    transferir_enviar, qualidade, qualidade_definir, controle_definir, downloads_limpar, traducao_limpar)}
+    transferir_enviar, qualidade, qualidade_definir, controle_definir, downloads_limpar, traducao_limpar, desinstalar_lista, devolver)}
 ACOES["downloads_pausar"] = lambda p, a: _pausar(p, a, True)
 ACOES["downloads_retomar"] = lambda p, a: _pausar(p, a, False)
 

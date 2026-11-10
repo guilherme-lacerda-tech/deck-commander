@@ -352,3 +352,35 @@ def test_limpar_historicos(tmp_path):
     assert sorted(x.stem for x in (d / "arquivo").glob("*.json")) == ["c1", "f1"]
     out = painel.downloads_limpar(p, {})
     assert p.qbt.apagados == ["h1"] and "1 download" in out["texto"]  # h3 concluído mas não está na biblioteca
+
+
+def test_desinstalar_lista_e_aviso_do_steam(tmp_path, monkeypatch):
+    import json
+    from dc import bot, painel, plugin_bridge
+    from dc.paths import get_paths
+    paths = get_paths(tmp_path / "dc").ensure()
+    rom = tmp_path / "Jogo.iso"; rom.write_bytes(b"x")
+    orig = tmp_path / "Orig.gba"; orig.write_bytes(b"x")
+    (paths.data / "launch-map.json").write_text(json.dumps({
+        "ps2-jogo": {"title": "Jogo", "console": "ps2", "rom": str(rom)},
+        "gba-orig": {"title": "Original", "console": "gba", "rom": str(orig), "removed": True},
+        "pc-fortnite": {"title": "Fortnite", "console": "pc", "rom": "Fortnite"}}), "utf-8")
+    plugin_bridge.done_path(paths).write_text(json.dumps({"gba-orig": {"removed": True, "motivo": "traduzido"}}), "utf-8")
+
+    class P:
+        pass
+    p = P(); p.paths = paths
+    d = painel.desinstalar_lista(p, {})
+    assert [j["gid"] for j in d["jogos"]] == ["ps2-jogo"]  # PC não entra
+    assert d["tirados"] == [{"gid": "gba-orig", "titulo": "Original", "console": "gba", "substituido": True}]
+
+    x = bot.Bot(paths, "T"); x.cfg["allowed"] = [1]; x.cfg["notify_chat"] = 9
+    sent = []
+    x.send = lambda chat, text, buttons=None: sent.append((text, buttons))
+    x.notify_removidos()  # 1ª vez: só memoriza
+    assert sent == []
+    plugin_bridge.done_path(paths).write_text(json.dumps({"gba-orig": {"removed": True, "motivo": "traduzido"},
+                                                          "ps2-jogo": {"appid": 0, "removed": True}}), "utf-8")
+    x.notify_removidos(); x.notify_removidos()
+    assert len(sent) == 1 and "Jogo" in sent[0][0]
+    assert sent[0][1] == [("Apagar os arquivos", "/remover ps2-jogo confirmar"), ("Trazer de volta", "/devolver ps2-jogo")]
