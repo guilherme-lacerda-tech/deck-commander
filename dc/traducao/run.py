@@ -638,6 +638,7 @@ def _dispatch(paths, store, job, cfg, progress, should_pause) -> tuple[dict, str
                         f"Não dá para traduzir este jogo automaticamente: {e}. Os textos dele não estão no formato "
                         "padrão da Nintendo (MSBT), e mexer em formato desconhecido poderia quebrar o jogo."), False
         job["extracao"] = how
+        portugues.unmark(paths.data, job["game_id"], "formato")  # achou os textos: não é mais "formato fechado"
         if not job["args"].get("aprovado"):
             rep0 = switch.Report(tid)
             files, _ = switch.scan(romfs, rep0, cfg["idioma_origem"])
