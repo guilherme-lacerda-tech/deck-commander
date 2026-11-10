@@ -143,7 +143,7 @@ def spawn(paths: Paths, op: str) -> None:
                      start_new_session=True, env={**os.environ, "PYTHONPATH": str(repo)})
 
 
-ATIVOS_FILA = ("na fila", "rodando", "aguardando tomada", "pausado (jogo aberto)", "aguardando sim")
+ATIVOS_FILA = ("na fila", "rodando", "aguardando tomada", "pausado (jogo aberto)", "aguardando sim", "aguardando ok")
 
 
 def translator_for(paths: Paths, store: Store, gid: str, g: dict, idi: dict, jobs: list[dict]) -> tuple[str, str]:
@@ -325,9 +325,9 @@ def run(paths: Paths, op: str) -> dict:
 
     try:
         result, text, ok = _dispatch(paths, store, job, cfg, progress, should_pause)
-        if job["status"] == "aguardando aprovação":  # provedor pago: espera /traduzir aprovar
+        if job["status"] in ("aguardando aprovação", "aguardando ok"):  # espera /traduzir aprovar ou o Sim no bot
             job.update(report=text, result=result)
-            store.finish(op, False, error="aguardando aprovação")
+            store.finish(op, False, error=job["status"])
         else:
             job.update(status="concluido" if ok else "falhou", report=text, result=result)
             store.finish(op, ok, result=result, error=None if ok else text[:300])
@@ -567,6 +567,97 @@ def _translate_unreal(paths, job, g, tid, rom, cfg, progress, should_pause):
              "data": datetime.now(timezone.utc).isoformat()}, msg, True)
 
 
+def _offer(job: dict, tid: str, oferta: dict, text: str) -> tuple[dict, str, bool]:
+    """Deixa a tarefa esperando o Sim do usuário no Telegram (o bot manda a pergunta com o tempo estimado)."""
+    job["status"] = "aguardando ok"
+    job["oferta"] = oferta
+    job["notified"] = False
+    return {"title_id": tid, "motor": oferta.get("motor", "")}, text, False
+
+
+def _not_yet(paths, job, tid: str, motor_name: str, why: str) -> tuple[dict, str, bool]:
+    """Não deu desta vez: marca com a versão do motor (tenta de novo sozinho quando o sistema aprender mais)."""
+    from . import motor, portugues
+    portugues.mark(paths.data, job["game_id"], formato="fechado", motor_versao=motor.VERSAO, motor=motor_name)
+    return {"title_id": tid, "motor": motor_name}, (
+        f"Jogo feito em {motor_name}: {why}\nNão é \"impossível\": quando o Deck Commander aprender mais sobre "
+        "esse formato, ele tenta de novo sozinho."), False
+
+
+def _translate_engine(paths, job, g, tid, rom, cfg, progress, should_pause):
+    """Jogo feito em Unity, GameMaker, Godot, RE Engine, RPG Maker ou com pacotes CRI: acha as frases com o
+    adaptador do motor, PERGUNTA no Telegram (quantas frases, tempo estimado) e, com o Sim, traduz e instala
+    os arquivos novos no mod do Ryujinx. Devolve None se nenhum adaptador reconhece o jogo."""
+    from .. import syncer
+    from . import converter, extract, motores, nca, portugues, switch
+    kp = switch.keys_path()
+    if not kp:
+        return None
+    upd = extract.latest_update(converter.collect(syncer.rom_roots(), tid))
+    try:
+        rfs, handles = nca.open_romfs(rom, nca.load_keys(kp), upd)
+    except (nca.NcaError, OSError):
+        return None
+    try:
+        files = rfs.files()
+        ad = motores.adapter_for(list(files))
+        if not ad:
+            return None
+
+        def read(path: str) -> bytes:
+            o, n = files[path]
+            return rfs.read_at(o, n)
+        try:
+            col = ad.collect(files, read)
+        except motores.MotorError as e:
+            return _not_yet(paths, job, tid, ad.NAME, f"{e}. Nada do jogo foi alterado.")
+        n = len(motores.unique_texts(col))
+        if not n:
+            return _not_yet(paths, job, tid, ad.NAME, (col.aviso or "não achei frases num formato que eu já leia")
+                            + ". Nada do jogo foi alterado.")
+        if not job["args"].get("motor_ok"):
+            return _offer(job, tid, {"motor": ad.NAME, "frases": n, "minutos": motores.estimate_minutes(n, cfg),
+                                     "aviso": col.aviso},
+                          f"Jogo feito em {ad.NAME}: achei {n} frases. Esperando o seu Sim no Telegram.")
+        portugues.unmark(paths.data, job["game_id"], "formato")
+        new, res, changed = motores.translate(paths, cfg, col, f"motor-{tid}", g.get("title", ""),
+                                              progress=progress, should_pause=should_pause)
+    finally:
+        for h in handles:
+            h.close()
+    if not new:
+        errs = "; ".join(res.errors[:2]) or "nenhuma frase traduzida"
+        return {"title_id": tid, "motor": ad.NAME}, f"Não consegui traduzir: {errs}", False
+    mod_root = switch.mod_target(tid)
+    motores.install(new, mod_root / "romfs")
+    (mod_root / "deck-commander-motor.json").write_text(json.dumps(
+        {"motor": ad.NAME, "base": rom.name, "update": upd.name if upd else None, "arquivos": sorted(new)},
+        ensure_ascii=False, indent=1), "utf-8")
+    _refresh_tabs(paths)
+    msg = (f"Tradução pronta: {changed} frases em português (jogo {ad.NAME}). O mod troca o texto em INGLÊS, então "
+           "o jogo precisa estar em inglês. Se aparecer quadradinho no lugar de ã/õ/ç, me avise que eu troco esses "
+           "acentos." + (f"\nObs.: {col.aviso}" if col.aviso else ""))
+    return ({"traducao_pt_br": True, "translated": changed, "provider": res.provider_used or "", "title_id": tid,
+             "motor": ad.NAME, "data": datetime.now(timezone.utc).isoformat()}, msg, True)
+
+
+def answer_motor(paths: Paths, op: str, yes: bool) -> str:
+    """Resposta ao botão Sim/Não da pergunta "traduzir este jogo <motor>? leva ~X"."""
+    job = load_job(paths, op)
+    if not job or job.get("status") != "aguardando ok":
+        return "Essa pergunta já foi respondida."
+    if not yes:
+        job.update(status="recusado", notified=True)
+        save_job(paths, job)
+        return f"Ok, {job['title']} fica como está. (Para pedir depois: /traduzir {job['title']})"
+    job["args"]["motor_ok"] = True
+    job.update(status="na fila", notified=False, progress=[0, 0])
+    save_job(paths, job)
+    spawn(paths, op)
+    of = job.get("oferta") or {}
+    return f"🛠 Começou: {job['title']} ({of.get('motor', '')}). Aviso aqui quando terminar."
+
+
 def _translate_n3ds(paths, job, g, rom: Path, cfg, progress, should_pause) -> tuple[dict, str, bool]:
     """3DS: mesmo tradutor de MSBT do Switch; o mod vai para o Azahar (load/mods/<TitleID>/romfs)."""
     import shutil
@@ -708,6 +799,9 @@ def _dispatch(paths, store, job, cfg, progress, should_pause) -> tuple[dict, str
         ue = _translate_unreal(paths, job, g, tid, rom, cfg, progress, should_pause)
         if ue:  # Unreal Engine (ex.: Final Fantasy Resonance): textos em .locres dentro do .pak
             return ue
+        eng = _translate_engine(paths, job, g, tid, rom, cfg, progress, should_pause)
+        if eng:  # Unity, GameMaker, Godot, RE Engine, RPG Maker, CRI: pergunta antes (Sim/Não + tempo)
+            return eng
         romfs = switch.find_romfs(tid)
         how = "pasta extraída"
         if not romfs:

@@ -54,6 +54,10 @@ def traduzir(bot, args: list[str]) -> str:
         if bot.cfg.get("pergunta_op") == args[1]:
             bot.cfg.pop("pergunta_op", None); bot.save_cfg()
         return run.answer_generic(P, args[1], args[2].lower() == "sim")
+    if sub == "motor" and len(args) == 3 and args[2].lower() in ("sim", "nao", "não"):
+        if bot.cfg.get("pergunta_op") == args[1]:
+            bot.cfg.pop("pergunta_op", None); bot.save_cfg()
+        return run.answer_motor(P, args[1], args[2].lower() == "sim")
     force = "--forcar" in args
     query = " ".join(a for a in args if not a.startswith("--"))
     gid, g, err = _find(bot, query)
@@ -403,6 +407,21 @@ def notify(bot) -> None:
                             "só troco o que cabe no mesmo espaço (sem risco de quebrar o jogo) e uso só as IAs "
                             "locais do PC/Deck. Se não achar nada seguro, aviso e não mexo em nada."),
                      buttons=[("Sim", f"/traduzir fora {j['op']} sim"), ("Não", f"/traduzir fora {j['op']} nao")])
+            continue
+        elif st == "aguardando ok":
+            from .motores import fmt_minutes
+            of = j.get("oferta") or {}
+            j["notified"] = True
+            run.save_job(bot.paths, j)
+            bot.cfg["pergunta_op"] = j["op"]
+            bot.save_cfg()
+            txt = (f"🧩 {j['title']} é feito em {of.get('motor', '?')}. Agora eu sei traduzir esse tipo de jogo.\n"
+                   f"Achei {of.get('frases', 0)} frases; tempo estimado: {fmt_minutes(int(of.get('minutos', 1)))} "
+                   "(só com as IAs locais do PC/Deck; o jogo original não é alterado, vira um mod).")
+            if of.get("aviso"):
+                txt += f"\nObs.: {of['aviso']}"
+            bot.send(chat, txt + "\nQuer que eu traduza?",
+                     buttons=[("Sim", f"/traduzir motor {j['op']} sim"), ("Não", f"/traduzir motor {j['op']} nao")])
             continue
         elif st == "aguardando aprovação":
             msg = f"💰 {j['title']}: {j.get('report', '')}"

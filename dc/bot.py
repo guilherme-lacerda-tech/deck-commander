@@ -180,7 +180,10 @@ class Bot:
         if op and uid in self.cfg["allowed"] and text.strip().lower() in ("sim", "s", "não", "nao", "n"):
             from .traducao import run as trad_run
             self.cfg.pop("pergunta_op", None); self.save_cfg()
-            return trad_run.answer_generic(self.paths, op, text.strip().lower() in ("sim", "s"))
+            yes = text.strip().lower() in ("sim", "s")
+            if (trad_run.load_job(self.paths, op) or {}).get("status") == "aguardando ok":  # pergunta de motor
+                return trad_run.answer_motor(self.paths, op, yes)
+            return trad_run.answer_generic(self.paths, op, yes)
         if uid not in self.cfg["allowed"]:
             code = pairing_code_valid(self.paths)
             if cmd == "/start" and code and args and not pysecrets.compare_digest(args[0].encode(), code.encode()):

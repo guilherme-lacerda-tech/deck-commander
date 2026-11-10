@@ -9,28 +9,30 @@ from __future__ import annotations
 from pathlib import PurePosixPath
 
 # 1: MSBT  2: Pokémon (trinity), LM3, GBA  3: SARC aninhado (BotW) + Unreal (.locres)
-VERSAO = 3
+# 4: adaptadores por motor (Unity, GameMaker, Godot, RE Engine, RPG Maker, CRI) — perguntam antes no Telegram
+VERSAO = 4
 
 # (nome, teste, já traduzo?, caminho)
 _MOTORES = [
     ("Nintendo (MSBT)", lambda n, e: ".msbt" in e or any(x.endswith(".ssarc") or "/bootup_" in x for x in n), True,
      "tradutor padrão"),
     ("Unreal Engine", lambda n, e: any("/content/paks/" in x for x in n) and (".pak" in e or ".utoc" in e), True,
-     "lê o .locres do .pak; se o pak for criptografado, a chave AES fica no executável do jogo e pode ser "
-     "achada testando os blocos dele contra o índice do pak (ainda não automático)"),
+     "lê o .locres do .pak e instala um pak de mod; pacote criptografado: não traduzo (seria preciso quebrar a "
+     "proteção do jogo)"),
     ("Unity", lambda n, e: any(x.endswith(("globalgamemanagers", "data.unity3d")) or "/streamingassets/" in x
-                               for x in n) or ".assets" in e, False,
-     "textos em .assets/AssetBundle (tabelas I2 Localization ou TextAsset); precisa de leitor do formato "
-     "serializado da Unity e, às vezes, refazer o atlas da fonte (TextMeshPro) com ã/õ — esforço médio/grande"),
+                               for x in n) or ".assets" in e, True,
+     "TextAsset (csv/json/xml/ink/yarn) e I2 Localization com typetree; pergunta antes (Sim/Não + tempo)"),
     ("RE Engine (Capcom)", lambda n, e: any(".msg." in x for x in n) or any(x.startswith("natives/") for x in n),
-     False, "arquivos .msg documentados pela comunidade; tradutor dedicado — esforço médio"),
-    ("CRI Middleware (CPK)", lambda n, e: ".cpk" in e, False,
-     "pacote .cpk é aberto (CRILAYLA é documentado); o texto dentro é formato de cada jogo — por jogo"),
-    ("Godot", lambda n, e: ".pck" in e, False, "pacote .pck + traduções .translation/.csv — esforço médio"),
-    ("GameMaker", lambda n, e: any(x.endswith("game.droid") or x.endswith("data.win") for x in n), False,
-     "textos dentro do data.win/game.droid (formato documentado) — esforço médio"),
-    ("RPG Maker", lambda n, e: any("/www/data/" in x or x.endswith(".rvdata2") for x in n), False,
-     "JSON/rvdata com os textos — esforço pequeno/médio"),
+     True,
+     ".msg (v12–23) solto ou em .pak (sem zstd/criptografia); pergunta antes"),
+    ("CRI Middleware (CPK)", lambda n, e: ".cpk" in e, True,
+     "abre o .cpk (CRILAYLA) e traduz os arquivos de texto de dentro; formato binário próprio do jogo fica de fora"),
+    ("Godot", lambda n, e: ".pck" in e, True,
+     ".pck (Godot 3/4) com csv/json/cenas/.translation; tradução comprimida (Optimized) ainda não"),
+    ("GameMaker", lambda n, e: any(x.endswith("game.droid") or x.endswith("data.win") for x in n), True,
+     "tabela STRG do data.win + arquivos de idioma ao lado; jogo YYC tem texto no executável"),
+    ("RPG Maker", lambda n, e: any("/www/data/" in x or x.endswith(".rvdata2") for x in n), True,
+     "JSON do MV/MZ (diálogos, escolhas, banco de dados); VX Ace (.rvdata2) ainda não"),
 ]
 
 
