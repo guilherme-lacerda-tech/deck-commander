@@ -104,6 +104,12 @@ Veja tudo o que dá e o que não dá para traduzir em [TRADUCAO-E-CONVERSAO.md](
 
 O PC conversa com o Deck por **SSH** (conexão segura com chave; nada fica aberto para a internet).
 
+> **Jeito fácil:** faça a 3.1 (no Deck) e a 3.3 (baixar o projeto), depois abra o **Assistente** com duplo clique em
+> `tools\pc\Assistente Deck Commander.bat`. No passo **Ligar ao Deck**, clique em **Procurar** (ou digite o IP) e em
+> **Ligar ao Deck**: ele cria a chave, abre uma janela preta pedindo a senha do Deck **uma vez** (o assistente não vê
+> nem guarda a senha), grava o endereço e mostra **Conectado ✓**. O mesmo assistente faz as Partes 4 e 5.
+> Os comandos abaixo continuam valendo como alternativa.
+
 ### 3.1 No Deck: ligue o SSH e descubra o IP
 No Konsole do Deck:
 ```bash
@@ -139,6 +145,11 @@ Leva o jogo com **tudo**: arquivos, updates, DLC, saves, configuração do emula
 keys/firmware/BIOS. Cada arquivo é conferido, a cópia continua de onde parou se cair, a configuração do PC ganha
 backup antes de ser trocada e **nada é apagado no Deck**.
 
+> **Jeito fácil:** abra o Assistente (duplo clique em `tools\pc\Assistente Deck Commander.bat`). O passo
+> **Emuladores** mostra quais já estão na pasta (padrão `D:\Emuladores`) e tem **Abrir página oficial** para os que
+> faltam (ele não baixa nada sozinho). O passo **Transferências** tem **Ativar** (faz a 4.2), a fila e o histórico
+> do Deck, e **Copiar agora** para copiar um jogo na hora. Os comandos abaixo são a alternativa.
+
 ### 4.1 Emuladores no PC
 Baixe a versão Windows **oficial** e extraia em `D:\Emuladores\<Nome>` (se não tiver D:, use outra pasta e passe
 `-Emuladores <pasta>`). Use a mesma versão do Deck quando puder, principalmente no Switch 2.
@@ -167,6 +178,12 @@ PC começa; o bot avisa quando terminar. Os jogos vão para `D:\DeckCommander\Jo
 ## Parte 5 — Jogar os jogos do PC no Deck (aba "Computador")
 
 O PC roda o jogo e transmite a imagem para o Deck; os botões do Deck chegam ao PC como um controle de Xbox.
+
+> **Jeito fácil:** abra o Assistente (duplo clique em `tools\pc\Assistente Deck Commander.bat`) e vá em **Jogar o PC
+> no Deck**. Ele diz se o Sunshine está instalado e abre o painel para parear (5.1 e 5.2), tem **Ativar biblioteca**
+> (faz a 5.3; o Windows pede permissão) e **Ver jogos achados**, detecta sozinho o IP, a rede e o MAC deste PC (e o IP
+> Tailscale, se houver) e grava no Deck com **Gravar no Deck** (faz a 5.4 e o IP da 5.6); **Testar** mostra o
+> `/pc status`. O passo seguinte, **IA do PC**, faz a parte do PC da Parte 2. Os comandos abaixo são a alternativa.
 
 ### 5.1 No PC: Sunshine
 1. Instale o **Sunshine** (github.com/LizardByte/Sunshine/releases, o instalador `.exe` do Windows).
