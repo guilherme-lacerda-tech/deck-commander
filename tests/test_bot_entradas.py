@@ -72,7 +72,7 @@ def test_console_and_magnet_in_same_message(x):
 def test_magnet_alone_uses_console_said_before(x):
     assert "= ps2" in msg(x, "PS2")
     assert msg(x, MAG).startswith("Adicionado (ps2)")
-    assert msg(x, MAG.replace("a" * 40, "b" * 40)).startswith("Adicionado (auto)")  # vale só para o próximo
+    assert msg(x, MAG.replace("a" * 40, "b" * 40)).startswith("Adicionado (descubro o console")  # vale só para o próximo
 
 
 def test_base32_magnet_is_valid(x):

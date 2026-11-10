@@ -29,8 +29,8 @@ ALIASES = [
     (r"3ds|n3ds|nintendo\s*3ds|new\s*3ds", "n3ds"),
     (r"wii\s*u|wiiu", "wiiu"),
     (r"ps\s*3|playstation\s*3|play\s*3", "ps3"),
-    (r"xbox\s*360|x\s*360|360", "x360"),
-    (r"xbox(?!\s*(?:one|series|s|x))(\s*cl[aá]ssico|\s*original)?", "xbox"),
+    (r"xbox\s*360|x\s*360|\b360\b", "x360"),
+    (r"xbox(?!\s*(?:one|series|s\b|x\b))(\s*cl[aá]ssico|\s*original)?", "xbox"),
     (r"dreamcast|\bdc\b", "dc"),
     (r"sega\s*cd|mega\s*cd|segacd", "segacd"),
     (r"saturn|sega\s*saturn", "saturn"),
@@ -150,6 +150,9 @@ class Bot:
                 c = m.group(1).strip()
                 if c not in [x[1] for x in btns]:
                     btns.append((c, c))
+        yn = {lbl.lower(): cmd for lbl, cmd in btns if lbl.lower() in ("sim", "não")}
+        if len(yn) == 2:  # pergunta Sim/Não: "sim"/"não" digitado vale como tocar no botão (por 1 hora)
+            self.cfg["sim_nao"] = {"chat": chat, "sim": yn["sim"], "nao": yn["não"], "at": time.time()}
         chunks = [text[i:i + 3900] for i in range(0, len(text), 3900)] or [""]
         for n, chunk in enumerate(chunks):
             extra = {}
@@ -219,6 +222,9 @@ class Bot:
                 self.log(f"usuário {uid} pareado")
                 return "Pareado ✅\n\n" + HELP
             self.log(f"recusado usuário {uid}: {cmd}")
+            if cmd == "/start" and args:
+                return ("Acesso negado: código errado ou vencido (vale 30 min). Gere outro no Deck: "
+                        "python3 -m dc x telegram-pair — e mande /start <código>.")
             return "Acesso negado. Pareie com /start <código> (o código é gerado no Deck)."
         if self.limited(uid):
             return "Calma 🙂 muitos comandos por minuto."
@@ -243,6 +249,9 @@ class Bot:
             magnet = mg
             if ops.in_safe_mode(P):
                 return "Safe-mode ativo."
+            going = self._downloading(magnet)
+            if going:
+                return f"Esse download já está na fila ({going}). Aviso quando terminar."
             cat = console or "auto"
             from . import dedup
             dup = self._already(dedup.magnet_name(magnet), console)
@@ -254,7 +263,8 @@ class Bot:
                 self.qbt.add(magnet, cat, str(Path(syncer._cfg(P)["downloads_root"]) / cat))
             except QbtError as e:
                 return f"❌ {e} (sem internet? o /sync continua funcionando com o que já baixou)"
-            return f"Adicionado ({cat}). Aviso quando terminar." + self._power_note()
+            where = cat if console else "descubro o console quando terminar; se não der, pergunto"
+            return f"Adicionado ({where}). Aviso quando terminar." + self._power_note()
         if cmd == "/sync":
             return syncer.run_sync(P, S, self.qbt, confirm_many=bool(args and args[0] == "tudo"),
                                    explicit=self.cfg.get("explicit"))
@@ -315,7 +325,11 @@ class Bot:
             return f"{len(hs)} download(s) {'pausado(s)' if cmd == '/pause' else 'retomado(s)'}. (o /sync não é afetado)"
         if cmd == "/disk":
             from . import vdf
-            items = health.disk_report(syncer.rom_roots(), vdf.read_shortcuts(syncer.shortcuts_path()))
+            try:
+                sc = vdf.read_shortcuts(syncer.shortcuts_path())
+            except (OSError, ValueError):  # Steam ainda sem login: lista sem "última vez jogado"
+                sc = []
+            items = health.disk_report(syncer.rom_roots(), sc)
             return "\n".join(f"{i['size'] / 1e9:5.1f} GB  {Path(i['path']).name[:40]}  (última vez: {i['last_played']})"
                              + ("  ← candidato" if i["suggest_remove"] else "") for i in items) + \
                 "\n(sugestão apenas — nada é apagado automaticamente)"
@@ -356,6 +370,15 @@ class Bot:
         if self.limited(uid):
             return "Calma 🙂 muitos comandos por minuto."
         self.cfg["notify_chat"] = chat
+        yes_no = text.strip().lower().strip("!.")
+        if yes_no in ("sim", "s", "não", "nao", "n"):
+            if self.cfg.get("pergunta_op"):
+                return self.handle(uid, chat, yes_no)
+            q = self.cfg.get("sim_nao") or {}
+            if q.get("chat") == chat and time.time() - q.get("at", 0) < 3600:
+                self.cfg.pop("sim_nao"); self.save_cfg()
+                return self.handle(uid, chat, q["sim"] if yes_no in ("sim", "s") else q["nao"])
+            return "Não tem nenhuma pergunta aberta agora. Se for de uma mensagem antiga, mande o comando de novo (/help)."
         pend = self.cfg.setdefault("pending_console", {})
         doc = m.get("document")
         caption = m.get("caption") or ""
@@ -416,12 +439,29 @@ class Bot:
             pend[str(uid)] = {"console": c, "at": time.time()}; self.save_cfg()
             return f"Ok, próximo .torrent ou magnet = {c}. Pode encaminhar."
         import re as _re
+        if _re.search(r"(?i)\b(baix[ae]r?|download|instalar?|quero (o|a|jogar))\b", text) and not doc:
+            return ("Eu não procuro jogos sozinho 🙂 Mande o link magnet (magnet:?xt=…) ou encaminhe o arquivo "
+                    ".torrent — se quiser, mande antes o nome do console (ex.: PS2).")
         if _re.search(r"\w", text) and _re.fullmatch(r"\s*[\w .+-]{1,24}\s*", text) and len(text.split()) <= 3 and not _re.search(
                 r"(?i)\b(ok|oi|ol[aá]|valeu|obrigad[oa]|blz|beleza|sim|n[aã]o|bom dia|boa (tarde|noite)|kk+|haha)\b", text):
             return (f"Não conheço o console \"{text.strip()}\". Uso: Switch, 3DS, DS, Wii U, Wii, GameCube, N64, SNES, "
                     "NES, GBA, Game Boy, PS1, PS2, PS3, PSP, Xbox, Dreamcast, Saturn, Mega Drive, Master System, "
                     "Game Gear, Sega CD, PC Engine, Arcade — mande o nome e depois o .torrent ou magnet.")
         return None  # conversa comum: ignora
+
+    def _downloading(self, magnet: str) -> str | None:
+        """Nome do torrent se esse magnet já estiver no qBittorrent (mesmo código btih)."""
+        import base64
+        m = re.search(r"(?i)btih:([0-9a-f]{40}|[a-z2-7]{32})", magnet)
+        if not m:
+            return None
+        h = m.group(1).lower()
+        if len(h) == 32:
+            h = base64.b32decode(h.upper()).hex()
+        try:
+            return next((t.get("name") or h[:8] for t in self.qbt.torrents() if (t.get("hash") or "").lower() == h), None)
+        except Exception:  # noqa: BLE001 — qBittorrent fora do ar: segue o fluxo normal (o add avisa)
+            return None
 
     # -- energia ------------------------------------------------------------------
     def _power_state(self) -> dict:
