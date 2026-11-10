@@ -29,7 +29,24 @@ abrir o modo Desktop no dia a dia.
   RetroArch / Dolphin / PPSSPP pelo Flathub se faltarem.
 - Opcional: uma conta no Telegram (bot) e uma chave gratuita do [SteamGridDB](https://www.steamgriddb.com/profile/preferences/api) (capas).
 
-## Instalação (uma vez)
+## Instalação rápida (1 comando)
+
+1. Instale o [Decky Loader](https://decky.xyz) (se ainda não tiver).
+2. No Deck, **modo Desktop** → abra o **Konsole** → cole e aperte Enter:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/SEU-USUARIO/deck-commander/main/install.sh | bash
+```
+
+3. No fim aparece um **QR code**: aponte o celular, ele abre o **@BotFather** (o robô oficial do Telegram
+   que cria bots). Mande `/newbot`, escolha um nome, copie o **token** e cole no Konsole (não aparece na tela).
+4. Aparece um **segundo QR**: ele abre o **seu** bot já com o código de pareamento — toque em **Iniciar**. Pronto:
+   só a sua conta manda no Deck.
+
+O token fica só em `~/.config/deck-commander/secrets/` (nunca no git). Para refazer o passo do Telegram:
+`python3 -m dc x telegram-setup`. A IA do PC (túnel) é opcional — veja `tools/pc/`.
+
+## Instalação (passo a passo, manual)
 
 No Deck, **modo Desktop**, abra o **Konsole**:
 
@@ -44,7 +61,7 @@ O instalador é idempotente (pode rodar de novo para atualizar) e mostra o que f
    ⚙️ Configurações → ative **Modo Desenvolvedor** → aba **Desenvolvedor** → **Instalar plugin de ZIP** →
    `Downloads/deck-commander-plugin.zip`. Reinicie o Deck **uma vez**.
 2. **Capas (opcional):** `python3 -m dc secret steamgriddb` e cole a chave (não aparece na tela).
-3. **Bot do Telegram (opcional):**
+3. **Bot do Telegram (opcional):** o jeito fácil é `python3 -m dc x telegram-setup` (QR code). À mão:
    - No Telegram, fale com **@BotFather** → `/newbot` → copie o token.
    - `python3 -m dc secret telegram` (cole o token) → `systemctl --user restart deck-commander-bot`
    - `python3 -m dc x telegram-pair` → mande `/start CODIGO` para o seu bot. Só a sua conta passa a ter acesso.

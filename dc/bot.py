@@ -79,6 +79,7 @@ Aviso aqui quando o download terminar.
 /devolver <nome> — traz de volta um jogo que você tirou pelo Steam
 /bateria sim|nao — baixar também fora da tomada (padrão: só na tomada)
 /traduzir <jogo> — tradução pt-BR com IA (Switch e Pokémon GBA) · /traduzir lista | status | config
+/traduzir biblioteca — traduz todos os jogos que ainda não estão em português (pergunta antes)
 /converter <jogo> [organizar|descompactar] — Switch: update/DLC e NSZ
 /status · /queue · /disk · /diagnostico
 /pause · /resume — downloads
@@ -124,6 +125,7 @@ class Bot:
         Todo comando citado na mensagem (ex.: "/traduzir aprovar 1a2b") também vira botão."""
         text = text.replace(self.token, "***")
         btns = [(b, b) if isinstance(b, str) else tuple(b) for b in (buttons or [])]
+        btns += self.__dict__.pop("next_buttons", None) or []  # botões pedidos pelo comando que gerou a resposta
         found = [m for m in COMMAND_IN_TEXT.finditer(text)
                  if " " in m.group(1) and not text[m.end():m.end() + 2] == " <"]  # só comando completo
         if len(found) <= 6:  # mensagem de ajuda (cheia de comandos) não vira painel de botões
@@ -180,9 +182,11 @@ class Bot:
             self.cfg.pop("pergunta_op", None); self.save_cfg()
             return trad_run.answer_generic(self.paths, op, text.strip().lower() in ("sim", "s"))
         if uid not in self.cfg["allowed"]:
-            code = (self.paths.state / "telegram-pairing").read_text().strip() \
-                if (self.paths.state / "telegram-pairing").exists() else None
-            if cmd == "/start" and code and args and pysecrets.compare_digest(args[0], code):
+            code = pairing_code_valid(self.paths)
+            if cmd == "/start" and code and args and not pysecrets.compare_digest(args[0].encode(), code.encode()):
+                pairing_failed(self.paths)
+                self.log(f"código de pareamento errado de {uid}")
+            if cmd == "/start" and code and args and pysecrets.compare_digest(args[0].encode(), code.encode()):
                 self.cfg["allowed"].append(uid); self.save_cfg()
                 (self.paths.state / "telegram-pairing").unlink()
                 self.log(f"usuário {uid} pareado")
@@ -661,11 +665,42 @@ class Bot:
             self.cfg["offset"] = offset; self.save_cfg()
 
 
+PAIR_TTL = 30 * 60   # o código de pareamento vale 30 minutos
+PAIR_MAX_FAILS = 5   # 5 códigos errados (de qualquer pessoa) e ele deixa de valer: gere outro no Deck
+
+
 def pair_code(paths: Paths) -> str:
     code = f"{pysecrets.randbelow(10**6):06d}"
     paths.state.mkdir(parents=True, exist_ok=True)
     (paths.state / "telegram-pairing").write_text(code, "utf-8")
+    (paths.state / "telegram-pairing.fails").unlink(missing_ok=True)
     return code
+
+
+def pairing_code_valid(paths: Paths) -> str | None:
+    """Código de pareamento em vigor, ou None (não existe, venceu ou errou demais). Sem isso, qualquer pessoa
+    que achasse o bot podia tentar os 1 milhão de códigos sem limite."""
+    f = paths.state / "telegram-pairing"
+    try:
+        if time.time() - f.stat().st_mtime > PAIR_TTL:
+            f.unlink(missing_ok=True)
+            return None
+        return f.read_text().strip() or None
+    except OSError:
+        return None
+
+
+def pairing_failed(paths: Paths) -> None:
+    fails_p = paths.state / "telegram-pairing.fails"
+    try:
+        n = int(fails_p.read_text()) + 1
+    except (OSError, ValueError):
+        n = 1
+    if n >= PAIR_MAX_FAILS:
+        (paths.state / "telegram-pairing").unlink(missing_ok=True)
+        fails_p.unlink(missing_ok=True)
+    else:
+        fails_p.write_text(str(n))
 
 
 def main() -> None:

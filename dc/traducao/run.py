@@ -69,9 +69,15 @@ def _alive(pid) -> bool:
         return False
     try:
         os.kill(int(pid), 0)
-        return True
     except (OSError, ValueError):
         return False
+    # depois de reiniciar o Deck o número do processo pode ter sido reaproveitado por outro programa:
+    # aí a tarefa "rodando" morta seguraria a fila para sempre
+    cmdline = Path(f"/proc/{int(pid)}/cmdline")
+    try:
+        return b"dc.traducao.run" in cmdline.read_bytes() if cmdline.exists() else True
+    except OSError:
+        return True
 
 
 MAX_JOBS = 2  # um jogo grande (ex.: Z-A, horas) não segura a fila: o próximo traduz junto
@@ -83,6 +89,27 @@ def active_job(paths: Paths, except_op: str = "") -> dict | None:
                if j["op"] != except_op and j.get("status") in ("rodando", "aguardando tomada", "pausado (jogo aberto)")
                and _alive(j.get("pid"))]
     return running[0] if len(running) >= MAX_JOBS else None
+
+
+class _queue_lock:
+    """Trava de arquivo entre os processos de tradução (só no Linux; no Windows dos testes não faz nada)."""
+
+    def __init__(self, paths: Paths):
+        self.f = None
+        self.path = jobs_dir(paths) / ".fila.lock"
+
+    def __enter__(self):
+        try:
+            import fcntl
+            self.f = open(self.path, "a")
+            fcntl.flock(self.f, fcntl.LOCK_EX)
+        except (ImportError, OSError):
+            self.f = None
+        return self
+
+    def __exit__(self, *exc):
+        if self.f:
+            self.f.close()  # fechar solta a trava
 
 
 def create(paths: Paths, store: Store, kind: str, game_id: str, title: str, args: dict) -> dict:
@@ -114,48 +141,123 @@ def spawn(paths: Paths, op: str) -> None:
                      start_new_session=True, env={**os.environ, "PYTHONPATH": str(repo)})
 
 
-def auto_queue(paths: Paths, store: Store, game_ids: list[str]) -> list[str]:
-    """Download novo que não está em português => tradução automática na fila (traducao.toml:
-    auto_traduzir = true, padrão). Devolve linhas para a mensagem do bot."""
-    cfg = ia.load_cfg(paths)
-    if not cfg.get("auto_traduzir", True) or not game_ids:
-        return []
+ATIVOS_FILA = ("na fila", "rodando", "aguardando tomada", "pausado (jogo aberto)", "aguardando sim")
+
+
+def translator_for(paths: Paths, store: Store, gid: str, g: dict, idi: dict, jobs: list[dict]) -> tuple[str, str]:
+    """Decide o que fazer com um jogo: (situação, tipo de tarefa). Situação: 'pt' (já em português),
+    'ok' (tem tradutor), 'fila' (já traduzindo/na fila), 'feito', 'falhou' (já tentou e não deu),
+    'generico' (só a tradução fora do padrão), 'sem' (sem tradutor)."""
     from . import portugues, rts
+    if portugues.status(gid, g, idi):
+        return "pt", ""
+    console = g.get("console", "")
+    if console == "switch":
+        kind = "translate_switch"
+    elif console == "n3ds":
+        kind = "translate_n3ds"
+    elif console in ("ps3", "wiiu"):
+        return "generico", "translate_generic"
+    else:
+        okc, _why = rts.supported(console, Path(g.get("rom", "")))
+        if not okc:
+            return "sem", ""
+        kind = "translate_retro"
+    if idi.get(gid, {}).get("formato") == "fechado" or idi.get(gid, {}).get("pouco_texto"):
+        return "sem", ""
+    mine = [j for j in jobs if j.get("game_id") == gid]
+    if any(j.get("status") in ATIVOS_FILA for j in mine):
+        return "fila", kind
+    if already_translated(store, gid, kind):
+        return "feito", kind
+    if any(j.get("type") == kind and j.get("status") in ("falhou", "aguardando análise") for j in mine):
+        return "falhou", kind
+    return "ok", kind
+
+
+def auto_queue(paths: Paths, store: Store, game_ids: list[str], lote: bool = False) -> list[str]:
+    """Download novo que não está em português => tradução automática na fila (traducao.toml:
+    auto_traduzir = true, padrão). Devolve linhas para a mensagem do bot.
+    `lote=True` ("/traduzir biblioteca"): pedido explícito (ignora auto_traduzir), não pergunta a tradução fora
+    do padrão de cada jogo e não lança um processo por jogo — kick_queue() lança o próximo quando abre vaga."""
+    cfg = ia.load_cfg(paths)
+    if (not cfg.get("auto_traduzir", True) and not lote) or not game_ids:
+        return []
+    from . import portugues
     try:
         lm = json.loads((paths.data / "launch-map.json").read_text("utf-8"))
     except (OSError, ValueError):
         return []
     idi = portugues.load_idiomas(paths.data)
+    jobs = all_jobs(paths)
     out = []
     for gid in game_ids:
         g = lm.get(gid)
         if not g or g.get("removed"):
             continue
-        st = portugues.status(gid, g, idi)
-        if st:
-            out.append(f"🇧🇷 {g['title']}: já está em português ({'oficial' if st == 'oficial' else 'traduzido'}).")
+        sit, kind = translator_for(paths, store, gid, g, idi, jobs)
+        if sit == "pt":
+            if not lote:
+                st = portugues.status(gid, g, idi)
+                out.append(f"🇧🇷 {g['title']}: já está em português ({'oficial' if st == 'oficial' else 'traduzido'}).")
             continue
-        if g["console"] == "switch":
-            kind = "translate_switch"
-        elif g["console"] == "n3ds":
-            kind = "translate_n3ds"
-        elif g["console"] in ("ps3", "wiiu"):
+        if sit == "generico" and not lote:
             if offer_generic(paths, store, gid, g["title"], "não há tradutor padrão para este console"):
                 out.append(f"❓ {g['title']}: vou perguntar se quer a tradução fora do padrão.")
             continue
-        else:
-            okc, _why = rts.supported(g["console"], Path(g.get("rom", "")))
-            if not okc:
-                continue
-            kind = "translate_retro"
-        if already_translated(store, gid, kind) or any(j.get("game_id") == gid and j.get("status") in
-                                                         ("na fila", "rodando", "aguardando tomada")
-                                                         for j in all_jobs(paths)):
+        if sit != "ok" and not (sit == "falhou" and not lote):
             continue
-        job = create(paths, store, kind, gid, g["title"], {"auto": True})
+        job = create(paths, store, kind, gid, g["title"], {"auto": True, **({"lote": True} if lote else {})})
+        jobs.append(job)
+        if lote:
+            out.append(f"• {g['title']}")
+            continue
         spawn(paths, job["op"])
         out.append(f"🈯 {g['title']}: não está em português — traduzindo sozinho; aviso quando ficar pronto.")
+    if lote:
+        kick_queue(paths)
     return out
+
+
+def _age_min(iso: str) -> float:
+    try:
+        return (datetime.now(timezone.utc) - datetime.fromisoformat(iso)).total_seconds() / 60
+    except (TypeError, ValueError):
+        return 1e9
+
+
+def library_plan(paths: Paths, store: Store) -> dict:
+    """Resumo para "/traduzir biblioteca": quantos entram na fila e por que os outros não."""
+    from . import portugues
+    lm = json.loads((paths.data / "launch-map.json").read_text("utf-8"))
+    idi = portugues.load_idiomas(paths.data)
+    jobs = all_jobs(paths)
+    out: dict[str, list[str]] = {k: [] for k in ("ok", "pt", "fila", "feito", "falhou", "generico", "sem")}
+    for gid, g in sorted(lm.items(), key=lambda kv: kv[1].get("title", "")):
+        if g.get("removed"):
+            continue
+        sit, _kind = translator_for(paths, store, gid, g, idi, jobs)
+        out[sit].append(gid)
+    return out
+
+
+def kick_queue(paths: Paths) -> list[str]:
+    """Lança as tarefas do lote que ainda não têm processo, até MAX_JOBS ao mesmo tempo (chamado pelo bot a
+    cada ciclo: sobrevive a reinício do Deck)."""
+    jobs = all_jobs(paths)
+    busy = sum(1 for j in jobs if j.get("status") in ("rodando", "aguardando tomada", "pausado (jogo aberto)", "na fila")
+               and _alive(j.get("pid")))
+    started = []
+    for j in jobs:
+        if busy >= MAX_JOBS:
+            break
+        if j.get("status") == "na fila" and (j.get("args") or {}).get("lote") and not _alive(j.get("pid"))                 and (not j.get("lancado") or _age_min(j["lancado"]) > 10):  # >10 min sem processo: Deck reiniciou
+            j["lancado"] = datetime.now(timezone.utc).isoformat()
+            save_job(paths, j)
+            spawn(paths, j["op"])
+            started.append(j["op"])
+            busy += 1
+    return started
 
 
 def already_translated(store: Store, game_id: str, kind: str) -> bool:
@@ -189,11 +291,15 @@ def run(paths: Paths, op: str) -> dict:
         raise SystemExit(f"tarefa {op} não existe")
     cfg = ia.load_cfg(paths)
     job["pid"] = os.getpid()
-    while active_job(paths, op):
-        job["status"] = "na fila"; save_job(paths, job); time.sleep(30)
+    while True:  # checar a vaga e ocupar é uma coisa só (senão duas tarefas esperando começam juntas)
+        with _queue_lock(paths):
+            if not active_job(paths, op):
+                job.update(status="rodando", started=datetime.now(timezone.utc).isoformat())
+                save_job(paths, job)
+                break
+            job["status"] = "na fila"; save_job(paths, job)
+        time.sleep(30)
     store.claim(op)  # 'pending' -> 'running' (ou já estava, se for retomada)
-    job.update(status="rodando", started=datetime.now(timezone.utc).isoformat())
-    save_job(paths, job)
     last = [0.0]
 
     def progress(done: int, total: int) -> None:

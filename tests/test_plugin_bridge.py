@@ -90,3 +90,18 @@ def test_launch_failure_leaves_message_for_plugin(tmp_path, monkeypatch):
     with pytest.raises(SystemExit):
         launch.main(["sumiu"])
     assert "removido" in json.loads((paths.data / "launch-error.json").read_text())["message"]
+
+
+def test_plugin_backend_appid_always_unsigned(tmp_path, monkeypatch):
+    """O Steam às vezes entrega o AppID com sinal (-1732342533 == 2562624763): grava e compara sem sinal."""
+    spec = importlib.util.spec_from_file_location("dcplugin3", Path(__file__).resolve().parents[1] / "decky-plugin/main.py")
+    m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+    base = tmp_path / "base"; base.mkdir()
+    for k, f in (("BASE", ""), ("QUEUE", "q.json"), ("DONE", "d.json"), ("ITEMS", "i.json"), ("REMOVE", "r.json")):
+        monkeypatch.setattr(m, k, str(base / f) if f else str(base))
+    p = m.Plugin(); run = asyncio.run
+    run(p.report("a", -1732342533, ""))
+    assert run(p.get_done())["a"]["appid"] == 2562624763
+    (base / "r.json").write_text(json.dumps([{"game_id": "a", "appid": 2562624763}]))
+    run(p.removal_done("a", -1732342533))  # o JS pode responder com sinal
+    assert run(p.get_removals()) == []

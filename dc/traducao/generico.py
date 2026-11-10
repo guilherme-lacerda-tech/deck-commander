@@ -29,7 +29,7 @@ def _script(ch: str) -> str:
         return "latin"
     if 0x370 <= o < 0x530:
         return "greek-cyr"
-    if 0x3040 <= o < 0xA000 or 0xAC00 <= o < 0xD7B0 or 0xFF00 <= o < 0xFFF0:
+    if 0x3000 <= o < 0xA000 or 0xAC00 <= o < 0xD7B0 or 0xFF00 <= o < 0xFFF0:  # 0x3000: 、。「」
         return "cjk"
     return "other"
 
@@ -115,10 +115,18 @@ def _utf8_runs(data: bytes, min_chars: int, taken: list[tuple[int, int]]) -> lis
     return out
 
 
+def _random_han(text: str) -> bool:
+    """Só ideogramas chineses, curto e sem kana/pontuação: quase sempre são bytes de dado que por acaso caem na
+    faixa CJK do UTF-16 (ex.: '紫黑戰', '塔姦敵' achados no índice do FF Resonance)."""
+    letters = [c for c in text if not c.isspace()]
+    return bool(letters) and len(letters) < 8 and all(0x3400 <= ord(c) < 0xA000 for c in letters)
+
+
 def find_strings(data: bytes, min_chars: int = 4, sentences_only: bool = False) -> list[Slot]:
     u16 = _utf16_runs(data, min_chars)
     taken = [(s.offset - 2, s.offset + s.length + 2) for s in u16]
     slots = u16 + _utf8_runs(data, min_chars, taken)
+    slots = [s for s in slots if not _random_han(s.text)]
     if sentences_only:
         slots = [s for s in slots if idioma.is_sentence(s.text)]
     return sorted(slots, key=lambda s: s.offset)

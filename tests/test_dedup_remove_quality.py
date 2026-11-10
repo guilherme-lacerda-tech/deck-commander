@@ -294,3 +294,28 @@ def test_sync_slow_extraction_continues_later_without_losing_state(tmp_path, mon
     assert "ficam para a próxima" in out and "Safe-mode" not in out
     st = json.loads((paths.state / "sync-state.json").read_text())
     assert list(st["ingested"]) == ["Rez"] and st["timeouts"] == 0
+
+
+def test_pt_version_hides_the_other_copy(tmp_path):
+    """Shadow of the Colossus duplicado (09/11): original + "(Dub-e-Leg)" → fica só o em português, sem apagar arquivo."""
+    import json as _json
+    from dc import dedup, syncer
+    from dc.paths import get_paths
+    paths = get_paths(tmp_path).ensure()
+    rom = tmp_path / "sotc.iso"; rom.write_bytes(b"x")
+    lm = {"ps2-sotc": {"title": "Shadow of the Colossus", "console": "ps2", "rom": str(rom)},
+          "ps2-sotc-pt": {"title": "Shadow of the Colossus (Dub-e-Leg)", "console": "ps2",
+                          "rom": "/sd/Shadow of the Colossus (Dub-e-Leg) (www.romsportugues.com).iso"},
+          "ps2-ico": {"title": "ICO", "console": "ps2", "rom": "/x/ico.iso"}}
+    assert dedup.pt_redundant(lm) == [("ps2-sotc", "ps2-sotc-pt")]
+    (paths.data / "launch-map.json").write_text(_json.dumps(lm))
+    (paths.data / "plugin-done.json").write_text(_json.dumps({"ps2-sotc": {"appid": 2562624763, "error": ""}}))
+    assert syncer.hide_pt_duplicates(paths, lm, ["ps2-ico"]) == []  # não mexe se o grupo não chegou agora
+    lines = syncer.hide_pt_duplicates(paths, lm, ["ps2-sotc"])
+    assert len(lines) == 1 and "/devolver" in lines[0]
+    after = _json.loads((paths.data / "launch-map.json").read_text())
+    assert after["ps2-sotc"]["removed"] and not after["ps2-sotc-pt"].get("removed") and rom.exists()
+    # dois em português (ou nenhum): não escolhe sozinho
+    lm2 = {"a": {"title": "Jogo (PT-BR)", "console": "ps2", "rom": "/a.iso"},
+           "b": {"title": "Jogo [PT-BR]", "console": "ps2", "rom": "/b.iso"}}
+    assert dedup.pt_redundant(lm2) == []

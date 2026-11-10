@@ -62,3 +62,14 @@ def test_layers_roundtrip():
         body, kind = generico.unpack(packed)
         assert body == raw
         assert generico.unpack(generico.pack(body, kind))[0] == raw
+
+
+def test_random_han_bytes_and_engine_containers_are_skipped(tmp_path):
+    """FF Resonance (09/11): bytes do índice da Unreal (.utoc) viraram "frases" chinesas e foram regravados."""
+    from dc.traducao import fora_padrao, generico
+    junk = "紫黑戰".encode("utf-16-le") + b"\x00\x00" + "これはテストです。".encode("utf-16-le") + b"\x00\x00"
+    texts = [s.text for s in generico.find_strings(junk, min_chars=3)]
+    assert "紫黑戰" not in texts and "これはテストです。" in texts
+    for n in ("FFRS-Switch.utoc", "global.ucas", "FFRS-Switch.pak", "data.unity3d", "Msg.dat"):
+        (tmp_path / n).write_bytes(b"x")
+    assert [p.name for p in fora_padrao.candidates(tmp_path)] == ["Msg.dat"]

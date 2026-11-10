@@ -54,7 +54,8 @@ class Plugin:
 
     async def report(self, game_id, appid, error):
         done = _load(DONE, {})
-        done[game_id] = {"appid": int(appid or 0), "error": error or ""}
+        # AppID sempre sem sinal (o JS do Steam às vezes entrega com sinal; a remoção compara pelo valor)
+        done[game_id] = {"appid": int(appid or 0) & 0xFFFFFFFF, "error": error or ""}
         _save(DONE, done)
         if not error:
             _save(QUEUE, [q for q in _load(QUEUE, []) if q.get("game_id") != game_id])
@@ -64,7 +65,9 @@ class Plugin:
         return _load(REMOVE, [])
 
     async def removal_done(self, game_id, appid):
-        _save(REMOVE, [r for r in _load(REMOVE, []) if not (r.get("game_id") == game_id and r.get("appid") == appid)])
+        want = int(appid or 0) & 0xFFFFFFFF
+        _save(REMOVE, [r for r in _load(REMOVE, []) if not (r.get("game_id") == game_id
+                                                            and int(r.get("appid") or 0) & 0xFFFFFFFF == want)])
         return await self.mark_removed(game_id)
 
     async def mark_removed(self, game_id):

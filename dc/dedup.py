@@ -126,3 +126,16 @@ def magnet_name(magnet: str) -> Optional[str]:
     from urllib.parse import parse_qs, urlparse
     q = parse_qs(urlparse(magnet).query)
     return (q.get("dn") or [None])[0]
+
+
+def pt_redundant(launch_map: dict) -> list[tuple[str, str]]:
+    """Mesmo jogo duas vezes e só uma delas em português (dublada/traduzida pelo nome): devolve
+    [(game_id que sai da biblioteca, game_id em português que fica)]. Ex.: "Shadow of the Colossus" e
+    "Shadow of the Colossus (Dub-e-Leg)". Só o atalho sai (remove.hide); /devolver traz de volta."""
+    from .traducao.portugues import is_pt_name
+    out = []
+    for grp in library_dups(launch_map):
+        pt = [g for g in grp if is_pt_name(launch_map[g].get("title", ""), launch_map[g].get("rom", ""))]
+        if len(pt) == 1:
+            out += [(g, pt[0]) for g in grp if g != pt[0]]
+    return out

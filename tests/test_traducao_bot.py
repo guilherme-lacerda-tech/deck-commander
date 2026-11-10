@@ -187,3 +187,39 @@ def test_progress_every_20_percent_with_eta(b, monkeypatch):
     comandos.progress_notify(b)
     assert len(b.sent) == n  # mesma faixa: não repete
     assert "25% (250/1000)" in b.handle(1, 1, "/traduzir status")
+
+
+def test_traduzir_biblioteca_asks_then_queues_two_at_a_time(b, monkeypatch, tmp_path):
+    """/traduzir biblioteca: mostra quantos entram e quantos não têm tradutor, pergunta (Sim/Não), e só então
+    enfileira; lança no máximo MAX_JOBS processos — o resto entra quando abre vaga (kick_queue)."""
+    from dc.traducao import ia
+    lm = json.loads((b.paths.data / "launch-map.json").read_text())
+    roms = tmp_path / "roms/switch"
+    for i in range(3):
+        r = roms / f"J{i}/J{i} [0100ABCD1234{i}000][v0].nsp"
+        r.parent.mkdir(parents=True); r.write_bytes(b"PFS0")
+        lm[f"switch-j{i}"] = {"title": f"J{i}", "console": "switch", "rom": str(r)}
+    lm["ps2-pt"] = {"title": "Jogo (PT-BR)", "console": "ps2", "rom": "/x/Jogo (PT-BR).iso"}
+    (b.paths.data / "launch-map.json").write_text(json.dumps(lm))
+    monkeypatch.setattr(ia, "build_chain", lambda *a: ["x"])
+    r = b.handle(1, 1, "/traduzir biblioteca")
+    assert "vão entrar na fila: 4" in r and "já em português: 1" in r and "sem tradutor automático: 1" in r
+    assert b.next_buttons == [("Sim", "/traduzir biblioteca sim"), ("Não", "/traduzir biblioteca nao")]
+    assert b.spawned == [] and run.all_jobs(b.paths) == []  # nada antes do Sim
+    assert "nada foi enfileirado" in b.handle(1, 1, "/traduzir biblioteca nao")
+    r = b.handle(1, 1, "/traduzir biblioteca sim")
+    assert "4 jogo(s) na fila" in r
+    jobs = run.all_jobs(b.paths)
+    assert len(jobs) == 4 and all(j["args"].get("lote") for j in jobs)
+    assert len(b.spawned) == run.MAX_JOBS  # não abre um processo por jogo
+    # processos lançados "vivos": nada novo; um terminou: entra o próximo
+    monkeypatch.setattr(run, "_alive", lambda pid: pid == 1)
+    for j in jobs:
+        if j["op"] in b.spawned:
+            j["pid"] = 1; run.save_job(b.paths, j)
+    assert run.kick_queue(b.paths) == []
+    j0 = run.load_job(b.paths, b.spawned[0]); j0.update(status="concluido"); j0.pop("pid"); run.save_job(b.paths, j0)
+    assert len(run.kick_queue(b.paths)) == 1
+    # de novo: nada repetido
+    assert "Nada novo" in b.handle(1, 1, "/traduzir biblioteca sim") or "vão entrar na fila: 0" in b.handle(
+        1, 1, "/traduzir biblioteca")

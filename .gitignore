@@ -3,3 +3,15 @@ __pycache__/
 .pytest_cache/
 probe.json
 deck-commander-probe/
+# segredos e dados do aparelho nunca vão para o git
+secrets/
+*.token
+*.key
+prod.keys
+title.keys
+id_*
+*_ed25519
+*.db
+.env
+launch-map.json
+plugin-*.json

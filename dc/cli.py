@@ -208,6 +208,9 @@ def _extra(paths, args) -> int:
             print("\n".join(controls.switch_layout(r[0])) or "já estava assim")
         for x in controls.check():
             print(("ok  " if x.ok else "!!  ") + f"{x.emulator}: {x.detail}")
+    elif c == "telegram-setup":
+        from .telegram_setup import run as tg_setup
+        return tg_setup(paths)
     elif c == "telegram-pair":
         from .bot import pair_code
         print("Código de pareamento (mande  /start CODIGO  para o seu bot):", pair_code(paths))

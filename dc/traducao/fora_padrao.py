@@ -22,6 +22,12 @@ from . import generico, ia, idioma
 MEDIA = (".bfstm", ".bwav", ".bwar", ".bars", ".mp4", ".webm", ".bntx", ".bfres", ".bcstm", ".bcwav",
          ".at9", ".ogg", ".wav", ".mp3", ".png", ".jpg", ".dds", ".ktx", ".astc", ".bclim", ".bflim", ".pmf")
 MAX_FILE = 32 * 1024 * 1024
+# pacotes/índices de motor de jogo: trocar bytes aqui quebra o jogo (FF Resonance, 09/11: o .utoc da Unreal
+# tinha nomes de arquivo e bytes soltos que pareciam japonês — "traduzir" isso corrompe o índice)
+CONTAINERS = (".utoc", ".ucas", ".pak", ".uasset", ".uexp", ".umap", ".ubulk", ".uptnl", ".resS", ".ress",
+              ".resource", ".assets", ".bundle", ".unity3d", ".ttf", ".otf", ".tps", ".nro", ".nso", ".npdm",
+              ".rpx", ".rpl", ".elf", ".self", ".sprx", ".prx", ".dll", ".exe", ".so")
+SKIP = tuple(x.lower() for x in MEDIA + CONTAINERS)
 
 
 @dataclass
@@ -56,7 +62,7 @@ def local_chain(paths, cfg: dict) -> list:
 
 
 def candidates(root: Path) -> list[Path]:
-    return sorted(p for p in root.rglob("*") if p.is_file() and p.suffix.lower() not in MEDIA
+    return sorted(p for p in root.rglob("*") if p.is_file() and p.suffix.lower() not in SKIP
                   and p.stat().st_size <= MAX_FILE)
 
 
@@ -142,7 +148,7 @@ def extract_switch(rom: Path, title_id: str, roots: list[Path], dest: Path) -> i
     n = 0
     try:
         for rel, (off, size) in rfs.files().items():
-            if size > MAX_FILE or Path(rel).suffix.lower() in MEDIA:
+            if size > MAX_FILE or Path(rel).suffix.lower() in SKIP:
                 continue
             out = dest / rel.lstrip("/")
             out.parent.mkdir(parents=True, exist_ok=True)

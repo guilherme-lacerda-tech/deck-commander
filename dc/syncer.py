@@ -205,6 +205,7 @@ def run_sync(paths: Paths, store: Store, qbt: Qbt | None, confirm_many: bool = F
                 from .traducao import run as trad_run
                 lm = json.loads((paths.data / "launch-map.json").read_text("utf-8"))
                 gids = [g for g, e in lm.items() if e.get("rom") in arrived_files]
+                lines += hide_pt_duplicates(paths, lm, gids)
                 lines += trad_run.auto_queue(paths, store, gids)
             except Exception as e:  # noqa: BLE001 — a tradução automática nunca atrapalha o /sync
                 lines.append(f"(tradução automática não começou: {e})")
@@ -230,3 +231,16 @@ def run_sync(paths: Paths, store: Store, qbt: Qbt | None, confirm_many: bool = F
     except Exception as e:  # noqa: BLE001
         store.finish(op, False, error=str(e))
         return f"❌ /sync falhou: {e}"
+
+
+def hide_pt_duplicates(paths: Paths, lm: dict, gids: list[str]) -> list[str]:
+    """Chegou um jogo que já existe em português (ou chegou a versão em português de um que já existia):
+    tira da biblioteca só o atalho da versão que não está em português — biblioteca sem duplicata."""
+    from . import dedup, remove
+    out = []
+    for hide, keep in dedup.pt_redundant(lm):
+        if hide in gids or keep in gids:
+            remove.hide(paths, hide, f"já existe a versão em português: {lm[keep]['title']}")
+            out.append(f"🇧🇷 {lm[hide]['title']}: fica só a versão em português ({lm[keep]['title']}); "
+                       f"a outra saiu da biblioteca (arquivos mantidos; /devolver {lm[hide]['title']} traz de volta).")
+    return out

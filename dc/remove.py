@@ -85,7 +85,7 @@ def plan(paths: Paths, game_id: str, roots: list[Path]) -> RemovePlan:
     rom = Path(e["rom"])
     move = _what_to_move(rom, roots, lm, game_id)
     done = _load(plugin_bridge.done_path(paths), {})
-    appids = [done[game_id]["appid"]] if done.get(game_id, {}).get("appid") else []
+    appids = [int(done[game_id]["appid"]) & 0xFFFFFFFF] if done.get(game_id, {}).get("appid") else []
     st = _load(paths.state / "sync-state.json", {})
     hs = [h for h, v in st.get("ingested", {}).items()
           if any(f == str(rom) or (move and f.startswith(str(move))) for f in v.get("files", []))]
@@ -173,7 +173,7 @@ def hide(paths: Paths, game_id: str, reason: str) -> str:
     """Tira SÓ o atalho da biblioteca (os arquivos ficam). Usado quando a versão traduzida substitui a
     original, para a biblioteca não ficar duplicada. Volta com /devolver."""
     done = _load(plugin_bridge.done_path(paths), {})
-    appid = done.get(game_id, {}).get("appid")
+    appid = int(done.get(game_id, {}).get("appid") or 0) & 0xFFFFFFFF
     if appid and plugin_bridge.installed():
         rq_p = paths.data / "plugin-remove.json"
         _save(rq_p, _load(rq_p, []) + [{"game_id": game_id, "appid": appid}])

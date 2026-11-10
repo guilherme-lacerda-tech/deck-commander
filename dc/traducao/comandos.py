@@ -10,6 +10,7 @@ from .. import ops
 from . import ia, run
 
 HELP = """/traduzir <jogo> — traduz para pt-BR com IA (Switch: vira mod; GBA Pokémon: ROM nova "(PT-BR)")
+/traduzir biblioteca — todos os jogos que ainda não estão em português (pergunta antes)
 /traduzir lista · status · config · revisar <op> · aplicar <op> · aprovar <op> · retomar <op> · desfazer <jogo>
 /converter <jogo> [organizar|descompactar] — Switch: confere/organiza update e DLC, descompacta NSZ"""
 
@@ -46,6 +47,8 @@ def traduzir(bot, args: list[str]) -> str:
         return _undo(bot, " ".join(args[1:]))
     if sub == "lista":
         return _lista(bot)
+    if sub == "biblioteca":
+        return _biblioteca(bot, args[1].lower() if len(args) > 1 else "")
     force = "--forcar" in args
     query = " ".join(a for a in args if not a.startswith("--"))
     gid, g, err = _find(bot, query)
@@ -107,6 +110,49 @@ def converter(bot, args: list[str]) -> str:
     job = run.create(bot.paths, bot.store, "convert_switch", gid, g["title"], {"acao": action})
     run.spawn(bot.paths, job["op"])
     return f"🔧 {action.capitalize()} {g['title']} ({job['op']}). Aviso quando terminar."
+
+
+def _biblioteca(bot, resp: str) -> str:
+    """Traduzir a biblioteca inteira: mostra quantos entram e pergunta (Sim/Não) antes de começar."""
+    P, S = bot.paths, bot.store
+    if ops.in_safe_mode(P):
+        return "Safe-mode ativo."
+    if resp in ("nao", "não", "n"):
+        return "Ok, nada foi enfileirado."
+    plan = run.library_plan(P, S)
+    lm = bot._map()
+    if resp in ("sim", "s"):
+        cfg = ia.load_cfg(P)
+        if not ia.build_chain(P, cfg):
+            return "Nenhuma IA disponível: instale o Ollama no Deck (./setup-deck.sh --modules A1) ou configure uma chave."
+        lines = run.auto_queue(P, S, plan["ok"], lote=True)
+        if not lines:
+            return "Nada novo para traduzir: tudo já está em português, traduzido ou na fila."
+        extra = "" if not run._power_paused(P, cfg) else "\n🔌 Começa quando o Deck for para a tomada."
+        more = f"\n… e mais {len(lines) - 40}" if len(lines) > 40 else ""
+        return (f"🈯 {len(lines)} jogo(s) na fila de tradução ({run.MAX_JOBS} de cada vez; aviso cada um que "
+                f"terminar):\n" + "\n".join(lines[:40]) + more + "\nAcompanhe com /traduzir status." + extra)
+    n = len(plan["ok"])
+    sem = len(plan["sem"]) + len(plan["generico"])
+    out = [f"📚 Biblioteca: {sum(len(v) for v in plan.values())} jogos",
+           f"🇧🇷 já em português: {len(plan['pt'])}",
+           f"🈯 vão entrar na fila: {n}"]
+    out += [f"   • {lm[g]['title']} ({lm[g]['console']})" for g in plan["ok"][:25]]
+    if n > 25:
+        out.append(f"   … e mais {n - 25}")
+    if plan["fila"] or plan["feito"]:
+        out.append(f"⏳ já traduzindo ou na fila: {len(plan['fila'])} · ✅ já traduzidos: {len(plan['feito'])}")
+    if plan["falhou"]:
+        out.append(f"⚠️ já tentei e não deu (não entram de novo): {len(plan['falhou'])} — "
+                   + ", ".join(lm[g]["title"] for g in plan["falhou"][:5]))
+    gen = (f" (destes, {len(plan['generico'])} só teriam a tradução fora do padrão, que pergunta jogo a jogo"
+           ")") if plan["generico"] else ""
+    out.append(f"🚫 sem tradutor automático: {sem}{gen}")
+    if not n:
+        return "\n".join(out + ["", "Nada novo para traduzir."])
+    bot.next_buttons = [("Sim", "/traduzir biblioteca sim"), ("Não", "/traduzir biblioteca nao")]
+    return "\n".join(out + ["", f"Começar a traduzir os {n}? Vai de {run.MAX_JOBS} em {run.MAX_JOBS}, "
+                                "pode levar dias; nada do jogo original é alterado."])
 
 
 def _lista(bot) -> str:
@@ -317,12 +363,15 @@ def progress_notify(bot) -> None:
 def notify(bot) -> None:
     """Avisa no Telegram quando uma tarefa termina, falha, espera aprovação ou ficou interrompida."""
     chat = bot.cfg.get("notify_chat")
+    run.kick_queue(bot.paths)  # "/traduzir biblioteca": abre vaga => próximo jogo começa
     if not chat:
         return
     for j in run.all_jobs(bot.paths):
         if j.get("notified"):
             continue
         st = j.get("status")
+        if st == "na fila" and (j.get("args") or {}).get("lote") and not j.get("started"):
+            continue  # lote ainda esperando a vez: kick_queue relança sozinho (mesmo depois de reiniciar)
         if st in ("rodando", "aguardando tomada", "pausado (jogo aberto)", "na fila") and j.get("pid") \
                 and not run._alive(j["pid"]):
             msg = f"⏹ A tarefa de {j['title']} parou (o Deck reiniciou?). Para continuar: /traduzir retomar {j['op']}"
