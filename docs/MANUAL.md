@@ -69,6 +69,9 @@ Não precisa abrir o modo Desktop no dia a dia. Instalação: [TUTORIAL-INSTALAC
 - No PC: jogos em `D:\DeckCommander\Jogos\<console>\<jogo>`, emuladores em `D:\Emuladores`.
 - Depois da cópia: na primeira vez, escolha o controle na tela de controles do emulador do PC. Os primeiros minutos
   podem engasgar enquanto os shaders são refeitos (normal).
+- **Jogar esse jogo do PC também no Deck (streaming):** crie um atalho dele (.lnk, que abre o emulador com o jogo)
+  na pasta `C:\Users\Public\Documents\Deck Commander\Jogos do PC`. Ele entra na aba **Computador** como os outros
+  jogos do PC.
 
 ## 8. Saúde e segurança
 - `/status`: tudo que está rodando, último backup, espaço livre.
