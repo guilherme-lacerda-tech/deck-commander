@@ -24,7 +24,8 @@ $logDir = 'D:\DeckCommander\logs'
 $trabalhos = 'C:\AutomacaoCasa\agente\trabalhos'   # pasta vigiada pelo agente da casa (não dorme com *.ativo recente)
 
 if ($Instalar) {
-    $acao = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ("-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"" + $MyInvocation.MyCommand.Path + "`"")
+    # pelo oculto.vbs: o "powershell -WindowStyle Hidden" ainda pisca uma janela a cada 5 min
+    $acao = New-ScheduledTaskAction -Execute 'wscript.exe' -Argument ("`"" + (Join-Path $aqui 'oculto.vbs') + "`" powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"" + $MyInvocation.MyCommand.Path + "`"")
     $gat = @((New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME),
              (New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 5)))
     $cfg = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -StartWhenAvailable -DontStopIfGoingOnBatteries -AllowStartIfOnBatteries -ExecutionTimeLimit (New-TimeSpan -Hours 12)
