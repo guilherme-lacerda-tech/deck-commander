@@ -261,7 +261,7 @@ def write_units(log: list[str]) -> None:
     UNITS.mkdir(parents=True, exist_ok=True)
     for name, body in UNIT_FILES.items():
         p = UNITS / name
-        if not p.exists() or p.read_text() != body:
+        if not p.exists() or p.read_text("utf-8") != body:
             p.write_text(body, "utf-8"); log.append(f"unidade {name}")
     _sc("daemon-reload")
 
