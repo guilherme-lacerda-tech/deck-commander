@@ -456,3 +456,27 @@ def test_nested_sarc_translation_lands_inside(tmp_path, monkeypatch):
     assert t0[0] == "PT Hello ⟦0⟧!" and t0[1] == [tag()]
     assert nx.read_msbt(msg.files["ActorType/Item.msbt"]).texts()[0][0] == "PT Sword"
     assert not (mod / "Pack/Bootup_EUfr.pack").exists()
+
+
+def _font(last):
+    return (b"FFNT\xff\xfe" + struct.pack("<HIIH", 0x14, 0x04010000, 0, 1) + b"\x00\x00"
+            + b"CMAP" + struct.pack("<I", 24) + struct.pack("<IIHHI", 0x20, last, 0, 0, 0))
+
+
+def test_font_check_uses_the_complete_font_and_only_warns(tmp_path):
+    """BotW: Normal tem todos os acentos, Caption não tem ã/õ — antes bloqueava tudo; agora traduz e avisa."""
+    r = tmp_path / "romfs"
+    (r / "Font").mkdir(parents=True)
+    (r / "Message").mkdir()
+    (r / "Message/Talk.msbt").write_bytes(make_msbt([["Hello"]], ["t0"]))
+    fonts = nx.Sarc("<", {"Normal_00.bffnt": _font(0xFF), "Caption_00.bffnt": _font(0x7E)},
+                    ["Normal_00.bffnt", "Caption_00.bffnt"], {"Normal_00.bffnt": 4, "Caption_00.bffnt": 4})
+    (r / "Font/Font_US.sbfarc").write_bytes(nx.yaz0_compress(nx.write_sarc(fonts)))
+    rep = switch.Report("x")
+    switch.scan(r, rep)
+    assert rep.font_ok and "Caption_00.bffnt" in rep.font and "quadradinho" in rep.font
+    only_bad = nx.Sarc("<", {"Caption_00.bffnt": _font(0x7E)}, ["Caption_00.bffnt"], {"Caption_00.bffnt": 4})
+    (r / "Font/Font_US.sbfarc").write_bytes(nx.write_sarc(only_bad))
+    rep = switch.Report("x")
+    switch.scan(r, rep)
+    assert not rep.font_ok  # nenhuma fonte serve: continua bloqueando
