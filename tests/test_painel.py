@@ -266,3 +266,32 @@ def test_cli_reads_json_from_stdin(P, monkeypatch, capsys):
     out = json.loads(capsys.readouterr().out)
     assert out["ok"] and "bateria" in out["texto"]
     assert painel.main(["bateria", "{nao-json"]) == 1
+
+
+def test_traducao_mostra_so_a_tarefa_mais_nova_de_cada_jogo(tmp_path):
+    import json
+    from dc import painel
+    from dc.paths import get_paths
+    from dc.traducao import run
+    paths = get_paths(tmp_path / "dc").ensure()
+    d = run.jobs_dir(paths)
+    velhas = [("a1", "falhou", "2026-11-08T10:00:00+00:00"), ("a2", "falhou", "2026-11-09T10:00:00+00:00"),
+              ("a3", "concluido", "2026-11-10T10:00:00+00:00")]
+    for op, st, cr in velhas:
+        (d / f"{op}.json").write_text(json.dumps({"op": op, "type": "translate_switch", "game_id": "switch-ff",
+                                                  "title": "Final Fantasy", "status": st, "created": cr}), "utf-8")
+    # a falha mais velha foi gravada por último (bot marcou "avisado"): não pode passar na frente
+    (d / "a1.json").write_text((d / "a1.json").read_text("utf-8"), "utf-8")
+
+    class P:
+        pass
+    p = P(); p.paths = paths; p.store = None; p._map = lambda: {}
+    import dc.traducao.run as r
+    orig = r.library_plan
+    r.library_plan = lambda *a, **k: {"ok": []}
+    try:
+        out = painel.traducao(p, {})
+    finally:
+        r.library_plan = orig
+    assert [t["op"] for t in out["tarefas"]] == ["a3"]
+    assert not out["tarefas"][0]["pode_retomar"]

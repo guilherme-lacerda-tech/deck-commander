@@ -299,10 +299,20 @@ def traducao(p: Ponte, a: dict) -> dict:
     lm = p._map()
     plan = run.library_plan(p.paths, p.store)
     tarefas = []
-    for j in reversed(run.all_jobs(p.paths)[-15:]):
+    vistos: set[str] = set()
+    # mais nova primeiro pela data de CRIAÇÃO (o arquivo de uma tarefa velha muda quando o bot marca "avisado")
+    for j in sorted(run.all_jobs(p.paths), key=lambda x: x.get("created", ""), reverse=True):
         st = j.get("status")
         if st in PERGUNTA:
             continue
+        # só a tarefa MAIS NOVA de cada jogo: uma tentativa antiga que falhou não aparece com "Retomar" depois que
+        # uma mais nova já terminou (ex.: Final Fantasy concluído + falhas de dias atrás)
+        chave = f"{j.get('game_id')}|{j.get('type')}"
+        if chave in vistos or str(st).startswith("cancelado"):
+            continue
+        vistos.add(chave)
+        if len(tarefas) >= 15:
+            break
         vivo = run._alive(j.get("pid"))
         tarefas.append({"op": j["op"], "titulo": j.get("title", j["op"]), "status": st,
                         "linha": comandos._status_line(p.paths, j),
@@ -498,7 +508,11 @@ def qualidade(p: Ponte, a: dict) -> dict:
         ctl = [{"emulador": x.emulator, "ok": x.ok, "detalhe": x.detail} for x in controls.check()]
     except Exception:  # noqa: BLE001 — aviso é conforto
         ctl = []
-    return {"jogos": jogos, "controles": ctl}
+    try:
+        lay = controls.layouts()
+    except Exception:  # noqa: BLE001
+        lay = []
+    return {"jogos": jogos, "controles": ctl, "layouts": lay}
 
 
 def qualidade_definir(p: Ponte, a: dict) -> dict:
@@ -507,11 +521,24 @@ def qualidade_definir(p: Ponte, a: dict) -> dict:
     return {"texto": p._quality([a["gid"], a["nivel"]])}
 
 
+def controle_definir(p: Ponte, a: dict) -> dict:
+    """Layout dos botões de um emulador: 'xbox' (A embaixo) ou 'switch' (A na direita)."""
+    from . import controls
+    if a.get("modo") not in controls.MODOS:
+        raise Erro("Escolha Controle de Xbox ou Controle de Switch.")
+    try:
+        feito = controls.definir_layout(a.get("id", ""), a["modo"])
+    except ValueError as e:
+        raise Erro(f"Não deu para trocar: {e}.")
+    nome = controls.MODOS[a["modo"]].split(" (")[0]
+    return {"texto": f"Pronto: {nome}. Vale na próxima vez que abrir o jogo." if feito else f"Já estava como {nome}."}
+
+
 ACOES = {f.__name__: f for f in (
     status, diagnostico, safe_mode, telegram, telegram_botfather, telegram_token, telegram_parear, downloads,
     bateria, duplicados, remover, traducao, traducao_automatica, traduzir, traducao_parar, traducao_retomar,
     traducao_responder, pc, pc_salvar, pc_testar, pc_acordar, pc_sincronizar, transferir, transferir_preparar,
-    transferir_enviar, qualidade, qualidade_definir)}
+    transferir_enviar, qualidade, qualidade_definir, controle_definir)}
 ACOES["downloads_pausar"] = lambda p, a: _pausar(p, a, True)
 ACOES["downloads_retomar"] = lambda p, a: _pausar(p, a, False)
 

@@ -614,6 +614,11 @@ function TelaQualidade() {
             j ? Txt("Agora: " + j.atual + ". Vale a partir da próxima vez que abrir o jogo.") : null,
             Txt("Jogo pesado ou com gráfico estranho: escolha nativo. Padrão = o do console.", { opacity: 0.8 }),
             Msg(msg)),
+        Sec("Botões A / B / X / Y", (d.layouts || []).length
+            ? [Txt("Escolha como os botões funcionam em cada console:", null, "lh")].concat((d.layouts || []).map((l) =>
+                Lista(l.emulador, Object.keys(l.opcoes).map((k) => ({ data: k, label: l.opcoes[k] })), l.atual,
+                    (m) => fazer("controle_definir", { id: l.id, modo: m }))))
+            : Txt("Nenhum emulador com escolha de botões aberto ainda (abra um jogo de Switch uma vez).")),
         Sec("Controles", faltam.length
             ? [Txt("Estes emuladores precisam que você escolha o controle UMA vez (no modo Desktop: abra o emulador → "
                 + "Controles → escolha o controle do Deck):", null, "ch")].concat(faltam.map((c, i) => Txt("⚠️ " + c.emulador, null, "c" + i)))
@@ -627,9 +632,19 @@ function Panel() {
     const [tela, setTela] = SP_REACT.useState(null);
     if (!TEM_DFL) return h(AtalhosPanel, null);  // Decky sem os componentes: só o painel antigo
     if (!tela || !TELAS[tela]) return h(TelaInicio, { ir: setTela });
-    return h("div", null,
-        h(D.PanelSection, null, h(D.PanelSectionRow, null, h(D.ButtonItem, { layout: "below", onClick: () => setTela(null) }, "← Voltar"))),
-        h(TELAS[tela], null));
+    // Botão B do controle dentro de uma tela: volta ao menu do painel (sem isso o Steam fecha o Deck Commander)
+    const voltar = (e) => {
+        if (e && e.stopPropagation) e.stopPropagation();
+        if (e && e.preventDefault) e.preventDefault();
+        setTela(null);
+        return true;
+    };
+    const corpo = [
+        h(D.PanelSection, { key: "v" }, h(D.PanelSectionRow, null, h(D.ButtonItem, { layout: "below", onClick: () => setTela(null) }, "← Voltar"))),
+        h(TELAS[tela], { key: "t" })];
+    return D.Focusable
+        ? h(D.Focusable, { onCancelButton: voltar, "flow-children": "column" }, corpo)
+        : h("div", null, corpo);
 }
 
 var index = definePlugin(() => {

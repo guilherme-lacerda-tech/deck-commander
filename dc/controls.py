@@ -35,6 +35,79 @@ class Check:
     detail: str
 
 
+# ---------------------------------------------------------------- layout dos botões, em palavras simples
+# "xbox":   apertar A no Deck = A no jogo (o A fica EMBAIXO, como no controle de Xbox e no próprio Deck)
+# "switch": botões na mesma POSIÇÃO do controle do Switch (o A fica na DIREITA: no Deck, é o botão B)
+MODOS = {"xbox": "Controle de Xbox (A embaixo — apertar A no Deck = A no jogo)",
+         "switch": "Controle de Switch (A na direita, igual ao Switch)"}
+# Lichii (Switch 2, base yuzu/eden): botões SDL 0=embaixo, 1=direita, 2=esquerda, 3=em cima
+_LICHII_BOTOES = {"xbox": {"a": 0, "b": 1, "x": 2, "y": 3}, "switch": {"a": 1, "b": 0, "x": 3, "y": 2}}
+_LICHII_RX = re.compile(r'^(player_0_button_([abxy]))="(engine:sdl,[^"]*?button:)(\d+)(.*)"$', re.M)
+
+
+def _lichii(home: Path) -> list[Path]:
+    return [home / ".config/eden/qt-config.ini", home / "Emulation/Lichii/user/config/qt-config.ini"]
+
+
+def _ryu_modo(home: Path) -> str | None:
+    p = next((x for x in _ryu(home) if x.exists()), None)
+    if p is None:
+        return None
+    pads = [i for i in json.loads(p.read_text("utf-8")).get("input_config") or [] if "Gamepad" in str(i.get("backend", ""))]
+    if not pads:
+        return None
+    return "xbox" if (pads[0].get("right_joycon") or {}).get("button_a") == "A" else "switch"
+
+
+def _lichii_modo(home: Path) -> str | None:
+    p = next((x for x in _lichii(home) if x.exists()), None)
+    if p is None:
+        return None
+    botoes = {m.group(2): int(m.group(4)) for m in _LICHII_RX.finditer(p.read_text("utf-8", "replace"))}
+    for modo, want in _LICHII_BOTOES.items():
+        if botoes and all(botoes.get(k) == v for k, v in want.items()):
+            return modo
+    return None
+
+
+def lichii_layout(mode: str, home: Path = H) -> list[str]:
+    """Lichii: troca só os 4 botões de face do Jogador 1 (mantém o controle escolhido)."""
+    want = _LICHII_BOTOES[mode]
+    log = []
+    for p in (x for x in _lichii(home) if x.exists()):
+        txt = p.read_text("utf-8", "replace")
+        novo = _LICHII_RX.sub(lambda m: f'{m.group(1)}="{m.group(3)}{want[m.group(2)]}{m.group(5)}"', txt)
+        if novo != txt:
+            bak = p.with_name(p.name + ".antes-deck-commander")
+            if not bak.exists():
+                bak.write_text(txt, "utf-8")
+            tmp = p.with_name(p.name + ".dc-tmp")
+            tmp.write_text(novo, "utf-8")
+            os.replace(tmp, p)
+            log.append(f"{p}: botões do Switch 2 como {MODOS[mode].split(' (')[0]}")
+    return log
+
+
+def layouts(home: Path = H) -> list[dict]:
+    """Emuladores em que dá para escolher o layout dos botões: [{id, emulador, atual, opcoes}]."""
+    out = []
+    for ident, nome, modo in (("ryujinx", "Nintendo Switch (Ryujinx)", _ryu_modo(home)),
+                              ("lichii", "Nintendo Switch 2 (Lichii)", _lichii_modo(home))):
+        if modo is not None:
+            out.append({"id": ident, "emulador": nome, "atual": modo, "opcoes": MODOS})
+    return out
+
+
+def definir_layout(ident: str, modo: str, home: Path = H) -> list[str]:
+    if modo not in MODOS:
+        raise ValueError("modo inválido")
+    if ident == "ryujinx":
+        return switch_layout("labels" if modo == "xbox" else "positional", home)
+    if ident == "lichii":
+        return lichii_layout(modo, home)
+    raise ValueError("emulador sem escolha de layout")
+
+
 def _ini_has(path: Path, section_rx: str, value_rx: str) -> bool | None:
     if not path.exists():
         return None
