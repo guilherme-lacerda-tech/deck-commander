@@ -1,13 +1,13 @@
 #!/bin/bash
 # Deck Commander — instalação em 1 comando no Steam Deck (modo Desktop → Konsole):
 #
-#   curl -fsSL https://raw.githubusercontent.com/SEU-USUARIO/deck-commander/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/guilherme-lacerda-tech/deck-commander/main/install.sh | bash
 #
 # Baixa (ou atualiza) o projeto em ~/deck-commander, instala tudo no $HOME (sem senha de administrador)
 # e abre o assistente do Telegram (QR code → @BotFather → cola o token → QR do seu bot → pronto).
 # Pode rodar de novo quando quiser: atualiza sem apagar nada.
 set -euo pipefail
-REPO="${DC_REPO:-https://github.com/SEU-USUARIO/deck-commander.git}"
+REPO="${DC_REPO:-https://github.com/guilherme-lacerda-tech/deck-commander.git}"
 BRANCH="${DC_BRANCH:-main}"
 DEST="${DC_DEST:-$HOME/deck-commander}"
 

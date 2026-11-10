@@ -35,7 +35,7 @@ abrir o modo Desktop no dia a dia.
 2. No Deck, **modo Desktop** → abra o **Konsole** → cole e aperte Enter:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/SEU-USUARIO/deck-commander/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/guilherme-lacerda-tech/deck-commander/main/install.sh | bash
 ```
 
 3. No fim aparece um **QR code**: aponte o celular, ele abre o **@BotFather** (o robô oficial do Telegram
@@ -51,7 +51,7 @@ O token fica só em `~/.config/deck-commander/secrets/` (nunca no git). Para ref
 No Deck, **modo Desktop**, abra o **Konsole**:
 
 ```bash
-git clone https://github.com/SEU-USUARIO/deck-commander.git ~/deck-commander
+git clone https://github.com/guilherme-lacerda-tech/deck-commander.git ~/deck-commander
 cd ~/deck-commander && ./setup-deck.sh --all
 ```
 
