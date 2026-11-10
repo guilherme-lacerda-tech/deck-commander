@@ -683,6 +683,9 @@ def _dispatch(paths, store, job, cfg, progress, should_pause) -> tuple[dict, str
         from . import lm3
         if lm3.supported(tid):  # Luigi's Mansion 3: textos no init.patch da Next Level Games (não é MSBT)
             return _translate_lm3(paths, job, g, tid, rom, cfg, progress, should_pause)
+        ue = _translate_unreal(paths, job, g, tid, rom, cfg, progress, should_pause)
+        if ue:  # Unreal Engine (ex.: Final Fantasy Resonance): textos em .locres dentro do .pak
+            return ue
         romfs = switch.find_romfs(tid)
         how = "pasta extraída"
         if not romfs:
@@ -696,9 +699,6 @@ def _dispatch(paths, store, job, cfg, progress, should_pause) -> tuple[dict, str
                 files = trinity_game.find_rom_files(rom, tid, syncer.rom_roots())
                 if files and trinity_game.is_trinity(files):  # Pokémon Legends Z-A / Scarlet-Violet
                     return _translate_trinity(paths, job, g, tid, rom, cfg, progress, should_pause)
-                ue = _translate_unreal(paths, job, g, tid, rom, cfg, progress, should_pause)
-                if ue:  # Unreal Engine (ex.: Final Fantasy Resonance): textos em .locres dentro do .pak
-                    return ue
                 romfs = switch.extract_with_hactool(rom, tid)
                 if not romfs and ("prod.keys" in str(e) or "ausente" in str(e)):
                     return {"title_id": tid}, (
