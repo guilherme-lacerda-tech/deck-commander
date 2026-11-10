@@ -102,10 +102,15 @@ class Bot:
         with urllib.request.urlopen(self.api + method, data=data, timeout=70) as r:
             return json.loads(r.read())["result"]
 
-    def send(self, chat: int, text: str) -> None:
+    def send(self, chat: int, text: str, buttons: list[str] | None = None) -> None:
         text = text.replace(self.token, "***")
-        for i in range(0, len(text), 3900):
-            self.call("sendMessage", chat_id=chat, text=text[i:i + 3900])
+        chunks = [text[i:i + 3900] for i in range(0, len(text), 3900)] or [""]
+        for n, chunk in enumerate(chunks):
+            extra = {}
+            if buttons and n == len(chunks) - 1:  # botões de resposta rápida (viram texto ao tocar)
+                extra["reply_markup"] = json.dumps({"keyboard": [[{"text": b} for b in buttons]],
+                                                    "one_time_keyboard": True, "resize_keyboard": True})
+            self.call("sendMessage", chat_id=chat, text=chunk, **extra)
 
     def save_cfg(self) -> None:
         tmp = self.cfg_path.with_name("telegram.json.tmp")
@@ -123,6 +128,11 @@ class Bot:
     def handle(self, uid: int, chat: int, text: str) -> str:
         parts = text.strip().split()
         cmd, args = parts[0].split("@")[0].lower(), parts[1:]
+        op = self.cfg.get("pergunta_op")
+        if op and uid in self.cfg["allowed"] and text.strip().lower() in ("sim", "s", "não", "nao", "n"):
+            from .traducao import run as trad_run
+            self.cfg.pop("pergunta_op", None); self.save_cfg()
+            return trad_run.answer_generic(self.paths, op, text.strip().lower() in ("sim", "s"))
         if uid not in self.cfg["allowed"]:
             code = (self.paths.state / "telegram-pairing").read_text().strip() \
                 if (self.paths.state / "telegram-pairing").exists() else None

@@ -367,3 +367,27 @@ def test_ensure_update_selected_fixes_ryujinx(tmp_path, monkeypatch):
     data = _j.loads((ryu / "games" / tid.lower() / "updates.json").read_text())
     assert data["selected"] == str(upd) and str(upd) in data["paths"]
     assert switch.ensure_update_selected(tid, [tmp_path]) is None  # já certo: não mexe
+
+
+def test_parallel_providers_share_work_and_survive_a_dead_one(tmp_path, monkeypatch):
+    from dc import ops
+    paths = get_paths(tmp_path / "dc").ensure()
+    cfg = ia.load_cfg(paths)
+    monkeypatch.setattr(ia, "RETRY_WAIT", 0, raising=False)
+    monkeypatch.setattr(ops, "game_running", lambda: True)  # jogo aberto: a IA do Deck não trabalha
+    good, bad, deck = FakeAI(), FakeAI(fail=True), FakeAI()
+    base = {**cfg["providers"]["ollama"], "modelo": "qwen"}
+    chain = [ia.Provider("pc", {**base, "url": "http://127.0.0.1:11435"}, "", good),
+             ia.Provider("ruim", {**base, "url": "http://10.0.0.9:11434"}, "", bad),
+             ia.Provider("deck", {**base, "url": "http://127.0.0.1:11434"}, "", deck)]
+    items = [ia.Item(f"i{n}", f"Hello number {n}") for n in range(130)]
+    seen = []
+    res = ia.translate(paths, cfg, items, "par", chain=chain, progress=lambda d, t: seen.append(d))
+    assert len(res.translated) == 130 and res.translated["i7"] == "PT Hello number 7"
+    assert deck.calls == 0 and good.calls > 0
+    assert seen[-1] == 130
+    assert any("ruim saiu" in e for e in res.errors)
+    # retomar: tudo vem do cache, nenhuma chamada nova
+    good.calls = 0
+    res2 = ia.translate(paths, cfg, items, "par", chain=chain)
+    assert len(res2.translated) == 130 and good.calls == 0

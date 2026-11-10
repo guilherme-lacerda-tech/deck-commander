@@ -255,6 +255,23 @@ def notify(bot) -> None:
             msg = f"✅ {j['title']}: pronto.\n{j.get('report', '')}"
         elif st == "falhou":
             msg = f"❌ {j['title']}: não deu certo (nada do original foi alterado).\n{j.get('report', '')}"
+            rep = (j.get("report") or "").lower()
+            formato = any(w in rep for w in ("formato", "não traduzi para não estragar", "msbt", "fora do padrão"))
+            if j.get("type") != "translate_generic" and formato:  # só quando o problema é o formato do texto
+                offer = run.offer_generic(bot.paths, bot.store, j["game_id"], j["title"], "tradução padrão falhou")
+                if offer:
+                    msg += "\n\nPosso tentar a tradução fora do padrão (próxima mensagem)."
+        elif st == "aguardando sim":
+            j["notified"] = True
+            run.save_job(bot.paths, j)
+            bot.cfg["pergunta_op"] = j["op"]
+            bot.save_cfg()
+            bot.send(chat, (f"🧩 {j['title']}: tradução fora do padrão — deseja traduzir?\n"
+                            "O texto deste jogo não está num formato conhecido. Eu procuro as frases nos arquivos, "
+                            "só troco o que cabe no mesmo espaço (sem risco de quebrar o jogo) e uso só as IAs "
+                            "locais do PC/Deck. Se não achar nada seguro, aviso e não mexo em nada."),
+                     buttons=["Sim", "Não"])
+            continue
         elif st == "aguardando aprovação":
             msg = f"💰 {j['title']}: {j.get('report', '')}"
         else:

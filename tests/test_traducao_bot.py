@@ -17,7 +17,7 @@ def b(tmp_path, monkeypatch):
     x.cfg["allowed"] = [1]
     x.cfg["notify_chat"] = 9
     x.sent = []
-    x.send = lambda chat, text: x.sent.append(text)
+    x.send = lambda chat, text, buttons=None: x.sent.append(text)
     rom = tmp_path / "roms/switch/Jogo/Jogo [0100ABCD12340000][v0].nsp"
     rom.parent.mkdir(parents=True)
     rom.write_bytes(b"PFS0" + b"\x00" * 60)
@@ -143,3 +143,30 @@ def test_auto_queue_translates_new_downloads_not_in_portuguese(b, monkeypatch, t
     assert run.auto_queue(b.paths, b.store, ["ps2-okami"]) == [] and len(b.spawned) == 1  # sem fila dupla
     (b.paths.config / "traducao.toml").write_text("auto_traduzir = false\n")
     assert run.auto_queue(b.paths, b.store, ["ps2-okami"]) == []
+
+
+def test_out_of_standard_offer_asks_yes_no_and_runs_on_yes(b):
+    asked = []
+    b.send = lambda chat, text, buttons=None: asked.append((text, buttons))
+    job = run.offer_generic(b.paths, b.store, "switch-jogo", "Jogo", "tradução padrão falhou")
+    assert job["status"] == "aguardando sim"
+    assert run.offer_generic(b.paths, b.store, "switch-jogo", "Jogo", "de novo") is None  # não pergunta 2x
+    comandos.notify(b)
+    text, buttons = asked[-1]
+    assert "fora do padrão" in text and buttons == ["Sim", "Não"]
+    r = b.handle(1, 1, "Sim")
+    assert "começou" in r and b.spawned == [job["op"]]
+    assert run.load_job(b.paths, job["op"])["status"] == "na fila"
+    assert "pergunta_op" not in b.cfg
+
+
+def test_out_of_standard_no_keeps_game(b):
+    b.send = lambda chat, text, buttons=None: None
+    job = run.offer_generic(b.paths, b.store, "switch-jogo", "Jogo", "x")
+    comandos.notify(b)
+    assert "fica como está" in b.handle(1, 1, "não")
+    assert run.load_job(b.paths, job["op"])["status"] == "recusado" and b.spawned == []
+
+
+def test_out_of_standard_not_offered_for_iso_consoles(b):
+    assert run.offer_generic(b.paths, b.store, "psx-hercules", "Hercules", "x") is None

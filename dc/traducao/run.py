@@ -22,10 +22,12 @@ from pathlib import Path
 
 from .. import ops
 from ..paths import Paths, get_paths
+from typing import Optional
+
 from ..store import Store
 from . import ia
 
-TYPES = ("translate_switch", "translate_retro", "convert_switch", "translate_n3ds")
+TYPES = ("translate_switch", "translate_retro", "convert_switch", "translate_n3ds", "translate_generic")
 
 
 def jobs_dir(paths: Paths) -> Path:
@@ -72,12 +74,15 @@ def _alive(pid) -> bool:
         return False
 
 
+MAX_JOBS = 2  # um jogo grande (ex.: Z-A, horas) não segura a fila: o próximo traduz junto
+
+
 def active_job(paths: Paths, except_op: str = "") -> dict | None:
-    for j in all_jobs(paths):
-        if j["op"] != except_op and j.get("status") in ("rodando", "aguardando tomada", "pausado (jogo aberto)") \
-                and _alive(j.get("pid")):
-            return j
-    return None
+    """Devolve uma tarefa que impede esta de começar (já há MAX_JOBS rodando), ou None."""
+    running = [j for j in all_jobs(paths)
+               if j["op"] != except_op and j.get("status") in ("rodando", "aguardando tomada", "pausado (jogo aberto)")
+               and _alive(j.get("pid"))]
+    return running[0] if len(running) >= MAX_JOBS else None
 
 
 def create(paths: Paths, store: Store, kind: str, game_id: str, title: str, args: dict) -> dict:
@@ -134,6 +139,10 @@ def auto_queue(paths: Paths, store: Store, game_ids: list[str]) -> list[str]:
             kind = "translate_switch"
         elif g["console"] == "n3ds":
             kind = "translate_n3ds"
+        elif g["console"] in ("ps3", "wiiu"):
+            if offer_generic(paths, store, gid, g["title"], "não há tradutor padrão para este console"):
+                out.append(f"❓ {g['title']}: vou perguntar se quer a tradução fora do padrão.")
+            continue
         else:
             okc, _why = rts.supported(g["console"], Path(g.get("rom", "")))
             if not okc:
@@ -396,6 +405,87 @@ def _translate_n3ds(paths, job, g, rom: Path, cfg, progress, should_pause) -> tu
     return result, rep.text(), rep.translated > 0 and not (rep.errors and not rep.applied)
 
 
+def offer_generic(paths: Paths, store: Store, game_id: str, title: str, motivo: str) -> Optional[dict]:
+    """Deixa a pergunta "tradução fora do padrão — deseja traduzir?" para o bot fazer (botões Sim/Não)."""
+    from . import fora_padrao
+    g = _game(paths, game_id)
+    if g.get("console") not in fora_padrao.SUPPORTED:
+        return None
+    if any(j.get("game_id") == game_id and j.get("type") == "translate_generic" and
+           j.get("status") in ("aguardando sim", "na fila", "rodando", "recusado") for j in all_jobs(paths)):
+        return None
+    job = create(paths, store, "translate_generic", game_id, title, {"motivo": motivo})
+    job.update(status="aguardando sim", notified=False, report=motivo)
+    save_job(paths, job)
+    return job
+
+
+def answer_generic(paths: Paths, op: str, yes: bool) -> str:
+    job = load_job(paths, op)
+    if not job or job.get("status") != "aguardando sim":
+        return "Essa pergunta já foi respondida."
+    if not yes:
+        job.update(status="recusado", notified=True)
+        save_job(paths, job)
+        return f"Ok, {job['title']} fica como está."
+    job.update(status="na fila", notified=False)
+    save_job(paths, job)
+    spawn(paths, op)
+    return (f"🛠 Tradução fora do padrão de {job['title']} começou, só com as IAs locais do PC/Deck. "
+            "Pode levar horas; aviso quando terminar.")
+
+
+def _translate_generic(paths, job, g, rom: Path, cfg, progress, should_pause) -> tuple[dict, str, bool]:
+    import shutil
+    from .. import syncer
+    from . import fora_padrao, n3ds, switch
+    console = g["console"]
+    work = paths.data / "traducao" / "fora-do-padrao" / job["game_id"]
+    shutil.rmtree(work, ignore_errors=True)
+    src, stage = work / "arquivos", work / "traduzidos"
+    expected = idioma_from_name(rom.name)
+    if console == "switch":
+        from ..dedup import base_title_id
+        tid = base_title_id(rom.name)
+        if not tid:
+            return {}, "não achei o Title ID no nome do arquivo", False
+        fora_padrao.extract_switch(rom, tid, syncer.rom_roots(), src)
+        rep = fora_padrao.translate_dir(paths, src, stage, g.get("title", ""), expected, progress=progress,
+                                        should_pause=should_pause)
+        if rep.changed:
+            fora_padrao.install_layeredfs(stage, switch.mod_target(tid) / "romfs")
+    elif console == "n3ds":
+        game = n3ds.open_game(rom)
+        game.extract(src, lambda rel: Path(rel).suffix.lower() not in fora_padrao.MEDIA)
+        rep = fora_padrao.translate_dir(paths, src, stage, g.get("title", ""), expected, progress=progress,
+                                        should_pause=should_pause)
+        if rep.changed:
+            fora_padrao.install_layeredfs(stage, n3ds.mod_dir(game.title_id) / "romfs")
+    else:  # jogo em pasta (PS3, Wii U): cópia "(PT-BR)" com links + os arquivos traduzidos
+        root = fora_padrao.folder_game_root(console, rom)
+        if not root:
+            return {}, "formato de arquivo deste jogo não é pasta; a tradução fora do padrão não se aplica", False
+        rep = fora_padrao.translate_dir(paths, root, stage, g.get("title", ""), expected, progress=progress,
+                                        should_pause=should_pause)
+        if rep.changed:
+            out = root.with_name(root.name + " (PT-BR)")
+            shutil.rmtree(out, ignore_errors=True)
+            fora_padrao.hardlink_copy(root, out)
+            for rel in rep.changed:
+                (out / rel).unlink(missing_ok=True)
+                shutil.copy2(stage / rel, out / rel)
+    shutil.rmtree(src, ignore_errors=True)
+    if rep.changed:
+        _refresh_tabs(paths)
+    return ({"traducao_pt_br": bool(rep.changed), "translated": rep.translated, "provider": rep.provider},
+            rep.text(), bool(rep.changed))
+
+
+def idioma_from_name(name: str):
+    from . import idioma
+    return idioma.language_from_name(name)
+
+
 def _dispatch(paths, store, job, cfg, progress, should_pause) -> tuple[dict, str, bool]:
     from .. import syncer
     g = _game(paths, job["game_id"])
@@ -462,6 +552,8 @@ def _dispatch(paths, store, job, cfg, progress, should_pause) -> tuple[dict, str
         return result, rep.text(), rep.translated > 0 and not (rep.errors and not rep.applied)
     if job["type"] == "translate_n3ds":
         return _translate_n3ds(paths, job, g, rom, cfg, progress, should_pause)
+    if job["type"] == "translate_generic":
+        return _translate_generic(paths, job, g, rom, cfg, progress, should_pause)
     if job["type"] == "translate_retro":
         from . import retro, rts
         if g["console"] == "gba" and retro.is_pokemon_gba(rom) and retro.meowth_bin():

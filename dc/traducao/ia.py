@@ -328,6 +328,121 @@ def _h(text: str) -> str:
     return hashlib.sha1(text.encode("utf-8")).hexdigest()[:16]
 
 
+PARALLEL_CHUNK = 40
+DECK_LOCAL = ("127.0.0.1:11434", "localhost:11434")
+
+
+def _is_deck_local(p: "Provider") -> bool:
+    return p.spec.get("tipo") == "ollama" and any(h in (p.spec.get("url") or "") for h in DECK_LOCAL)
+
+
+def _translate_parallel(paths, cfg, items, job, glossary, examples, pool, progress, should_pause) -> "Result":
+    """Vários provedores ao mesmo tempo (internet + PC + Deck): as frases ficam numa fila de pacotes e cada
+    provedor puxa o próximo quando termina o dele; o mais rápido faz mais. Um provedor que falha 3 pacotes
+    seguidos sai e os pacotes dele voltam para a fila. A IA do Deck só trabalha sem jogo aberto (não rouba
+    desempenho). Cada provedor guarda o próprio cache (job#provedor); no fim tudo vai para o cache do job, e
+    retomar uma tradução interrompida reaproveita tudo o que já tinha sido feito."""
+    import queue
+    import threading
+    from .. import ops
+    res = Result()
+    cdir = _cache_path(paths, job).parent
+    known: dict[str, str] = {}
+    for f in [_cache_path(paths, job), *cdir.glob(f"{job}#*.json")]:
+        try:
+            known.update(json.loads(f.read_text("utf-8")))
+        except (OSError, ValueError):
+            pass
+    todo = []
+    for it in items:
+        if only_codes(it.text):
+            res.translated[it.id] = it.text
+        elif _h(it.text) in known:
+            res.translated[it.id] = known[_h(it.text)]
+        else:
+            todo.append(it)
+    total = len(items)
+    state = {"done": total - len(todo)}
+    progress(state["done"], total)
+    q: "queue.Queue[list]" = queue.Queue()
+    for i in range(0, len(todo), PARALLEL_CHUNK):
+        q.put(todo[i:i + PARALLEL_CHUNK])
+    lock = threading.Lock()
+    alive = {p.name for p in pool}
+    pending = {"n": q.qsize()}
+
+    def worker(prov: "Provider") -> None:
+        fails = 0
+        while True:
+            with lock:
+                if not pending["n"]:
+                    return
+            if _is_deck_local(prov) and ops.game_running():
+                time.sleep(10)  # jogo aberto: a IA do Deck espera (os outros seguem)
+                continue
+            try:
+                chunk = q.get(timeout=5)
+            except queue.Empty:
+                continue
+            sub = translate(paths, cfg, chunk, f"{job}#{prov.name}", glossary, examples, chain=[prov],
+                            should_pause=should_pause)
+            bad = [it for it in chunk if it.id not in sub.translated and
+                   sub.flagged.get(it.id, "").startswith(("nenhum provedor", "falha na IA"))]
+            with lock:
+                for k, v in sub.translated.items():
+                    res.translated[k] = v
+                    res.flagged.pop(k, None)
+                for k, v in sub.flagged.items():
+                    if k not in res.translated:
+                        res.flagged[k] = v
+                res.review.update(sub.review)
+                res.tokens += sub.tokens
+                if sub.provider_used and prov.name not in res.provider_used.split("+"):
+                    res.provider_used = "+".join(x for x in (res.provider_used, prov.name) if x)
+                if chunk and len(bad) == len(chunk):  # o provedor não traduziu nada: devolve o pacote
+                    fails += 1
+                    for it in chunk:
+                        res.flagged.pop(it.id, None)
+                    q.put(chunk)
+                    if fails >= 3:
+                        alive.discard(prov.name)
+                        res.errors.append(f"{prov.name} saiu da tradução paralela (3 falhas seguidas)")
+                        if not alive:
+                            pending["n"] = 0
+                        return
+                    continue
+                fails = 0
+                state["done"] += len(chunk)
+                pending["n"] -= 1
+                progress(state["done"], total)
+
+    threads = [threading.Thread(target=worker, args=(p,), daemon=True) for p in pool]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
+    leftover = False
+    while not q.empty():  # todos os provedores saíram: o que sobrou fica no original
+        leftover = True
+        for it in q.get_nowait():
+            res.flagged[it.id] = "nenhum provedor respondeu"
+    if leftover:
+        res.errors.append("todos os provedores falharam")
+    # junta os caches dos provedores no cache do job
+    merged = dict(known)
+    for f in cdir.glob(f"{job}#*.json"):
+        try:
+            merged.update(json.loads(f.read_text("utf-8")))
+        except (OSError, ValueError):
+            pass
+    cp = _cache_path(paths, job)
+    cp.parent.mkdir(parents=True, exist_ok=True)
+    tmp = cp.with_name(cp.name + ".tmp")
+    tmp.write_text(json.dumps(merged, ensure_ascii=False), "utf-8")
+    os.replace(tmp, cp)
+    return res
+
+
 def translate(paths: Paths, cfg: dict, items: list[Item], job: str, glossary: Optional[dict] = None,
               examples: Optional[list[tuple[str, str]]] = None, chain: Optional[list[Provider]] = None,
               progress: Callable[[int, int], None] = lambda done, total: None,
@@ -335,6 +450,9 @@ def translate(paths: Paths, cfg: dict, items: list[Item], job: str, glossary: Op
     """Traduz `items`. Nunca levanta exceção por causa de uma frase: o problema vira `flagged`."""
     glossary = glossary or {}
     chain = chain if chain is not None else build_chain(paths, cfg)
+    pool = [p for p in chain if p.free]
+    if cfg.get("paralelo", True) and len(pool) > 1 and len(items) > PARALLEL_CHUNK and "#" not in job:
+        return _translate_parallel(paths, cfg, items, job, glossary, examples, pool, progress, should_pause)
     res = Result()
     if not chain:
         res.errors.append("nenhum provedor de IA disponível (instale o Ollama ou configure uma chave)")
