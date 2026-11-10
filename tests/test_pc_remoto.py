@@ -270,3 +270,14 @@ def test_config_secreta(paths):
     c["codigo"] = "abc"
     p = pc_remoto.salvar_config(paths, c)
     assert pc_remoto.carregar_config(paths)["codigo"] == "abc" and p.name == "pc-remoto.json"
+
+
+def test_bot_routes_pc_command(tmp_path, monkeypatch):
+    from dc import bot, pc_remoto
+    from dc.paths import get_paths
+    paths = get_paths(tmp_path).ensure()
+    x = bot.Bot(paths, "T")
+    x.cfg["allowed"] = [1]
+    seen = []
+    monkeypatch.setattr(pc_remoto, "comando_pc", lambda b, args: seen.append(args) or "ok pc")
+    assert x.handle(1, 1, "/pc status") == "ok pc" and seen == [["status"]]

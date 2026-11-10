@@ -96,6 +96,7 @@ Aviso aqui quando o download terminar.
 /baixar — baixa mesmo assim um download que parecia repetido
 /devolver <nome> — traz de volta um jogo que você tirou pelo Steam
 /bateria sim|nao — baixar também fora da tomada (padrão: só na tomada)
+/pc listar | sincronizar | acordar | status — jogos do PC no Deck (aba "Computador")
 /traduzir <jogo> — tradução pt-BR com IA (Switch e Pokémon GBA) · /traduzir lista | status | config
 /traduzir biblioteca — traduz todos os jogos que ainda não estão em português (pergunta antes)
 /converter <jogo> [organizar|descompactar] — Switch: update/DLC e NSZ
@@ -288,6 +289,9 @@ class Bot:
                 st["ingested"].pop(h); syncer._save_state(P, st)
             self.cfg.setdefault("explicit", {})[h] = console; self.save_cfg()
             return f"Ok, {st['pending'][h]} = {console}. Rode /sync."
+        if cmd == "/pc":  # jogos do PC transmitidos para o Deck (aba "Computador")
+            from . import pc_remoto
+            return pc_remoto.comando_pc(self, args)
         if cmd == "/bateria":
             return self._battery(args)
         if cmd == "/baixar":
