@@ -11,4 +11,5 @@
 - `tools/` — diagnóstico no Deck: `cef_eval.py`, `bootstrap_collections.py`, `deck_probe.py`, spikes `s1_reboot.py`/`s5_real_copy.py`
 - `docs/PC-REMOTO.md` — jogos do PC no Deck (aba Computador): `dc/pc_remoto.py` + `tools/pc/biblioteca-pc.ps1`
 - `dc/transferir.py` + `tools/pc/transferir-do-deck.ps1`/`.bat` — transferência segura de um jogo do Deck para o PC (`docs/TRANSFERENCIA.md`)
+- `dc/painel.py` + `decky-plugin/` — interface gráfica no menu "…" do modo de jogo (ações JSON que reaproveitam os comandos do bot; `docs/MANUAL.md`, "Pelo painel do Deck")
 - `docs/desenvolvimento/` — análise da spec v5.1, relatórios de spikes, histórico

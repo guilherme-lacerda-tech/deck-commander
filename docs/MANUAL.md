@@ -77,6 +77,29 @@ Não precisa abrir o modo Desktop no dia a dia. Instalação: [TUTORIAL-INSTALAC
 - Backup diário das configurações e saves; testes automáticos toda semana; nada é apagado sem confirmação.
 - Quarentena: `/quarantine list` · `review <id>` · `clear <id>`.
 
+## Pelo painel do Deck (sem Telegram)
+No modo de jogo: botão **…** → ícone do Decky (tomada) → **Deck Commander**. Tudo funciona só com o controle
+(A escolhe, B volta). A tela inicial mostra o **status** (downloads, traduções com % e previsão, espaço livre,
+bateria), o botão **Diagnóstico** (o que falta fazer) e a chave **Modo seguro**. Abaixo, uma tela para cada coisa:
+
+- **Telegram:** mostra se o bot está configurado e ligado ao seu celular. **Configurar bot** mostra o QR do
+  @BotFather e um campo para o token (aperte A no campo para abrir o teclado); depois aparece o QR do seu bot para
+  ligar o celular. O token fica só no Deck e não aparece na tela.
+- **Downloads:** lista com andamento, pausar/retomar (um ou todos), **Baixar fora da tomada** e **Procurar jogos
+  repetidos** (cada um com **Remover**, que mostra antes o que vai acontecer e pede confirmação).
+- **Tradução:** **Traduzir sozinho** liga/desliga a tradução automática; **Perguntas** (Sim/Não dos jogos de motor
+  diferente e da tradução fora do padrão); **Tarefas** com Parar/Retomar; **Não traduzidos** com o botão Traduzir.
+- **PC:** campos do PC (IP de casa, rede de casa, MAC, IP da Tailscale, porteiro e código, opcionais), **Salvar**,
+  **Testar conexão**, **Acordar PC**, **Sincronizar jogos do PC** e a lista dos jogos do PC.
+- **Levar jogo para o PC:** busque o jogo, escolha na lista, veja o tamanho e o que vai junto e toque em
+  **Enviar pro PC**. A fila mostra o andamento.
+- **Qualidade e controles:** resolução por jogo (padrão, nativo, 2x, 3x…) e quais emuladores ainda precisam que
+  você escolha o controle uma vez (no modo Desktop).
+- **Biblioteca e desempenho:** situação dos atalhos criados pelo plugin e o ajuste de desempenho do jogo aberto.
+
+O painel faz exatamente o mesmo que os comandos do bot (por baixo, `python3 -m dc.painel <ação>`). Se algo der
+errado, aparece uma mensagem simples na própria tela; detalhes ficam em `~/.local/state/deck-commander/painel.log`.
+
 ## Todos os comandos
 | Comando | Para quê |
 |---|---|

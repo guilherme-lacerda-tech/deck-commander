@@ -280,7 +280,8 @@ function DesempenhoPanel() {
     return h("div", null, ...out);
 }
 
-function Panel() {
+// Situação dos atalhos criados pelo plugin + desempenho do jogo aberto (tela "Biblioteca e desempenho").
+function AtalhosPanel() {
     const [st, setSt] = SP_REACT.useState(null);
     const refresh = async () => setSt(await call("get_status"));
     SP_REACT.useEffect(() => { refresh(); }, []);
@@ -298,6 +299,337 @@ function Panel() {
         h("div", { style: { borderTop: "1px solid #ffffff30", marginTop: "10px", paddingTop: "6px" } },
             h("div", { style: { fontWeight: "bold", fontSize: "14px" } }, "Desempenho e qualidade"),
             h(DesempenhoPanel, null)));
+}
+
+// ================================================================================================
+// Interface completa (usável só com o controle): cada tela chama dc/painel.py pelo backend (main.py).
+// ================================================================================================
+const D = window.DFL || {};
+const TEM_DFL = !!(D.PanelSection && D.PanelSectionRow && D.ButtonItem && D.ToggleField && D.TextField && D.DropdownItem);
+
+async function painel(acao, args) {
+    try {
+        return (await call("painel", acao, args || {})) || { ok: false, erro: "sem resposta do plugin" };
+    } catch (e) {
+        return { ok: false, erro: "o plugin não respondeu (" + e + ")" };
+    }
+}
+
+const Sec = (title, ...kids) => h(D.PanelSection, { title }, ...kids.flat(2).filter(Boolean));
+const Row = (child, key) => h(D.PanelSectionRow, { key }, child);
+const Txt = (t, style, key) => Row(h("div", { style: Object.assign({ fontSize: "12px", whiteSpace: "pre-wrap",
+    padding: "2px 0", lineHeight: "1.35" }, style || {}) }, t), key);
+const Bt = (label, onClick, opts, key) => Row(h(D.ButtonItem, Object.assign({ layout: "below", onClick }, opts || {}), label), key);
+const Toggle = (label, checked, onChange, description) => Row(h(D.ToggleField, { label, checked: !!checked, onChange, description }));
+const Campo = (label, value, onChange, opts) => Row(h(D.TextField, Object.assign({ label, value: value || "",
+    onChange: (e) => onChange(e.target.value) }, opts || {})));
+const Lista = (label, opcoes, sel, onChange) => Row(h(D.DropdownItem, { label, rgOptions: opcoes, selectedOption: sel,
+    strDefaultLabel: "Escolha…", onChange: (o) => onChange(o.data) }));
+const Barra = (pct, texto, resto, key) => (D.ProgressBarWithInfo && pct !== null && pct !== undefined)
+    ? Row(h(D.ProgressBarWithInfo, { label: texto, description: resto || "", nProgress: pct }), key)
+    : Txt(texto + (pct !== null && pct !== undefined ? " — " + pct + "%" : "") + (resto ? " · " + resto : ""), null, key);
+const Qr = (src) => src ? Row(h("img", { src, style: { width: "220px", height: "220px", display: "block",
+    margin: "6px auto", imageRendering: "pixelated", background: "#fff" } })) : null;
+const Msg = (m) => m ? Txt(m.erro ? "⚠️ " + m.erro : m.texto, { color: m.erro ? "#ff8a80" : "#8bc34a" }) : null;
+const Carregando = (d) => !d ? Txt("carregando…") : (!d.ok ? Txt("⚠️ " + d.erro, { color: "#ff8a80" }) : null);
+
+function confirmar(titulo, texto, okTxt, onOK) {
+    if (!D.showModal || !D.ConfirmModal) { onOK(); return; }
+    D.showModal(h(D.ConfirmModal, { strTitle: titulo, strDescription: texto, strOKButtonText: okTxt || "Confirmar",
+        strCancelButtonText: "Cancelar", onOK }));
+}
+
+// Dados de uma ação (recarrega a cada `cada` ms enquanto a tela está aberta)
+function useDados(acao, args, cada) {
+    const [d, setD] = SP_REACT.useState(null);
+    const vivo = SP_REACT.useRef(true);
+    const carregar = async () => { const r = await painel(acao, args); if (vivo.current) setD(r); return r; };
+    SP_REACT.useEffect(() => {
+        vivo.current = true;
+        carregar();
+        const t = cada ? setInterval(carregar, cada) : null;
+        return () => { vivo.current = false; if (t) clearInterval(t); };
+    }, []);
+    return [d, carregar];
+}
+
+// Executa uma ação com mensagem de resultado; trava os botões enquanto roda
+function useAcao(recarregar) {
+    const [msg, setMsg] = SP_REACT.useState(null);
+    const [ocupado, setOcupado] = SP_REACT.useState(false);
+    const fazer = async (acao, args) => {
+        setOcupado(true);
+        setMsg({ texto: "aguarde…" });
+        const r = await painel(acao, args);
+        setOcupado(false);
+        setMsg(r.ok ? { texto: r.texto || "feito ✅" } : { erro: r.erro });
+        if (recarregar) await recarregar();
+        return r;
+    };
+    return [msg, ocupado, fazer, setMsg];
+}
+
+const semAcento = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+const filtrar = (jogos, busca) => {
+    const q = semAcento(busca).split(/\s+/).filter(Boolean);
+    return jogos.filter((j) => { const t = semAcento(j.titulo + " " + j.console); return q.every((w) => t.includes(w)); });
+};
+const opcoesJogos = (jogos) => jogos.slice(0, 150).map((j) => ({ data: j.gid, label: j.titulo + " (" + j.console + ")" }));
+
+// ---- 1. Início / Status -------------------------------------------------------------------------
+function TelaInicio({ ir }) {
+    const [d, recarregar] = useDados("status", {}, 10000);
+    const [diag, setDiag] = SP_REACT.useState(null);
+    const [msg, ocupado, fazer] = useAcao(recarregar);
+    const menu = Sec("Configurar e usar",
+        Bt("💬 Telegram", () => ir("telegram")),
+        Bt("⬇️ Downloads", () => ir("downloads")),
+        Bt("🈯 Tradução" + (d && d.perguntas ? " (" + d.perguntas + " pergunta" + (d.perguntas > 1 ? "s" : "") + ")" : ""), () => ir("traducao")),
+        Bt("🖥️ PC (jogar os jogos do PC)", () => ir("pc")),
+        Bt("📦 Levar jogo para o PC", () => ir("transferir")),
+        Bt("🎚️ Qualidade e controles", () => ir("qualidade")),
+        Bt("📚 Biblioteca e desempenho", () => ir("atalhos")));
+    if (!d || !d.ok) return h("div", null, Sec("Status", Carregando(d)), menu);
+    const ativos = d.downloads.filter((x) => !x.concluido);
+    let diagRows = null;
+    if (diag && diag !== "carregando") {
+        diagRows = diag.ok
+            ? [Txt(diag.problemas.length ? "Encontrei " + diag.problemas.length + " ponto(s) para ver:"
+                : "✅ Tudo certo (" + diag.total + " verificações).", null, "dgt")]
+                .concat(diag.problemas.map((p, i) => Txt("• " + p.problema + ": " + p.detalhe + (p.acao ? " → " + p.acao : ""), null, "dg" + i)))
+            : Txt("⚠️ " + diag.erro, { color: "#ff8a80" });
+    }
+    return h("div", null,
+        Sec("Status",
+            d.safe_mode ? Txt("🛑 Modo seguro LIGADO: downloads e automações parados. " + (d.safe_motivo || ""), { color: "#ffb74d" }) : null,
+            d.erro_downloads ? Txt("⚠️ " + d.erro_downloads, { color: "#ffb74d" }) : null,
+            ativos.length ? ativos.map((x) => Barra(x.pct, x.nome, x.estado + (x.eta_min ? " · faltam ~" + x.eta_min + " min" : ""), x.hash))
+                : Txt("Downloads: nada baixando agora (" + d.downloads.length + " concluído(s))."),
+            d.downloads_pausados_energia ? Txt("🔌 Downloads esperando a tomada (" + d.motivo_energia + ")") : null,
+            d.traducoes.map((t) => Barra(t.pct, "🈯 " + t.titulo, t.status + (t.eta ? " · " + t.eta : ""), t.op)),
+            d.perguntas ? Txt("❓ Tem pergunta de tradução esperando você: abra Tradução.", { color: "#ffb74d" }) : null,
+            Txt("💾 Espaço livre: " + d.espaco.map((e) => e.livre_gb + " GB " + e.onde).join(" · ")
+                + (d.bateria !== null && d.bateria !== undefined ? "   🔋 " + d.bateria + "%" : "")),
+            Bt(diag === "carregando" ? "Verificando… (até 1 min)" : "🩺 Diagnóstico: o que falta fazer?", async () => {
+                setDiag("carregando");
+                setDiag(await painel("diagnostico"));
+            }, { disabled: diag === "carregando" }),
+            diagRows,
+            Toggle("Modo seguro", d.safe_mode, (v) => confirmar(v ? "Ligar o modo seguro?" : "Desligar o modo seguro?",
+                v ? "Para os downloads e as automações (nada é apagado). Use se algo estiver dando errado."
+                  : "Religa os downloads e as automações.", v ? "Ligar" : "Desligar",
+                () => fazer("safe_mode", { ligar: v })), "Desliga as automações sem apagar nada"),
+            Msg(msg)),
+        menu);
+}
+
+// ---- 2. Telegram --------------------------------------------------------------------------------
+function TelaTelegram() {
+    const [d, recarregar] = useDados("telegram");
+    const [passo, setPasso] = SP_REACT.useState(null);  // null | {botfather} | {parear}
+    const [token, setToken] = SP_REACT.useState("");
+    const [msg, ocupado, fazer, setMsg] = useAcao();
+    const salvarToken = async () => {
+        const t = token;
+        setToken("");  // o token não fica guardado na tela
+        const r = await fazer("telegram_token", { token: t });
+        if (r.ok) { setPasso({ parear: r }); setMsg({ texto: "✅ Bot @" + r.usuario + " configurado." }); recarregar(); }
+    };
+    const out = [];
+    if (!d || !d.ok) out.push(Carregando(d));
+    else {
+        out.push(Txt(d.configurado ? ("Bot: " + (d.usuario ? "@" + d.usuario + " ✅" : "configurado (sem internet para conferir)"))
+            : "Bot: ainda não configurado."));
+        out.push(Txt("Celular ligado ao bot: " + (d.pareado ? "sim ✅" : "não") + (d.codigo_aberto ? " · código de pareamento aberto" : "")));
+    }
+    out.push(Bt(d && d.configurado ? "Configurar outro bot" : "Configurar bot", async () => {
+        setMsg(null);
+        const r = await painel("telegram_botfather");
+        setPasso(r.ok ? { botfather: r } : null);
+        if (!r.ok) setMsg({ erro: r.erro });
+    }, { disabled: ocupado }));
+    if (d && d.configurado) {
+        out.push(Bt("Ligar um celular ao bot (QR)", async () => {
+            const r = await fazer("telegram_parear");
+            if (r.ok) { setPasso({ parear: r }); setMsg(null); }
+        }, { disabled: ocupado }));
+    }
+    if (passo && passo.botfather) {
+        out.push(Txt("PASSO 1 de 2 — criar o bot", { fontWeight: "bold" }));
+        out.push(Qr(passo.botfather.qr));
+        out.push(Txt(passo.botfather.passos));
+        out.push(Campo("Token do bot", token, setToken, { bIsPassword: true, description: "Aperte A no campo para abrir o teclado" }));
+        out.push(Bt("Salvar token", salvarToken, { disabled: ocupado || token.length < 20 }));
+    }
+    if (passo && passo.parear) {
+        out.push(Txt("PASSO 2 de 2 — ligar o SEU celular", { fontWeight: "bold" }));
+        out.push(Qr(passo.parear.qr));
+        out.push(Txt(passo.parear.texto));
+        out.push(Bt("Já toquei em INICIAR — conferir", async () => { await recarregar(); }));
+    }
+    out.push(Msg(msg));
+    return Sec("Telegram", out);
+}
+
+// ---- 3. Downloads -------------------------------------------------------------------------------
+function TelaDownloads() {
+    const [d, recarregar] = useDados("downloads", {}, 10000);
+    const [dups, setDups] = SP_REACT.useState(null);
+    const [msg, ocupado, fazer] = useAcao(recarregar);
+    const procurar = async () => { setDups({ carregando: true }); setDups(await painel("duplicados")); };
+    const alvo = (it) => (it.hash ? { hash: it.hash, nome: it.titulo } : { gid: it.gid });
+    const remover = async (it) => {
+        const plano = await painel("remover", alvo(it));
+        if (!plano.ok) { await fazer("remover", alvo(it)); return; }  // mostra o erro
+        confirmar("Remover?", plano.texto, "Remover", async () => {
+            await fazer("remover", Object.assign({ confirmar: true }, alvo(it)));
+            procurar();
+        });
+    };
+    if (!d || !d.ok) return Sec("Downloads", Carregando(d));
+    const out = [];
+    if (d.erro_downloads) out.push(Txt("⚠️ " + d.erro_downloads, { color: "#ffb74d" }));
+    if (!d.downloads.length) out.push(Txt("Nenhum download na lista."));
+    d.downloads.forEach((x) => {
+        out.push(Barra(x.pct, x.nome, x.estado + (x.eta_min ? " · faltam ~" + x.eta_min + " min" : "")
+            + (x.velocidade_kb ? " · " + x.velocidade_kb + " KB/s" : ""), "b" + x.hash));
+        if (!x.concluido) out.push(Bt(x.pausado ? "▶ Retomar este" : "⏸ Pausar este",
+            () => fazer(x.pausado ? "downloads_retomar" : "downloads_pausar", { hash: x.hash }), { disabled: ocupado }, "a" + x.hash));
+    });
+    if (d.downloads.some((x) => !x.concluido)) {
+        out.push(Bt("⏸ Pausar todos", () => fazer("downloads_pausar"), { disabled: ocupado }));
+        out.push(Bt("▶ Retomar todos", () => fazer("downloads_retomar"), { disabled: ocupado }));
+    }
+    out.push(Toggle("Baixar fora da tomada", d.bateria_permitida, (v) => fazer("bateria", { permitir: v }),
+        "Abaixo de " + d.bateria_minima + "% sempre pausa"));
+    out.push(Msg(msg));
+    const rep = [Bt(dups && dups.carregando ? "Procurando…" : "Procurar jogos repetidos", procurar, { disabled: !!(dups && dups.carregando) })];
+    if (dups && dups.ok) {
+        rep.push(Txt(dups.texto));
+        dups.itens.forEach((it, i) => rep.push(Bt("🗑 Remover: " + it.titulo, () => remover(it), { disabled: ocupado }, "r" + i)));
+        if (dups.itens.length) rep.push(Txt("Os arquivos ficam 30 dias na quarentena antes de sumir.", { opacity: 0.8 }));
+    } else if (dups && dups.erro) rep.push(Txt("⚠️ " + dups.erro, { color: "#ff8a80" }));
+    return h("div", null, Sec("Downloads", out), Sec("Repetidos", rep));
+}
+
+// ---- 4. Tradução --------------------------------------------------------------------------------
+function TelaTraducao() {
+    const [d, recarregar] = useDados("traducao", {}, 15000);
+    const [msg, ocupado, fazer] = useAcao(recarregar);
+    if (!d || !d.ok) return Sec("Tradução", Carregando(d));
+    const per = d.perguntas.length ? Sec("Perguntas", d.perguntas.map((p) => [
+        Txt("🧩 " + p.texto, null, "t" + p.op),
+        Bt("Sim, traduzir", () => fazer("traducao_responder", { op: p.op, sim: true }), { disabled: ocupado }, "s" + p.op),
+        Bt("Não", () => fazer("traducao_responder", { op: p.op, sim: false }), { disabled: ocupado }, "n" + p.op)])) : null;
+    const tar = Sec("Tarefas", d.tarefas.length ? d.tarefas.map((t) => [
+        Txt(t.linha, null, "l" + t.op),
+        t.pode_parar ? Bt("⏹ Parar " + t.titulo, () => confirmar("Parar a tradução?", "O que já foi traduzido fica guardado; "
+            + "dá para retomar depois de onde parou.", "Parar", () => fazer("traducao_parar", { op: t.op })), { disabled: ocupado }, "p" + t.op) : null,
+        t.pode_retomar ? Bt("▶ Retomar " + t.titulo, () => fazer("traducao_retomar", { op: t.op }), { disabled: ocupado }, "r" + t.op) : null,
+    ]) : Txt("Nenhuma tradução ainda."));
+    const jogos = Sec("Não traduzidos", d.nao_traduzidos.length
+        ? d.nao_traduzidos.map((j) => Bt("Traduzir: " + j.titulo + " (" + j.console + ")", () => fazer("traduzir", { gid: j.gid }),
+            { disabled: ocupado }, j.gid))
+        : Txt("Nenhum jogo esperando tradução: tudo em português, traduzido, na fila ou sem tradutor automático."));
+    return h("div", null,
+        Sec("Tradução",
+            Toggle("Traduzir sozinho", d.automatica, (v) => fazer("traducao_automatica", { ligar: v }),
+                "Jogo novo que não está em português entra na fila"),
+            Msg(msg)),
+        per, tar, jogos);
+}
+
+// ---- 5. PC --------------------------------------------------------------------------------------
+function TelaPC() {
+    const [d, recarregar] = useDados("pc");
+    const [f, setF] = SP_REACT.useState(null);
+    const [msg, ocupado, fazer] = useAcao(recarregar);
+    SP_REACT.useEffect(() => {
+        if (d && d.ok && !f) setF({ host_casa: d.host_casa, rede_casa: d.rede_casa, mac: d.mac,
+            host_tailscale: d.host_tailscale, porteiro: d.porteiro, codigo: "" });
+    }, [d]);
+    if (!d || !d.ok || !f) return Sec("PC", Carregando(d));
+    const set = (k) => (v) => setF(Object.assign({}, f, { [k]: v }));
+    return h("div", null,
+        Sec("PC",
+            Bt("📡 Testar conexão", () => fazer("pc_testar"), { disabled: ocupado }),
+            Bt("⏰ Acordar PC", () => fazer("pc_acordar"), { disabled: ocupado }),
+            Bt("🔄 Sincronizar jogos do PC", () => fazer("pc_sincronizar"), { disabled: ocupado }),
+            Msg(msg)),
+        Sec("Configuração do PC",
+            Campo("IP do PC em casa", f.host_casa, set("host_casa"), { description: "ex.: 192.168.0.10" }),
+            Campo("Rede de casa", f.rede_casa, set("rede_casa"), { description: "começo do IP, ex.: 192.168.0." }),
+            Campo("MAC do PC", f.mac, set("mac"), { description: "ex.: AA:BB:CC:DD:EE:FF (para acordar em casa)" }),
+            Campo("IP da Tailscale", f.host_tailscale, set("host_tailscale"), { description: "para jogar fora de casa (opcional)" }),
+            Campo("Porteiro (opcional)", f.porteiro, set("porteiro"), { description: "aparelho que acorda o PC, ex.: http://…/acordar" }),
+            Campo("Código do porteiro", f.codigo, set("codigo"), { bIsPassword: true,
+                description: d.codigo_definido ? "já definido (deixe vazio para manter)" : "opcional" }),
+            Bt("💾 Salvar", () => fazer("pc_salvar", f), { disabled: ocupado })),
+        Sec("Jogos do PC (" + d.jogos.length + ")", d.jogos.length ? Txt(d.jogos.map((j) => "• " + j).join("\n"))
+            : Txt("Nenhum ainda. Com o PC acordado, toque em Sincronizar.")));
+}
+
+// ---- 6. Transferências --------------------------------------------------------------------------
+function TelaTransferir() {
+    const [d, recarregar] = useDados("transferir", {}, 20000);
+    const [busca, setBusca] = SP_REACT.useState("");
+    const [gid, setGid] = SP_REACT.useState(null);
+    const [prep, setPrep] = SP_REACT.useState(null);
+    const [msg, ocupado, fazer] = useAcao(recarregar);
+    if (!d || !d.ok) return Sec("Levar jogo para o PC", Carregando(d));
+    const achados = filtrar(d.jogos, busca);
+    const escolher = async (g) => { setGid(g); setPrep({ carregando: true }); setPrep(await painel("transferir_preparar", { gid: g })); };
+    return h("div", null,
+        Sec("Levar jogo para o PC",
+            Campo("Buscar jogo", busca, setBusca, { description: achados.length + " jogo(s)" }),
+            Lista("Jogo", opcoesJogos(achados), gid, escolher),
+            prep && prep.carregando ? Txt("Vendo o que vai junto…") : null,
+            prep && prep.ok ? [Txt("Tamanho: " + prep.tamanho + " em " + prep.arquivos + " arquivos", { fontWeight: "bold" }, "pt"),
+                Txt(prep.resumo, { opacity: 0.9 }, "pr"),
+                Bt("📦 Enviar pro PC", () => confirmar("Enviar " + prep.titulo + " para o PC?",
+                    "O PC acorda, busca e copia sozinho (confere cada arquivo; nada é apagado no Deck).", "Enviar",
+                    () => fazer("transferir_enviar", { gid })), { disabled: ocupado }, "pe")] : null,
+            prep && prep.erro ? Txt("⚠️ " + prep.erro, { color: "#ff8a80" }) : null,
+            Msg(msg)),
+        Sec("Fila", d.fila.length ? d.fila.map((e, i) => Txt("• " + e.titulo + ": " + e.status, null, "f" + i))
+            : Txt("Nenhuma transferência pedida.")));
+}
+
+// ---- 7. Qualidade e controles -------------------------------------------------------------------
+function TelaQualidade() {
+    const [d, recarregar] = useDados("qualidade");
+    const [busca, setBusca] = SP_REACT.useState("");
+    const [gid, setGid] = SP_REACT.useState(null);
+    const [msg, ocupado, fazer] = useAcao(recarregar);
+    if (!d || !d.ok) return Sec("Qualidade", Carregando(d));
+    const achados = filtrar(d.jogos, busca);
+    const j = d.jogos.find((x) => x.gid === gid);
+    const faltam = d.controles.filter((c) => !c.ok);
+    return h("div", null,
+        Sec("Qualidade por jogo",
+            Campo("Buscar jogo", busca, setBusca, { description: achados.length + " jogo(s)" }),
+            Lista("Jogo", opcoesJogos(achados), gid, setGid),
+            j ? Lista("Resolução", j.niveis.map((n) => ({ data: n, label: n })), j.atual,
+                (n) => fazer("qualidade_definir", { gid: j.gid, nivel: n })) : null,
+            j ? Txt("Agora: " + j.atual + ". Vale a partir da próxima vez que abrir o jogo.") : null,
+            Txt("Jogo pesado ou com gráfico estranho: escolha nativo. Padrão = o do console.", { opacity: 0.8 }),
+            Msg(msg)),
+        Sec("Controles", faltam.length
+            ? [Txt("Estes emuladores precisam que você escolha o controle UMA vez (no modo Desktop: abra o emulador → "
+                + "Controles → escolha o controle do Deck):", null, "ch")].concat(faltam.map((c, i) => Txt("⚠️ " + c.emulador, null, "c" + i)))
+            : Txt("✅ Todos os emuladores já reconhecem o controle.")));
+}
+
+const TELAS = { telegram: TelaTelegram, downloads: TelaDownloads, traducao: TelaTraducao, pc: TelaPC,
+    transferir: TelaTransferir, qualidade: TelaQualidade, atalhos: AtalhosPanel };
+
+function Panel() {
+    const [tela, setTela] = SP_REACT.useState(null);
+    if (!TEM_DFL) return h(AtalhosPanel, null);  // Decky sem os componentes: só o painel antigo
+    if (!tela || !TELAS[tela]) return h(TelaInicio, { ir: setTela });
+    return h("div", null,
+        h(D.PanelSection, null, h(D.PanelSectionRow, null, h(D.ButtonItem, { layout: "below", onClick: () => setTela(null) }, "← Voltar"))),
+        h(TELAS[tela], null));
 }
 
 var index = definePlugin(() => {

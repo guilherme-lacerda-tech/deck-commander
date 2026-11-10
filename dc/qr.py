@@ -1,7 +1,7 @@
 """QR code em Python puro (só biblioteca padrão), para o instalador mostrar no terminal do Deck.
 
 Modo byte, correção de erro nível M, versões 1 a 10 (até ~210 caracteres — sobra para links do Telegram).
-Saída: terminal (meios-blocos Unicode) ou PNG.
+Saída: terminal (meios-blocos Unicode), PNG ou SVG (painel do Deck).
 """
 from __future__ import annotations
 
@@ -234,3 +234,12 @@ def png(text: str, path: Path, scale: int = 8, margin: int = 4) -> Path:
             + chunk(b"IDAT", zlib.compress(b"".join(rows), 9)) + chunk(b"IEND", b""))
     path.write_bytes(data)
     return path
+
+
+def svg(text: str, margin: int = 4) -> str:
+    """QR em SVG (para o painel do Deck mostrar como imagem): um caminho só, fundo branco, módulos pretos."""
+    m = encode(text)
+    n = len(m) + 2 * margin
+    d = "".join(f"M{x + margin} {y + margin}h1v1h-1z" for y, row in enumerate(m) for x, dark in enumerate(row) if dark)
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {n} {n}" shape-rendering="crispEdges">'
+            f'<rect width="{n}" height="{n}" fill="#fff"/><path fill="#000" d="{d}"/></svg>')

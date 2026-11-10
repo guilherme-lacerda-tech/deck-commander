@@ -19,6 +19,9 @@ QUEUE = os.path.join(BASE, "plugin-queue.json")
 DONE = os.path.join(BASE, "plugin-done.json")
 ITEMS = os.path.join(BASE, "plugin-items.json")  # escrito pelo Deck Commander e pelo plugin
 REMOVE = os.path.join(BASE, "plugin-remove.json")  # pedidos de remoção (/remover no bot)
+# tempo-limite por ação do painel (s); as que usam rede ou varrem a biblioteca demoram mais
+PAINEL_TEMPO = {"diagnostico": 150, "pc_sincronizar": 150, "transferir_preparar": 150, "pc_acordar": 40,
+                "telegram_token": 60, "telegram": 30, "telegram_parear": 30, "traducao": 90, "safe_mode": 90}
 
 
 def _load(path, default):
@@ -201,6 +204,46 @@ class Plugin:
         f.parent.mkdir(parents=True, exist_ok=True)
         _save(str(f), cfg)
         return "medição ligada" if on else "medição desligada"
+
+    # ---- Interface completa (dc/painel.py) ------------------------------------------------------------
+    async def painel(self, acao, args=None):
+        """Roda `python3 -m dc.painel <acao>` como o usuário, fora do processo do Decky, com tempo-limite.
+        Os parâmetros vão pela entrada padrão (o token do Telegram não aparece na lista de processos)."""
+        import asyncio
+        import signal
+        if not isinstance(acao, str) or not acao.replace("_", "").isalnum():
+            return {"ok": False, "erro": "ação inválida"}
+        repo = os.environ.get("DC_PAINEL_REPO") or os.path.join(HOME, "deck-commander")  # outro só em teste
+        uid = os.getuid()
+        env = {k: v for k, v in os.environ.items() if k not in ("LD_LIBRARY_PATH", "PYTHONHOME", "PYTHONPATH")}
+        if os.environ.get("LD_LIBRARY_PATH_ORIG"):  # o Decky é empacotado (PyInstaller): devolve o original
+            env["LD_LIBRARY_PATH"] = os.environ["LD_LIBRARY_PATH_ORIG"]
+        env.update(HOME=HOME, PYTHONPATH=repo, PYTHONIOENCODING="utf-8")
+        env.setdefault("XDG_RUNTIME_DIR", f"/run/user/{uid}")  # systemctl --user (modo seguro, bot, traduções)
+        env.setdefault("DBUS_SESSION_BUS_ADDRESS", f"unix:path=/run/user/{uid}/bus")
+        limite = PAINEL_TEMPO.get(acao, 45)
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "/usr/bin/python3", "-m", "dc.painel", acao, cwd=repo, env=env, start_new_session=True,
+                stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        except OSError:
+            return {"ok": False, "erro": "Não achei o Deck Commander em ~/deck-commander."}
+        try:
+            out, _err = await asyncio.wait_for(proc.communicate(json.dumps(args or {}).encode()), limite)
+        except asyncio.TimeoutError:
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except OSError:
+                pass
+            await proc.wait()
+            return {"ok": False, "erro": f"Demorou mais de {limite} s e eu parei. Tente de novo daqui a pouco."}
+        for linha in reversed(out.decode("utf-8", "replace").splitlines()):
+            if linha.startswith("{"):
+                try:
+                    return json.loads(linha)
+                except ValueError:
+                    break
+        return {"ok": False, "erro": "O Deck Commander não respondeu direito (atualizado?). Veja o Diagnóstico."}
 
     async def _main(self):
         os.makedirs(BASE, exist_ok=True)
