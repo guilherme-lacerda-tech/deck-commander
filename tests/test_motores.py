@@ -117,11 +117,9 @@ def test_engine_no_keeps_game(b, monkeypatch):  # noqa: F811
 
 
 def test_translate_keeps_leading_and_trailing_space(monkeypatch):
-    col = motores.Coleta([motores.Texto("a", "  Just like I will stop Him.
-")], lambda tr: {"/x": tr})
+    col = motores.Coleta([motores.Texto("a", "  Just like I will stop Him.\n")], lambda tr: {"/x": tr})
     monkeypatch.setattr(ia, "translate", lambda paths, cfg, items, job, glossary=None, **k: types.SimpleNamespace(
         translated={i.id: "Assim como eu vou detê-Lo." for i in items}))
     monkeypatch.setattr(ia, "load_glossary", lambda *a: {})
     files, _r, n = motores.translate(None, {}, col, "j", "T")
-    assert files["/x"]["a"] == "  Assim como eu vou detê-Lo.
-"
+    assert files["/x"]["a"] == "  Assim como eu vou detê-Lo.\n"
