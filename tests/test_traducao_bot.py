@@ -223,3 +223,14 @@ def test_traduzir_biblioteca_asks_then_queues_two_at_a_time(b, monkeypatch, tmp_
     # de novo: nada repetido
     assert "Nada novo" in b.handle(1, 1, "/traduzir biblioteca sim") or "vão entrar na fila: 0" in b.handle(
         1, 1, "/traduzir biblioteca")
+
+
+def test_runner_crash_log_has_date_and_task(b, monkeypatch):
+    """traducao.log: cada erro com data/hora, código da tarefa e jogo (antes só o traceback solto)."""
+    def boom(*a, **k):
+        raise RuntimeError("falha de teste")
+    monkeypatch.setattr(run, "_dispatch", boom)
+    job = run.create(b.paths, b.store, "translate_switch", "switch-jogo", "Jogo", {})
+    run.run(b.paths, job["op"])
+    log = (b.paths.logs / "traducao.log").read_text("utf-8")
+    assert f"tarefa {job['op']} (translate_switch) — Jogo" in log and "falha de teste" in log

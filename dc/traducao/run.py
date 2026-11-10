@@ -330,7 +330,8 @@ def run(paths: Paths, op: str) -> dict:
         job.update(status="falhou", report=f"{type(e).__name__}: {e}")
         store.finish(op, False, error=f"{type(e).__name__}: {e}")
         with open(paths.logs / "traducao.log", "a", encoding="utf-8") as f:
-            f.write(traceback.format_exc())
+            f.write(f"\n[{datetime.now().isoformat(timespec='seconds')}] tarefa {op} ({job.get('type')}) — "
+                    f"{job.get('title', job.get('game_id'))}\n" + traceback.format_exc())
     job["finished"] = datetime.now(timezone.utc).isoformat()
     job.pop("pid", None)
     save_job(paths, job)
