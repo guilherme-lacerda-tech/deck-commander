@@ -46,7 +46,7 @@ def _link_or_copy(src: Path, dst: Path) -> None:
 
 def classify(name: str, explicit: Optional[str] = None) -> Optional[str]:
     if explicit and explicit != "auto":  # "auto" = /add sem console: decide pelo nome
-        return explicit if explicit in CONSOLES else None
+        return explicit if explicit in CONSOLES and not CONSOLES[explicit].get("remoto") else None
     for rx, c in NAME_HINTS:
         if rx.search(name):
             return c

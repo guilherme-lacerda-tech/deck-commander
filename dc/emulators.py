@@ -75,6 +75,9 @@ CONSOLES = {
                "cmd": [FLATPAK, "run", "org.libretro.RetroArch", "-f", "-L", str(RA_CORES / "fbneo_libretro.so"), "{rom}"]},
     "switch": {"label": "Nintendo Switch", "exts": [".xci", ".nsp", ".nsz", ".xcz"],
                "cmd": [str(H / "Downloads/publish/Ryujinx"), "--fullscreen", "{rom}"]},
+    # Jogos do PC de casa por streaming (Moonlight <- Sunshine). Não há ROM nem emulador: o dc-launch chama
+    # dc.pc_remoto.jogar (acorda o PC, espera o Sunshine, transmite). Lista vem do PC: dc.pc_remoto.sincronizar.
+    "pc":     {"label": "Computador", "exts": [], "remoto": True, "cmd": []},
     # Switch 2 (experimental): dumps extraídos <jogo>/base/exefs/main, abertos pelo Lichii como o usuário já fazia
     "switch2": {"label": "Nintendo Switch 2", "exts": [], "dump": True,
                 "cmd": [str(H / "Emulation/Lichii/lichii-linux-x86_64-pgo.AppImage"), "-f", "-g", "{rom}"]},

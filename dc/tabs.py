@@ -19,7 +19,7 @@ GAMES_AND_SOFTWARE = 1 | 2
 EMULATOR_HINTS = ("pcsx2", "duckstation", "ryujinx", "lichii", "dolphin", "retroarch", "ppsspp", "eden", "melonds",
                   "azahar", "cemu", "rpcs3", "xemu", "flycast", "xenia")
 STORE_TITLES = {"epic": "Epic Games", "gog": "GOG", "amazon": "Amazon Games", "itch": "itch.io"}
-ORDER = ["ps2", "psx", "ps3", "psp", "switch", "switch2", "n3ds", "nds", "wiiu", "wii", "gc", "n64", "snes", "nes",
+ORDER = ["pc", "ps2", "psx", "ps3", "psp", "switch", "switch2", "n3ds", "nds", "wiiu", "wii", "gc", "n64", "snes", "nes",
          "gba", "gbc", "gb", "x360", "xbox", "dc", "saturn", "segacd", "genesis", "sms", "gg", "pce", "arcade"]
 
 

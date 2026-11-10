@@ -57,3 +57,4 @@ Tudo roda a partir de `~/deck-commander` (Konsole no modo Desktop, ou SSH).
 | `python3 -m dc x export [arquivo.zip]` · `x import <zip> [--apply]` | configs para outro Deck, sem segredos |
 | `python3 -m dc inventory` · `contracts` | inventário (M-1) · validação dos contratos (M27) |
 | `systemctl --user enable --now deck-commander-dashboard` | painel em http://127.0.0.1:8765 (opcional) |
+| `python3 -m dc x pc status · listar · sincronizar · acordar · jogar <app> · config [chave valor]` | jogos do PC na aba Computador (docs/PC-REMOTO.md) |

@@ -74,7 +74,10 @@ def _extra(paths, args) -> int:
     c, r = args[0], args[1:]
     apply = "--apply" in r
     r = [x for x in r if x != "--apply"]
-    if c == "configure":
+    if c == "pc":  # jogos do PC de casa (aba Computador): listar | sincronizar | acordar | status | config
+        from . import pc_remoto
+        print(pc_remoto.cli(paths, r))
+    elif c == "configure":
         for l in emulators.configure(apply=apply) or ["nada a mudar"]:
             print(l)
         print("" if apply else "(dry-run; use --apply)")

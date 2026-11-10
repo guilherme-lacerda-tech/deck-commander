@@ -11,6 +11,16 @@ from .library import build_command
 from .paths import get_paths
 
 
+def _jogar_pc(game_id: str, entry: dict, paths, say, fail) -> None:
+    from . import pc_remoto
+    app = entry.get("app") or entry.get("title", game_id)
+    say(f"lançando {game_id}: PC remoto, app {app!r}")
+    code, msg = pc_remoto.jogar(app, paths, say=say)
+    if code and msg:
+        fail(f"pc: {msg}", msg)
+    sys.exit(code)
+
+
 def main(argv: list[str]) -> None:
     paths = get_paths()
     log = paths.logs / "launch.log"
@@ -35,6 +45,14 @@ def main(argv: list[str]) -> None:
     game_id = argv[0]
     try:
         launch_map = json.loads((paths.data / "launch-map.json").read_text("utf-8"))
+    except Exception as e:  # noqa: BLE001
+        fail(f"erro ao ler o mapa: {e}", "Esse jogo foi removido ou não está mais na biblioteca.")
+    if launch_map.get(game_id, {}).get("console") == "pc":  # jogo do PC de casa por streaming
+        try:
+            _jogar_pc(game_id, launch_map[game_id], paths, say, fail)
+        except Exception as e:  # noqa: BLE001
+            fail(f"pc: erro {e!r}", f"{launch_map[game_id].get('title', game_id)}: não deu para abrir no PC ({e}).")
+    try:
         emu_cfg = paths.config / "emulators.json"
         emulators = json.loads(emu_cfg.read_text("utf-8")) if emu_cfg.exists() else {}
         cmd = build_command(game_id, launch_map, emulators)

@@ -276,7 +276,7 @@ def diagnose(paths: Paths, store: Store, repair: bool = False) -> list[Finding]:
         lm = json.loads((paths.data / "launch-map.json").read_text("utf-8"))
         emu_cfg = paths.config / "emulators.json"
         emu = json.loads(emu_cfg.read_text("utf-8")) if emu_cfg.exists() else {}
-        broken = [g for g in lm if not lm[g].get("removed") and not all(os.path.exists(x) for x in (library.build_command(g, lm, emu)[0], lm[g]["rom"]))]
+        broken = [g for g in lm if not lm[g].get("removed") and lm[g].get("console") != "pc" and not all(os.path.exists(x) for x in (library.build_command(g, lm, emu)[0], lm[g]["rom"]))]
         f.append(Finding("config", "ask", not broken, f"{len(broken)} lançador(es) quebrado(s): {broken[:5]}" if broken else "ok",
                          "oferecer restauração: dc restore <snapshot>" if broken else ""))
     except (OSError, ValueError):

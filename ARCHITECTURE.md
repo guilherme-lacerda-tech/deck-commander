@@ -38,6 +38,7 @@ Sem o plugin instalado, o Deck Commander grava `shortcuts.vdf` (com backup) e pe
 | M2.5 capas | `dc/artwork.py` |
 | M3 emuladores, perfis, detecção, qualidade por jogo, controles | `dc/emulators.py`, `dc/adapters/`, `dc/quality.py`, `dc/controls.py` |
 | M4 Telegram, torrents, /sync, energia | `dc/bot.py`, `dc/qbt.py`, `dc/content.py`, `dc/syncer.py`, `dc/safe_extract.py`, `dc/power.py` |
+| Jogos do PC por streaming (aba Computador) | `dc/pc_remoto.py`, `tools/pc/biblioteca-pc.ps1` (ver docs/PC-REMOTO.md) |
 | M5 traduções IPS/BPS/UPS | `dc/patches.py` |
 | M6/M7/M20/M21/M10.1 | `dc/health.py` |
 | M10/M11 serviços, testes, updates, painel | `dc/services.py` |

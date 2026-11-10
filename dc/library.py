@@ -72,6 +72,8 @@ def scan(roots: Iterable[Path]) -> tuple[list[Game], list[str]]:
     for root in roots:
         root = Path(root)
         for console, spec in CONSOLES.items():
+            if spec.get("remoto"):  # jogos do PC: vêm do Sunshine (dc.pc_remoto), não do disco
+                continue
             d = root / console
             if not d.is_dir():
                 continue
