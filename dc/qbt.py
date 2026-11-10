@@ -76,9 +76,11 @@ class Qbt:
             raise QbtError("o qBittorrent recusou o arquivo .torrent")
 
     def set_seeding_limits(self, ratio: float, minutes: int) -> None:
-        """Ao atingir o limite o torrent é PARADO (continua na lista; o /sync usa normalmente)."""
+        """Ao atingir o limite o torrent é PARADO (continua na lista; o /sync usa normalmente).
+        Também aplica QUEUE_PREFS (reaplicado 1x/h pelo serviço de energia)."""
         prefs = {"max_ratio_enabled": ratio >= 0, "max_ratio": ratio,
-                 "max_seeding_time_enabled": minutes >= 0, "max_seeding_time": minutes, "max_ratio_act": 0}
+                 "max_seeding_time_enabled": minutes >= 0, "max_seeding_time": minutes, "max_ratio_act": 0,
+                 **QUEUE_PREFS}
         self._req("app/setPreferences", {"json": json.dumps(prefs)})
 
     def preferences(self) -> dict:
@@ -107,4 +109,9 @@ class Qbt:
 
 
 DUP_OK_TAG = "dc-dup-ok"  # baixado com /baixar: o usuário quer esta cópia mesmo sendo o mesmo jogo
+# Torrent sem fontes (parado há 1 min, < 2 KiB/s) não ocupa vaga da fila: sem isso, 3 torrents mortos
+# (max_active_downloads=3) travavam todos os downloads que viessem depois.
+QUEUE_PREFS = {"dont_count_slow_torrents": True, "slow_torrent_dl_rate_threshold": 2,
+               "slow_torrent_ul_rate_threshold": 2, "slow_torrent_inactive_timer": 60}
+
 DONE_STATES = {"uploading", "stalledUP", "pausedUP", "stoppedUP", "queuedUP", "forcedUP", "checkingUP"}
