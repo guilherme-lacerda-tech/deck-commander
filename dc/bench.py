@@ -39,9 +39,24 @@ def launcher_pids(game_id: str | None = None) -> list[int]:
     return out
 
 
+def deck_ai_busy(url: str = "http://127.0.0.1:11434/api/ps") -> bool:
+    """A IA do próprio Deck está com um modelo carregado (traduzindo)? Aí o FPS medido sairia baixo e o
+    auto-ajuste baixaria a qualidade à toa."""
+    import urllib.request
+    try:
+        with urllib.request.urlopen(url, timeout=2) as r:
+            return bool(json.loads(r.read()).get("models"))
+    except (OSError, ValueError):
+        return False  # Ollama do Deck desligado/não instalado: livre
+
+
 def run(paths: Paths, game_id: str, seconds: int = 120, log=print) -> dict | None:
     if launcher_pids():
         log("Tem um jogo aberto agora; o benchmark só roda com o Deck livre.")
+        return None
+    if deck_ai_busy():
+        log("A IA do Deck está traduzindo agora; o benchmark mediria FPS baixo. Tente quando a tradução terminar "
+            "(o modelo sai da memória uns 5 min depois).")
         return None
     done = json.loads((paths.data / "plugin-done.json").read_text("utf-8"))
     appid = (done.get(game_id) or {}).get("appid")

@@ -104,3 +104,16 @@ def test_sync_skipped_warns_once_and_console_retries(tmp_path, monkeypatch):
     assert "nenhum arquivo jogável" not in out2   # não repete a cada /sync
     st = syncer._state(P)
     assert "ab" * 20 in st["pending"]
+
+
+def test_bench_refuses_while_deck_ai_is_busy(tmp_path, monkeypatch):
+    from dc import bench
+    from dc.paths import get_paths
+    P = get_paths(tmp_path).ensure()
+    real = bench.deck_ai_busy
+    monkeypatch.setattr(bench, "launcher_pids", lambda *a: [])
+    monkeypatch.setattr(bench, "deck_ai_busy", lambda *a: True)
+    said = []
+    assert bench.run(P, "psx-jogo", 30, log=said.append) is None
+    assert "IA do Deck" in said[0]
+    assert real("http://127.0.0.1:9/api/ps") is False  # sem Ollama: livre
