@@ -712,7 +712,12 @@ class Bot:
             self.cfg["removidos_avisados"] = sorted(tirados)
             self.save_cfg()
             return
-        novos = sorted(tirados - set(self.cfg["removidos_avisados"]))
+        try:  # já perguntado na tela do Deck (painel): não pergunta de novo pelo Telegram
+            from .painel import perguntados_path
+            na_tela = set(json.loads(perguntados_path(self.paths).read_text("utf-8")))
+        except (OSError, ValueError, ImportError):
+            na_tela = set()
+        novos = sorted(tirados - set(self.cfg["removidos_avisados"]) - na_tela)
         if not novos or not chat:
             return
         lm = remove.effective_map(self.paths)

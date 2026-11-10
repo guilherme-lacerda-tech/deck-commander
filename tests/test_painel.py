@@ -384,3 +384,24 @@ def test_desinstalar_lista_e_aviso_do_steam(tmp_path, monkeypatch):
     x.notify_removidos(); x.notify_removidos()
     assert len(sent) == 1 and "Jogo" in sent[0][0]
     assert sent[0][1] == [("Apagar os arquivos", "/remover ps2-jogo confirmar"), ("Trazer de volta", "/devolver ps2-jogo")]
+
+
+def test_perguntado_na_tela_nao_pergunta_no_telegram(tmp_path):
+    import json
+    from dc import bot, painel, plugin_bridge
+    from dc.paths import get_paths
+    paths = get_paths(tmp_path / "dc").ensure()
+    rom = tmp_path / "J.iso"; rom.write_bytes(b"x")
+    (paths.data / "launch-map.json").write_text(json.dumps({"ps2-j": {"title": "J", "console": "ps2", "rom": str(rom)}}))
+    x = bot.Bot(paths, "T"); x.cfg["allowed"] = [1]; x.cfg["notify_chat"] = 9
+    sent = []
+    x.send = lambda chat, text, buttons=None: sent.append(text)
+    x.notify_removidos()
+    plugin_bridge.done_path(paths).write_text(json.dumps({"ps2-j": {"appid": 0, "removed": True}}))
+
+    class P:
+        pass
+    p = P(); p.paths = paths
+    painel.removido_perguntado(p, {"gid": "ps2-j"})
+    x.notify_removidos()
+    assert sent == []

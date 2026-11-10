@@ -104,6 +104,29 @@ async function remember(it) {
     try { await call("remember_item", it.game_id, it); } catch (e) { /* backend antigo */ }
 }
 
+// "Gerenciar → Remover jogo não Steam" no menu do jogo: pergunta NA TELA, como o "Desinstalar" do Steam, se
+// apaga os arquivos também (vão para a quarentena por 30 dias). O bot não pergunta de novo pelo Telegram.
+async function perguntarApagar(gid, nome) {
+    const W = window.DFL || {};
+    if (!W.showModal || !W.ConfirmModal) return;  // sem os componentes: o bot pergunta pelo Telegram
+    let plano;
+    try { plano = await painel("remover", { gid }); } catch (e) { return; }
+    if (!plano || !plano.ok) return;
+    try { await painel("removido_perguntado", { gid }); } catch (e) { /* o bot pergunta */ }
+    W.showModal(SP_REACT.createElement(W.ConfirmModal, {
+        strTitle: "Desinstalar " + nome + "?",
+        strDescription: "Você tirou o jogo da biblioteca. Quer apagar os arquivos também e liberar o espaço?\n\n"
+            + plano.texto.replace(/^Remover[^\n]*\n/, "").replace(/• atalho sai do Steam \(ao vivo\)\n?/, ""),
+        strOKButtonText: "Apagar os arquivos",
+        strCancelButtonText: "Manter os arquivos",
+        onOK: async () => {
+            const r = await painel("remover", { gid, confirmar: true });
+            toaster.toast({ title: "Deck Commander", body: r && r.ok ? nome + " desinstalado (30 dias na quarentena)"
+                : "Não deu para apagar: " + ((r && r.erro) || "erro") });
+        },
+    }));
+}
+
 async function reconcile() {
     let done;
     try { done = (await call("get_done")) || {}; } catch (e) { return; } // backend antigo: sem autocorreção
@@ -112,6 +135,7 @@ async function reconcile() {
         if (exists(v.appid)) { seenThisSession.add(v.appid); continue; }
         if (seenThisSession.has(v.appid)) { // existia há pouco e sumiu: o usuário removeu pelo Steam
             try { await call("mark_removed", gid); note("removido por você: " + v.item.name); } catch (e) { /* backend antigo */ }
+            perguntarApagar(gid, v.item.name);
             continue;
         }
         try {

@@ -331,6 +331,27 @@ def devolver(p: Ponte, a: dict) -> dict:
     return {"texto": f"{titulo} volta para a biblioteca em instantes."}
 
 
+def perguntados_path(paths: Paths) -> Path:
+    """Jogos tirados pelo Steam cuja pergunta "apagar os arquivos?" já apareceu na tela do Deck."""
+    return paths.data / "removidos-perguntados.json"
+
+
+def removido_perguntado(p: Ponte, a: dict) -> dict:
+    if not a.get("gid"):
+        raise Erro("Falta o jogo.")
+    f = perguntados_path(p.paths)
+    try:
+        vistos = json.loads(f.read_text("utf-8"))
+    except (OSError, ValueError):
+        vistos = []
+    if a["gid"] not in vistos:
+        vistos.append(a["gid"])
+        tmp = f.with_name(f.name + ".tmp")
+        tmp.write_text(json.dumps(vistos), "utf-8")
+        tmp.replace(f)
+    return {"texto": "ok"}
+
+
 # ----------------------------------------------------------------------------------------------- tradução
 PERGUNTA = {"aguardando sim": "fora", "aguardando ok": "motor"}
 
@@ -609,7 +630,7 @@ ACOES = {f.__name__: f for f in (
     status, diagnostico, safe_mode, telegram, telegram_botfather, telegram_token, telegram_parear, downloads,
     bateria, duplicados, remover, traducao, traducao_automatica, traduzir, traducao_parar, traducao_retomar,
     traducao_responder, pc, pc_salvar, pc_testar, pc_acordar, pc_sincronizar, transferir, transferir_preparar,
-    transferir_enviar, qualidade, qualidade_definir, controle_definir, downloads_limpar, traducao_limpar, desinstalar_lista, devolver)}
+    transferir_enviar, qualidade, qualidade_definir, controle_definir, downloads_limpar, traducao_limpar, desinstalar_lista, devolver, removido_perguntado)}
 ACOES["downloads_pausar"] = lambda p, a: _pausar(p, a, True)
 ACOES["downloads_retomar"] = lambda p, a: _pausar(p, a, False)
 
