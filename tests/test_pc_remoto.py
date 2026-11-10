@@ -27,6 +27,9 @@ def paths(tmp_path, monkeypatch):
 @pytest.fixture
 def cfg():
     c = json.loads(json.dumps(pc_remoto.DEFAULT))
+    c.update(host_tailscale="100.118.222.56", host_casa="192.168.100.25", rede_casa="192.168.100.",
+             mac="24-B2-B9-0B-61-71", broadcast="192.168.100.255",
+             porteiro=["http://100.77.101.93:8766/acordar", "http://192.168.100.23:8766/acordar"])
     c["codigo"] = "SEGREDO"
     return c
 
@@ -266,7 +269,7 @@ def test_comando_pc_bot(paths, cfg, monkeypatch):
 
 def test_config_secreta(paths):
     c = pc_remoto.carregar_config(paths)
-    assert c["host_tailscale"] == "100.118.222.56" and c["codigo"] == ""
+    assert c["host_tailscale"] == "" and c["codigo"] == "" and c["porteiro"] == []  # nada de rede de ninguém no código
     c["codigo"] = "abc"
     p = pc_remoto.salvar_config(paths, c)
     assert pc_remoto.carregar_config(paths)["codigo"] == "abc" and p.name == "pc-remoto.json"

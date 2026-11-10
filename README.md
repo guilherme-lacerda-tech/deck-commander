@@ -9,6 +9,9 @@ abrir o modo Desktop no dia a dia.
 > (no Steam restart), and lets you queue downloads from a Telegram bot. Everything stays in `$HOME`;
 > SteamOS system files are never touched. Docs are in Portuguese (pt-BR).
 
+> **Começando do zero?** Siga o [tutorial de instalação](docs/TUTORIAL-INSTALACAO.md) e depois o
+> [manual de uso](docs/MANUAL.md).
+
 ## O que ele faz
 
 | | |

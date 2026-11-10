@@ -29,7 +29,7 @@ param(
     [string]$Emuladores = 'D:\Emuladores',
     [switch]$SoInstalar,
     [switch]$SemInstalar,
-    [string]$Deck = 'deck@192.168.100.24',
+    [string]$Deck = '',   # vazio = lê %USERPROFILE%\.deck-commander\deck.txt (ex.: deck@192.168.0.50); senão deck@steamdeck
     [string]$Chave = (Join-Path $env:USERPROFILE '.ssh\deck_commander_ed25519'),
     [string]$EmuDir,
     [switch]$SemEmuladorLinux,
@@ -39,6 +39,10 @@ param(
     [int]$Lote = 1500
 )
 $ErrorActionPreference = 'Stop'
+if (-not $Deck) {
+    $arqDeck = Join-Path $env:USERPROFILE '.deck-commander\deck.txt'
+    $Deck = if (Test-Path $arqDeck) { (Get-Content $arqDeck -TotalCount 1).Trim() } else { 'deck@steamdeck' }
+}
 $Utf8 = New-Object System.Text.UTF8Encoding($false)
 $Stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 

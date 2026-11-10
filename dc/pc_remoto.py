@@ -40,12 +40,13 @@ PORTA_SUNSHINE = 47989
 TEMPLATE_CONTROLE = "controller_neptune_gamepad+mouse.vdf"  # "Gamepad com trackpad como mouse"
 
 DEFAULT = {
-    "host_tailscale": "100.118.222.56",
-    "host_casa": "192.168.100.25",
-    "rede_casa": "192.168.100.",
-    "mac": "24-B2-B9-0B-61-71",
-    "broadcast": "192.168.100.255",
-    "porteiro": ["http://100.77.101.93:8766/acordar", "http://192.168.100.23:8766/acordar"],
+    # Nada da rede de ninguém fica no código: cada Deck configura o próprio PC (python3 -m dc x pc config ...).
+    "host_tailscale": "",          # IP do PC na Tailscale (para jogar fora de casa)
+    "host_casa": "",               # IP do PC no WiFi de casa
+    "rede_casa": "",               # começo do IP da rede de casa (ex.: "192.168.0.")
+    "mac": "",                     # MAC da placa de rede do PC (para acordar direto, em casa)
+    "broadcast": "255.255.255.255",
+    "porteiro": [],                # opcional: aparelho sempre ligado em casa que acorda o PC (URL ...?t=código)
     "codigo": "",
     "espera_pronto_s": 90,
     "moonlight_args": ["--resolution", "1280x800", "--fps", "60", "--display-mode", "fullscreen",
@@ -103,8 +104,10 @@ def em_casa(cfg: dict) -> bool:
     """O Deck está no WiFi de casa? (IP local da rota até o PC; não manda nada pela rede.)"""
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            s.connect((cfg.get("host_casa") or "192.168.100.25", 9))
-            return s.getsockname()[0].startswith(cfg.get("rede_casa") or "192.168.100.")
+            if not cfg.get("host_casa") or not cfg.get("rede_casa"):
+                return False
+            s.connect((cfg["host_casa"], 9))
+            return s.getsockname()[0].startswith(cfg["rede_casa"])
     except OSError:
         return False
 
@@ -147,8 +150,11 @@ def acordar(cfg: dict, http_get: Callable = _http_get, wol: Callable = enviar_wo
                 erros.append(f"{urllib.parse.urlsplit(base).hostname}: {type(e).__name__}")
     else:
         erros.append("sem código do porteiro na config")
+    if not cfg.get("mac"):
+        erros.append("sem o MAC do PC na config")
+        return False, "não consegui pedir para acordar: " + "; ".join(erros)
     try:  # só chega ao PC se o Deck estiver na rede de casa
-        wol(cfg.get("mac") or DEFAULT["mac"], cfg.get("broadcast") or "255.255.255.255")
+        wol(cfg["mac"], cfg.get("broadcast") or "255.255.255.255")
         return True, "magic packet direto enviado (" + "; ".join(erros) + ")"
     except Exception as e:  # noqa: BLE001
         erros.append(f"WoL: {e}")

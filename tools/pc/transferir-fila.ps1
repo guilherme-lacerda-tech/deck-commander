@@ -9,10 +9,14 @@
 param(
     [switch]$Instalar,
     [switch]$Desinstalar,
-    [string]$Deck = 'deck@192.168.100.24',
+    [string]$Deck = '',   # vazio = lê %USERPROFILE%\.deck-commander\deck.txt (ex.: deck@192.168.0.50); senão deck@steamdeck
     [string]$Chave = (Join-Path $env:USERPROFILE '.ssh\deck_commander_ed25519')
 )
 $ErrorActionPreference = 'Stop'
+if (-not $Deck) {
+    $arqDeck = Join-Path $env:USERPROFILE '.deck-commander\deck.txt'
+    $Deck = if (Test-Path $arqDeck) { (Get-Content $arqDeck -TotalCount 1).Trim() } else { 'deck@steamdeck' }
+}
 $OutputEncoding = New-Object Text.UTF8Encoding $false   # texto para o ssh em UTF-8 (senão "Ragnarök" vira "Ragnar?k")
 $aqui = Split-Path -Parent $MyInvocation.MyCommand.Path
 $tarefa = 'DeckCommander Transferencias'
@@ -62,10 +66,21 @@ if ($LASTEXITCODE -ne 0 -or -not $json) { exit 0 }
 $fila = @($json | ConvertFrom-Json | ForEach-Object { $_ } | Where-Object { $_.id })  # "[]" vira lista vazia de verdade
 if ($fila.Count -eq 0) { exit 0 }
 
-New-Item -ItemType Directory -Force $trabalhos -ErrorAction SilentlyContinue | Out-Null
-$ativo = Join-Path $trabalhos 'deck-commander-transferencia.ativo'
-# mantém o arquivo "ativo" atualizado a cada minuto enquanto copia (o agente da casa olha a data dele)
-$pulso = Start-Job -ScriptBlock { param($f) while ($true) { Set-Content -Path $f -Value (Get-Date -Format o); Start-Sleep 60 } } -ArgumentList $ativo
+# Enquanto copia, o PC não pode dormir:
+#  - para o Windows: pedido de energia "sistema necessário" (vale para qualquer PC; some quando o processo termina);
+#  - se existir a automação da casa (C:\AutomacaoCasa), também o arquivo "*.ativo" que o agente dela vigia.
+$ativo = $null
+if (Test-Path 'C:\AutomacaoCasa\agente') {
+    New-Item -ItemType Directory -Force $trabalhos -ErrorAction SilentlyContinue | Out-Null
+    $ativo = Join-Path $trabalhos 'deck-commander-transferencia.ativo'
+}
+Add-Type -Namespace DC -Name Energia -MemberDefinition '[DllImport("kernel32.dll")] public static extern uint SetThreadExecutionState(uint f);'
+$pulso = Start-Job -ScriptBlock {
+    param($f)
+    Add-Type -Namespace DC -Name Energia -MemberDefinition '[DllImport("kernel32.dll")] public static extern uint SetThreadExecutionState(uint f);'
+    [DC.Energia]::SetThreadExecutionState([uint32]'0x80000001') | Out-Null   # ES_CONTINUOUS | ES_SYSTEM_REQUIRED
+    while ($true) { if ($f) { Set-Content -Path $f -Value (Get-Date -Format o) }; Start-Sleep 60 }
+} -ArgumentList $ativo
 
 function Marcar([string]$id, [string]$status, [string]$nota) {
     $nota | & ssh.exe @sshArgs "cd ~/deck-commander && python3 -m dc.transferir marcar '$id' '$status' -" 2>$null | Out-Null
