@@ -219,6 +219,24 @@ function Ler-Gog {
     return $out
 }
 
+# Qualquer outro jogo (emulador, jogo sem loja): ponha um ATALHO (.lnk) nesta pasta e ele vai para o Deck.
+# Ex.: "Donkey Kong Bananza.lnk" -> lichii.exe -f -g "...\main". O nome do atalho e o nome que aparece no Deck.
+$PastaAtalhos = Join-Path $env:PUBLIC 'Documents\Deck Commander\Jogos do PC'
+
+function Ler-Atalhos {
+    $out = @()
+    if (-not (Test-Path -LiteralPath $PastaAtalhos)) { return $out }
+    $ws = New-Object -ComObject WScript.Shell
+    foreach ($f in Get-ChildItem -LiteralPath $PastaAtalhos -Filter '*.lnk' -File) {
+        try { $l = $ws.CreateShortcut($f.FullName) } catch { continue }
+        if (-not $l.TargetPath -or -not (Test-Path -LiteralPath $l.TargetPath)) { continue }
+        $pasta = if ($l.WorkingDirectory) { $l.WorkingDirectory } else { Split-Path $l.TargetPath -Parent }
+        $lancar = ('"{0}" {1}' -f $l.TargetPath, $l.Arguments).Trim()
+        $out += Jogo $f.BaseName 'Atalho' $lancar $pasta $null
+    }
+    return $out
+}
+
 function Ler-Ubisoft {
     $out = @()
     foreach ($k in Get-ChildItem -Path 'HKLM:\SOFTWARE\WOW6432Node\Ubisoft\Launcher\Installs' -ErrorAction SilentlyContinue) {
@@ -303,7 +321,7 @@ function Cliente-Conectado {
 
 # ---------------------------------------------------------------------------------------------- principal
 $jogos = @()
-foreach ($leitor in 'Ler-Epic', 'Ler-Riot', 'Ler-Steam', 'Ler-Gog', 'Ler-Ubisoft', 'Ler-Xbox') {
+foreach ($leitor in 'Ler-Epic', 'Ler-Riot', 'Ler-Steam', 'Ler-Gog', 'Ler-Ubisoft', 'Ler-Xbox', 'Ler-Atalhos') {
     try { $jogos += @(& $leitor) } catch { Escrever ("{0}: falhou ({1})" -f $leitor, $_.Exception.Message) }
 }
 # mesmo nome em duas lojas: o segundo ganha a loja no nome
