@@ -11,7 +11,7 @@ from . import ia, run
 
 HELP = """/traduzir <jogo> — traduz para pt-BR com IA (Switch: vira mod; GBA Pokémon: ROM nova "(PT-BR)")
 /traduzir biblioteca — todos os jogos que ainda não estão em português (pergunta antes)
-/traduzir lista · status · config · revisar <op> · aplicar <op> · aprovar <op> · retomar <op> · desfazer <jogo>
+/traduzir lista · status · config · revisar <op> · aplicar <op> · aprovar <op> · parar <op> · retomar <op> · desfazer <jogo>
 /converter <jogo> [organizar|descompactar] — Switch: confere/organiza update e DLC, descompacta NSZ"""
 
 
@@ -38,6 +38,9 @@ def traduzir(bot, args: list[str]) -> str:
         if not js:
             return "Nenhuma tradução/conversão ainda."
         return "\n".join(_status_line(P, j) for j in reversed(js))
+    if sub == "parar" and len(args) == 2:
+        job = run.load_job(P, args[1])
+        return _stop(bot, job) if job else "Não achei essa tarefa (veja /traduzir status)."
     if sub in ("revisar", "aplicar", "aprovar", "retomar") and len(args) == 2:
         job = run.load_job(P, args[1])
         if not job:
@@ -265,6 +268,35 @@ def _approve(bot, job: dict) -> str:
     return f"Aprovado. Tradução de {job['title']} começando."
 
 
+TRAVADA_MIN = 45  # "rodando" sem nenhum progresso por tanto tempo = provavelmente travada
+
+
+def _stop(bot, job: dict) -> str:
+    """Para uma tarefa (ex.: travada). O que já foi traduzido fica no cache: /traduzir retomar continua dali."""
+    import signal
+    import subprocess
+    if job.get("status") in ("concluido", "falhou", "interrompida", "recusado"):
+        return f"{job['title']} não está rodando ({job.get('status')})."
+    pid = job.get("pid")
+    if run._alive(pid):
+        subprocess.run(["systemctl", "--user", "stop", f"deck-commander-traducao-{job['op']}"], capture_output=True)
+        if run._alive(pid):
+            try:
+                os.kill(int(pid), signal.SIGTERM)
+            except OSError:
+                pass
+    job = run.load_job(bot.paths, job["op"]) or job
+    job.update(status="interrompida", notified=True)
+    job.pop("pid", None)
+    run.save_job(bot.paths, job)
+    try:
+        bot.store.finish(job["op"], False, error="interrompida pelo usuário")
+    except (ValueError, KeyError):
+        pass
+    return (f"⏹ Parei {job['title']}. O que já foi traduzido está guardado; para continuar de onde parou: "
+            f"/traduzir retomar {job['op']}")
+
+
 def _resume(bot, job: dict) -> str:
     if job.get("status") in ("concluido",):
         return "Essa tarefa já terminou."
@@ -354,8 +386,17 @@ def progress_notify(bot) -> None:
         if j.get("status") not in ATIVOS or not tot:
             continue
         a = av.get(j["op"])
+        if a is not None and j.get("status") == "rodando":  # vigia: rodando sem progresso por muito tempo
+            if a.get("ultimo_d") != d:
+                a.update(ultimo_d=d, desde=time.time(), travada=False); changed = True
+            elif not a.get("travada") and time.time() - a.get("desde", time.time()) > TRAVADA_MIN * 60:
+                a["travada"] = True; changed = True
+                if chat:
+                    bot.send(chat, f"⚠️ {j['title']} está parada em {d}/{tot} há {TRAVADA_MIN} min (a IA pode ter "
+                                   f"travado). Para destravar: /traduzir parar {j['op']} e depois "
+                                   f"/traduzir retomar {j['op']} (nada traduzido se perde).")
         if a is None:  # começa a acompanhar: ponto de partida do ritmo (não avisa faixas já passadas)
-            av[j["op"]] = {"t0": time.time(), "d0": d, "faixa": d * 5 // tot}
+            av[j["op"]] = {"t0": time.time(), "d0": d, "faixa": d * 5 // tot, "ultimo_d": d, "desde": time.time()}
             changed = True
             if chat:
                 bot.send(chat, f"📊 Acompanhando {j['title']}: {d * 100 // tot}% ({d}/{tot}). "
