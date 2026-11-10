@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import hashlib
+import http.client
 import json
 import os
 import re
@@ -189,8 +190,8 @@ def _http(url: str, body: dict, headers: dict, timeout: float) -> dict:
             return json.loads(r.read())
     except urllib.error.HTTPError as e:
         raise ProviderError(f"HTTP {e.code}") from e
-    except (OSError, ValueError) as e:
-        raise ProviderError(str(e)) from e
+    except (OSError, ValueError, http.client.HTTPException) as e:  # inclui conexão que caiu no meio da resposta
+        raise ProviderError(str(e) or type(e).__name__) from e
 
 
 @dataclass
@@ -224,7 +225,10 @@ class Provider:
                              "options": {"temperature": 0.2, "num_predict": max_tokens, "repeat_penalty": 1.1},
                              "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]},
                             {}, timeout)
-            return out["message"]["content"], int(out.get("prompt_eval_count", 0)) + int(out.get("eval_count", 0))
+            try:
+                return out["message"]["content"], int(out.get("prompt_eval_count", 0)) + int(out.get("eval_count", 0))
+            except (KeyError, TypeError, ValueError) as e:
+                raise ProviderError(f"resposta inesperada: {str(out)[:120]}") from e
         headers = {"Authorization": f"Bearer {self.key or 'deck-commander'}"}
         out = self.http(self.spec["url"].rstrip("/") + "/chat/completions",
                         {"model": self.model, "temperature": 0.2, "max_tokens": max_tokens,
@@ -384,8 +388,13 @@ def _translate_parallel(paths, cfg, items, job, glossary, examples, pool, progre
                 chunk = q.get(timeout=5)
             except queue.Empty:
                 continue
-            sub = translate(paths, cfg, chunk, f"{job}#{prov.name}", glossary, examples, chain=[prov],
-                            should_pause=should_pause)
+            try:
+                sub = translate(paths, cfg, chunk, f"{job}#{prov.name}", glossary, examples, chain=[prov],
+                                should_pause=should_pause)
+            except Exception as e:  # noqa: BLE001 — um provedor que quebra nunca pode prender o pacote (a
+                sub = Result()      # tradução ficaria "rodando" para sempre): conta como falha e devolve
+                for it in chunk:
+                    sub.flagged[it.id] = f"falha na IA: {type(e).__name__}"
             bad = [it for it in chunk if it.id not in sub.translated and
                    sub.flagged.get(it.id, "").startswith(("nenhum provedor", "falha na IA"))]
             with lock:
