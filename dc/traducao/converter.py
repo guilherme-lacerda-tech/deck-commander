@@ -145,6 +145,22 @@ def ensure_keys() -> bool:
     return True
 
 
+def decompress_temp(p: Path, work: Path) -> Optional[Path]:
+    """Descompacta um .nsz/.xcz numa pasta temporária SÓ para ler (o arquivo da biblioteca não muda).
+    Devolve o .nsp/.xci temporário, ou None se não der (sem nsz, sem chaves, sem espaço)."""
+    tool = nsz_bin()
+    if not tool or not ensure_keys():
+        return None
+    work.mkdir(parents=True, exist_ok=True)
+    if shutil.disk_usage(work).free < p.stat().st_size * 2:
+        return None
+    r = subprocess.run([tool, "-D", "-o", str(work), str(p)], capture_output=True, text=True, timeout=7200)
+    made = [f for f in work.iterdir() if f.suffix.lower() in (".nsp", ".xci") and f.stem == p.stem]
+    if r.returncode != 0 or len(made) != 1 or not looks_valid(made[0]):
+        return None
+    return made[0]
+
+
 def decompress(paths: Paths, tf: TitleFiles) -> list[str]:
     tool = nsz_bin()
     if not tool:

@@ -53,7 +53,20 @@ def extract_texts(rom: Path, title_id: str, roots: list[Path], source: str = "en
             return dest, "reaproveitado (mesma versão)"
     except (OSError, ValueError):
         pass
-    rfs, handles = nca.open_romfs(rom, keys, upd)
+    tmp_dir = dest.parent / "descompactado.tmp"  # jogo .nsz: cópia temporária só para ler os textos
+    try:
+        rfs, handles = nca.open_romfs(rom, keys, upd)
+    except nca.NcaError as e:
+        if "NCZ" not in str(e):
+            raise
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        r2 = converter.decompress_temp(rom, tmp_dir) if rom.suffix.lower() in (".nsz", ".xcz") else rom
+        u2 = converter.decompress_temp(upd, tmp_dir) if upd and upd.suffix.lower() in (".nsz", ".xcz") else upd
+        if not r2 or (upd and not u2):
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+            raise nca.NcaError("jogo comprimido (NSZ) e não consegui descompactar uma cópia temporária "
+                               "(falta espaço livre ou a ferramenta nsz)") from e
+        rfs, handles = nca.open_romfs(r2, keys, u2)
     try:
         files = rfs.files()
         picked = text_files(files, source)
@@ -75,3 +88,4 @@ def extract_texts(rom: Path, title_id: str, roots: list[Path], source: str = "en
     finally:
         for h in handles:
             h.close()
+        shutil.rmtree(tmp_dir, ignore_errors=True)

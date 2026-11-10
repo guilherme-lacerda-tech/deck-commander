@@ -331,7 +331,8 @@ def notify(bot) -> None:
         elif st == "falhou":
             msg = f"❌ {j['title']}: não deu certo (nada do original foi alterado).\n{j.get('report', '')}"
             rep = (j.get("report") or "").lower()
-            formato = any(w in rep for w in ("formato", "não traduzi para não estragar", "msbt", "fora do padrão"))
+            formato = any(w in rep for w in ("formato", "não traduzi para não estragar", "msbt", "fora do padrão")) \
+                and not any(w in rep for w in ("ncz", "nsz", "comprimido", "prod.keys", "espaço"))
             if j.get("type") != "translate_generic" and formato:  # só quando o problema é o formato do texto
                 offer = run.offer_generic(bot.paths, bot.store, j["game_id"], j["title"], "tradução padrão falhou")
                 if offer:
