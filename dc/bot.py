@@ -30,7 +30,7 @@ ALIASES = [
     (r"wii\s*u|wiiu", "wiiu"),
     (r"ps\s*3|playstation\s*3|play\s*3", "ps3"),
     (r"xbox\s*360|x\s*360|360", "x360"),
-    (r"xbox(\s*cl[aá]ssico|\s*original)?", "xbox"),
+    (r"xbox(?!\s*(?:one|series|s|x))(\s*cl[aá]ssico|\s*original)?", "xbox"),
     (r"dreamcast|\bdc\b", "dc"),
     (r"sega\s*cd|mega\s*cd|segacd", "segacd"),
     (r"saturn|sega\s*saturn", "saturn"),
@@ -42,7 +42,7 @@ ALIASES = [
     (r"switch\s*2|nsw\s*2|sw2", "switch2"),
     (r"switch(\s*1)?|nsw|nintendo switch", "switch"),
     (r"ps\s*2|playstation\s*2|play\s*2", "ps2"),
-    (r"ps\s*1|psx|ps\s*one|playstation(\s*1)?|play\s*1", "psx"),
+    (r"ps\s*1|psx|ps\s*one|playstation(?!\s*[2-9])(\s*1)?|play\s*1", "psx"),
     (r"psp", "psp"), (r"game\s*cube|gamecube|ngc|\bgc\b", "gc"), (r"wii", "wii"),
     (r"n64|nintendo\s*64", "n64"), (r"snes|super\s*nintendo|super\s*nes", "snes"),
     (r"gba|game\s*boy\s*advance", "gba"),
@@ -60,6 +60,23 @@ def parse_console(text: str):
         if re.fullmatch(rf"\s*(?:{rx})\s*", t) or re.search(rf"(?:^|\W)(?:{rx})(?:$|\W)", t):
             return c
     return None
+MAGNET_RX = re.compile(r"magnet:\?\S+", re.I)
+
+
+def valid_magnet(m: str) -> bool:
+    """Magnet de verdade: tem o código do torrent (btih com 40 hex ou 32 base32, ou btmh v2)."""
+    return bool(re.search(r"(?i)xt=urn:(?:btih:(?:[0-9a-f]{40}|[a-z2-7]{32})(?![0-9a-z])|btmh:[0-9a-f]{20,})", m or ""))
+
+
+def looks_like_torrent(data: bytes) -> bool:
+    """Arquivo .torrent é um dicionário bencode com a chave 'info' (página HTML/zip renomeado não é)."""
+    return bool(data) and data[:1] == b"d" and b"4:info" in data[:1 << 20]
+
+
+BAD_MAGNET = ("Esse magnet está incompleto ou inválido (falta o código do torrent, \"xt=urn:btih:…\"). "
+              "Copie o link inteiro de novo ou encaminhe o arquivo .torrent.")
+UNKNOWN_CONSOLE = ("Uso: Switch, 3DS, DS, Wii U, Wii, GameCube, N64, SNES, NES, GBA, Game Boy, PS1, PS2, PS3, PSP, "
+                   "Xbox, Xbox 360, Dreamcast, Saturn, Mega Drive, Master System, Game Gear, Sega CD, PC Engine, Arcade")
 # comando citado numa mensagem (só palavras simples: ids de jogo, códigos de tarefa, opções)
 COMMAND_IN_TEXT = re.compile(
     r"(/(?:traduzir|converter|sync|devolver|remover|qualidade|controles|status|disk|calibrar)"
@@ -152,11 +169,19 @@ class Bot:
         data = cq.get("data") or ""
         command = self.cfg.get("botoes", {}).get(data[2:]) if data.startswith("c:") else None
         chat = (cq.get("message") or {}).get("chat", {}).get("id")
-        if not command or chat is None:
+        if chat is None:
+            return
+        if not command:  # botão de uma mensagem antiga (o código já saiu da memória do bot)
+            self.send(chat, "Esse botão é de uma mensagem antiga e não vale mais. Mande o comando de novo "
+                            "(ou /help).")
             return
         uid = cq["from"]["id"]
         self.log(f"{uid}: botão {command}")
-        reply = self.handle(uid, chat, command)
+        try:
+            reply = self.handle(uid, chat, command)
+        except Exception as e:  # noqa: BLE001 — o botão nunca fica sem resposta
+            self.log(f"erro no botão {command}: {e!r}")
+            reply = f"❌ Deu erro ao rodar {command.split()[0]}: {e}. Nada foi apagado; tente de novo ou mande /diagnostico."
         if reply:
             self.send(chat, reply)
 
@@ -174,7 +199,9 @@ class Bot:
 
     # -- comandos --------------------------------------------------------------
     def handle(self, uid: int, chat: int, text: str) -> str:
-        parts = text.strip().split()
+        parts = (text or "").strip().split()
+        if not parts:
+            return ""
         cmd, args = parts[0].split("@")[0].lower(), parts[1:]
         op = self.cfg.get("pergunta_op")
         if op and uid in self.cfg["allowed"] and text.strip().lower() in ("sim", "s", "não", "nao", "n"):
@@ -202,7 +229,18 @@ class Bot:
         if cmd == "/add":
             if not args:
                 return "Uso: /add [console] <magnet>"
-            console, magnet = (args[0], args[1]) if len(args) > 1 else (None, args[0])
+            mg = next((a for a in args if a.lower().startswith("magnet:")), None)
+            if not mg:
+                return BAD_MAGNET if any("magnet" in a.lower() for a in args) else                     "Uso: /add [console] <magnet>  (o magnet começa com magnet:?xt=…)"
+            if not valid_magnet(mg):
+                return BAD_MAGNET
+            rest = " ".join(a for a in args if a is not mg)
+            console = parse_console(rest) if rest else None
+            if rest and not console:
+                return f"Não conheço o console \"{rest[:30]}\". Não baixei.\n{UNKNOWN_CONSOLE}"
+            if console == "switch2":
+                return "Switch 2 ainda não é suportado no Deck (o Lichii é experimental). Não baixei."
+            magnet = mg
             if ops.in_safe_mode(P):
                 return "Safe-mode ativo."
             cat = console or "auto"
@@ -220,6 +258,8 @@ class Bot:
         if cmd == "/sync":
             return syncer.run_sync(P, S, self.qbt, confirm_many=bool(args and args[0] == "tudo"),
                                    explicit=self.cfg.get("explicit"))
+        if cmd in ("/console", "/aprovar") and not args:
+            return "Uso: /console <id> <console>" if cmd == "/console" else "Uso: /aprovar <id>"
         if cmd == "/console" and len(args) == 2:
             st = syncer._state(P)
             h = next((k for k in st.get("pending", {}) if k.startswith(args[0])), None)
@@ -314,9 +354,16 @@ class Bot:
         pend = self.cfg.setdefault("pending_console", {})
         doc = m.get("document")
         caption = m.get("caption") or ""
-        if text.strip().startswith("magnet:?"):
-            c = self._console_for(uid, None)
-            return self.handle(uid, chat, f"/add {c} {text.strip()}" if c else f"/add {text.strip()}")
+        mm = MAGNET_RX.search(text)
+        if mm:  # magnet colado, sozinho ou junto do console ("Switch magnet:?…")
+            rest = (text[:mm.start()] + " " + text[mm.end():]).strip()
+            found = parse_console(rest) if rest else None
+            if rest and not found and len(rest) <= 24:
+                return f"Não conheço o console \"{rest}\". Não baixei.\n{UNKNOWN_CONSOLE}"
+            c = self._console_for(uid, found)
+            if c:
+                pend.pop(str(uid), None)
+            return self.handle(uid, chat, f"/add {c} {mm.group(0)}" if c else f"/add {mm.group(0)}")
         if doc:
             name = doc.get("file_name") or "arquivo"
             if not name.lower().endswith(".torrent"):
@@ -328,10 +375,16 @@ class Bot:
                 return "Switch 2 ainda não é suportado no Deck (o Lichii é experimental). Não baixei."
             if ops.in_safe_mode(self.paths):
                 return "Safe-mode ativo."
-            info = self.call("getFile", file_id=doc["file_id"])
-            with urllib.request.urlopen(f"https://api.telegram.org/file/bot{self.token}/{info['file_path']}",
-                                        timeout=60) as r:
-                data = r.read()
+            try:
+                info = self.call("getFile", file_id=doc["file_id"])
+                with urllib.request.urlopen(f"https://api.telegram.org/file/bot{self.token}/{info['file_path']}",
+                                            timeout=60) as r:
+                    data = r.read()
+            except Exception as e:  # noqa: BLE001 — rede caiu no meio
+                self.log(f"falha ao baixar o .torrent {name}: {type(e).__name__}")
+                return f"❌ Não consegui pegar o arquivo {name} do Telegram (internet?). Encaminhe de novo daqui a pouco."
+            if not looks_like_torrent(data):
+                return f"{name} não é um .torrent válido (parece outro tipo de arquivo renomeado). Não baixei."
             cat = console or "auto"
             from . import dedup
             dup = self._already(dedup.torrent_name(data) or name, console)
@@ -358,7 +411,7 @@ class Bot:
             pend[str(uid)] = {"console": c, "at": time.time()}; self.save_cfg()
             return f"Ok, próximo .torrent ou magnet = {c}. Pode encaminhar."
         import re as _re
-        if _re.fullmatch(r"\s*[\w .+-]{1,24}\s*", text) and len(text.split()) <= 3 and not _re.search(
+        if _re.search(r"\w", text) and _re.fullmatch(r"\s*[\w .+-]{1,24}\s*", text) and len(text.split()) <= 3 and not _re.search(
                 r"(?i)\b(ok|oi|ol[aá]|valeu|obrigad[oa]|blz|beleza|sim|n[aã]o|bom dia|boa (tarde|noite)|kk+|haha)\b", text):
             return (f"Não conheço o console \"{text.strip()}\". Uso: Switch, 3DS, DS, Wii U, Wii, GameCube, N64, SNES, "
                     "NES, GBA, Game Boy, PS1, PS2, PS3, PSP, Xbox, Dreamcast, Saturn, Mega Drive, Master System, "

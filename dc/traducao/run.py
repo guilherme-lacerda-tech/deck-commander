@@ -229,7 +229,10 @@ def _age_min(iso: str) -> float:
 def library_plan(paths: Paths, store: Store) -> dict:
     """Resumo para "/traduzir biblioteca": quantos entram na fila e por que os outros não."""
     from . import portugues
-    lm = json.loads((paths.data / "launch-map.json").read_text("utf-8"))
+    try:
+        lm = json.loads((paths.data / "launch-map.json").read_text("utf-8"))
+    except (OSError, ValueError):  # Deck novo, nenhum jogo ainda
+        lm = {}
     idi = portugues.load_idiomas(paths.data)
     jobs = all_jobs(paths)
     out: dict[str, list[str]] = {k: [] for k in ("ok", "pt", "fila", "feito", "falhou", "generico", "sem")}
