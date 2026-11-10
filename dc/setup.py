@@ -172,6 +172,32 @@ def install_ai(log: list[str]) -> None:
     _venv_pip(MEOWTH_VENV, "meowth", log)
 
 
+XENIA_URL = ("https://github.com/xenia-canary/xenia-canary-releases/releases/download/02d2cb5/"
+             "xenia_canary_linux.tar_.xz")
+XENIA_DIR = H / ".local/share/deck-commander/emus/xenia-canary"
+
+
+def install_xenia(log: list[str]) -> None:
+    """Xbox 360: Xenia Canary (build Linux oficial do projeto, versão fixa). Não há flatpak dele."""
+    exe = XENIA_DIR / "xenia_canary"
+    if exe.exists():
+        log.append("Xenia Canary (Xbox 360): já instalado")
+        return
+    XENIA_DIR.mkdir(parents=True, exist_ok=True)
+    arc = XENIA_DIR / "xenia.tar.xz"
+    try:
+        download(XENIA_URL, arc)
+        subprocess.run(["tar", "-xJf", str(arc), "-C", str(XENIA_DIR)], check=True)
+        arc.unlink()
+        found = next((f for f in XENIA_DIR.rglob("xenia_canary") if f.is_file()), None)
+        if found and found != exe:
+            found.rename(exe)
+        exe.chmod(0o755)
+        log.append("Xenia Canary (Xbox 360): instalado")
+    except (OSError, subprocess.CalledProcessError) as e:
+        log.append(f"Xenia Canary: falhou ({e})")
+
+
 def install_nsz(log: list[str]) -> None:
     _venv_pip(NSZ_VENV, "nsz", log)
 
@@ -377,6 +403,7 @@ def setup(paths: Paths, modules: list[str], dev: bool = False, downloads: bool =
     if "A3" in wanted:
         if downloads:
             install_nsz(log)
+            install_xenia(log)
         elif not (NSZ_VENV / "bin/nsz").exists():
             log.append("PENDENTE: nsz (rode ./setup-deck.sh --modules A3)")
     if dev:
