@@ -307,7 +307,7 @@ def traducao(p: Ponte, a: dict) -> dict:
             continue
         # só a tarefa MAIS NOVA de cada jogo: uma tentativa antiga que falhou não aparece com "Retomar" depois que
         # uma mais nova já terminou (ex.: Final Fantasy concluído + falhas de dias atrás)
-        chave = f"{j.get('game_id')}|{j.get('type')}"
+        chave = str(j.get('game_id') or j.get('op'))
         if chave in vistos or str(st).startswith("cancelado"):
             continue
         vistos.add(chave)
