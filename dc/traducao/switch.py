@@ -28,7 +28,7 @@ from . import ia, nx
 H = Path.home()
 RYU_DIRS = [H / ".config/Ryujinx", H / ".var/app/io.github.ryubing.Ryujinx/config/Ryujinx"]
 MOD_NAME = "Deck Commander PT-BR"
-ARCHIVE_EXT = {".sarc", ".szs", ".zs", ".pack", ".arc", ".blarc", ".bfarc"}
+ARCHIVE_EXT = {".sarc", ".szs", ".zs", ".pack", ".arc", ".blarc", ".bfarc", ".sbfarc"}  # .sbfarc: fontes (BotW)
 _LANG = re.compile(r"(?<![A-Za-z])(US|EU|JP|KR|CN|TW)(en|es|fr|de|it|nl|ru|ja|ko|zh|pt)(?![a-z])|"
                    r"(?<![A-Za-z])(en|es|fr|de|it|nl|ru|ja|ko|zh|pt)[-_](US|GB|ES|MX|FR|CA|DE|IT|NL|RU|JP|KR|CN|TW|BR|PT)"
                    r"(?![A-Za-z])|(?<![A-Za-z])(English|Spanish|French|German|Italian|Japanese|Dutch|Russian)(?![a-z])")
@@ -294,7 +294,15 @@ def _check_fonts(fonts: list[tuple[str, bytes]], report: Report) -> None:
         miss = nx.missing_ptbr(chars)
         if miss:
             missing[name] = miss
-    if missing:
+    complete = [n for n, _ in fonts if n not in missing and n not in unread]
+    if missing and complete:
+        # o jogo tem fonte com todos os acentos (a do texto corrido); as que faltam costumam ser de título/logo
+        # (BotW: Normal tem tudo, Caption/Special não têm ã/õ) — traduz e avisa onde pode aparecer quadradinho
+        report.font = (f"fonte principal com os acentos ✅ ({Path(complete[0].split(':')[-1]).name}); "
+                       f"⚠️ sem {'/'.join(sorted(set(''.join(missing.values()))))[:40]} em: "
+                       + ", ".join(Path(n.split(":")[-1]).name for n in list(missing)[:4])
+                       + " (títulos podem mostrar quadradinho)")
+    elif missing:
         n, miss = next(iter(missing.items()))
         report.font = f"⚠️ a fonte do jogo não tem: {miss} ({n})"
         report.font_ok = False
