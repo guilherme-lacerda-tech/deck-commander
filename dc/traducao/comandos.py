@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from pathlib import Path
 
@@ -35,8 +36,7 @@ def traduzir(bot, args: list[str]) -> str:
         js = run.all_jobs(P)[-8:]
         if not js:
             return "Nenhuma tradução/conversão ainda."
-        return "\n".join(f"{j['op']} · {j['title']} · {j['status']}" + (
-            f" ({j['progress'][0]}/{j['progress'][1]})" if j.get("progress", [0, 0])[1] else "") for j in reversed(js))
+        return "\n".join(_status_line(P, j) for j in reversed(js))
     if sub in ("revisar", "aplicar", "aprovar", "retomar") and len(args) == 2:
         job = run.load_job(P, args[1])
         if not job:
@@ -237,6 +237,81 @@ def _undo(bot, query: str) -> str:
         return ("✅ Mod de tradução removido; o jogo volta ao idioma original." if uninstall_mod(tid)
                 else "Esse jogo não tem mod de tradução do Deck Commander.")
     return f"Para tirar a ROM traduzida, use /remover {g['title']} (PT-BR)."
+
+
+ATIVOS = ("rodando", "aguardando tomada", "pausado (jogo aberto)", "na fila")
+
+
+def _avisos_path(P):
+    return P.state / "traducao-avisos.json"
+
+
+def _avisos(P) -> dict:
+    try:
+        return json.loads(_avisos_path(P).read_text("utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def _save_avisos(P, data: dict) -> None:
+    f = _avisos_path(P)
+    tmp = f.with_name(f.name + ".tmp")
+    tmp.write_text(json.dumps(data), "utf-8")
+    os.replace(tmp, f)
+
+
+def _fmt_dur(sec: float) -> str:
+    m = int(sec // 60)
+    return f"{m // 60} h {m % 60:02d} min" if m >= 60 else f"{max(m, 1)} min"
+
+
+def _eta(P, j: dict) -> str:
+    """Previsão pelo ritmo medido desde que o bot começou a acompanhar a tarefa."""
+    import time
+    from datetime import datetime, timedelta
+    d, tot = (j.get("progress") or [0, 0])[:2]
+    a = _avisos(P).get(j["op"])
+    if not a or not tot or d <= a["d0"]:
+        return ""
+    rate = (d - a["d0"]) / max(1.0, time.time() - a["t0"])  # frases por segundo
+    left = (tot - d) / rate
+    fim = (datetime.now() + timedelta(seconds=left)).strftime("%H:%M")
+    return f" · {rate * 60:.0f} frases/min · faltam ~{_fmt_dur(left)} (termina ~{fim})"
+
+
+def _status_line(P, j: dict) -> str:
+    d, tot = (j.get("progress") or [0, 0])[:2]
+    pct = f" {d * 100 // tot}% ({d}/{tot})" if tot else ""
+    return f"{j['title']} · {j['status']}{pct}{_eta(P, j) if j.get('status') in ATIVOS else ''}"
+
+
+def progress_notify(bot) -> None:
+    """Aviso a cada 20% de cada tradução em andamento, com a previsão de término."""
+    import time
+    chat = bot.cfg.get("notify_chat")
+    P = bot.paths
+    av = _avisos(P)
+    changed = False
+    for j in run.all_jobs(P):
+        d, tot = (j.get("progress") or [0, 0])[:2]
+        if j.get("status") not in ATIVOS or not tot:
+            continue
+        a = av.get(j["op"])
+        if a is None:  # começa a acompanhar: ponto de partida do ritmo (não avisa faixas já passadas)
+            av[j["op"]] = {"t0": time.time(), "d0": d, "faixa": d * 5 // tot}
+            changed = True
+            if chat:
+                bot.send(chat, f"📊 Acompanhando {j['title']}: {d * 100 // tot}% ({d}/{tot}). "
+                               "Aviso a cada 20%, com a previsão de término.")
+            continue
+        faixa = d * 5 // tot  # 0..5 (cada faixa = 20%)
+        if a["faixa"] < faixa < 5:
+            a["faixa"] = faixa
+            changed = True
+            if chat:
+                bot.send(chat, f"⏳ {j['title']}: {faixa * 20}% traduzido ({d}/{tot}){_eta(P, j)}")
+    if changed:
+        _save_avisos(P, av)
 
 
 def notify(bot) -> None:

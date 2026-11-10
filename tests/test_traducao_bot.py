@@ -170,3 +170,20 @@ def test_out_of_standard_no_keeps_game(b):
 
 def test_out_of_standard_not_offered_for_iso_consoles(b):
     assert run.offer_generic(b.paths, b.store, "psx-hercules", "Hercules", "x") is None
+
+
+def test_progress_every_20_percent_with_eta(b, monkeypatch):
+    import time as _t
+    job = run.create(b.paths, b.store, "translate_switch", "switch-jogo", "Jogo", {})
+    job.update(status="rodando", progress=[100, 1000]); run.save_job(b.paths, job)
+    now = [1000.0]
+    monkeypatch.setattr(_t, "time", lambda: now[0])
+    comandos.progress_notify(b)
+    assert "Acompanhando Jogo: 10%" in b.sent[-1]
+    job["progress"] = [250, 1000]; run.save_job(b.paths, job); now[0] += 150
+    comandos.progress_notify(b)
+    assert "20% traduzido" in b.sent[-1] and "60 frases/min" in b.sent[-1] and "faltam" in b.sent[-1]
+    n = len(b.sent)
+    comandos.progress_notify(b)
+    assert len(b.sent) == n  # mesma faixa: não repete
+    assert "25% (250/1000)" in b.handle(1, 1, "/traduzir status")

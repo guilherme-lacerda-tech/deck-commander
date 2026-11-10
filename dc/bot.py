@@ -599,6 +599,7 @@ class Bot:
             try:
                 from .traducao import comandos as trad
                 trad.notify(self)
+                trad.progress_notify(self)
             except Exception as e:  # noqa: BLE001
                 self.log(f"aviso de tradução: {e}")
             try:
