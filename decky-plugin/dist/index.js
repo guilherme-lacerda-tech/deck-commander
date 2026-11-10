@@ -317,17 +317,29 @@ async function painel(acao, args) {
 
 const Sec = (title, ...kids) => h(D.PanelSection, { title }, ...kids.flat(2).filter(Boolean));
 const Row = (child, key) => h(D.PanelSectionRow, { key }, child);
-const Txt = (t, style, key) => Row(h("div", { style: Object.assign({ fontSize: "12px", whiteSpace: "pre-wrap",
-    padding: "2px 0", lineHeight: "1.35" }, style || {}) }, t), key);
+// Texto: também é uma "parada" do direcional (Focusable). Sem isso a seta pula de botão em botão e o texto entre
+// eles nunca entra na tela. Quebra palavra/caminho comprido em vez de cortar.
+const ESTILO_TXT = { fontSize: "13px", whiteSpace: "pre-wrap", overflowWrap: "anywhere", wordBreak: "break-word",
+    padding: "4px 2px", lineHeight: "1.4" };
+const Txt = (t, style, key) => Row(D.Focusable
+    ? h(D.Focusable, { style: Object.assign({}, ESTILO_TXT, style || {}), onActivate: () => {} }, t)
+    : h("div", { style: Object.assign({}, ESTILO_TXT, style || {}) }, t), key);
 const Bt = (label, onClick, opts, key) => Row(h(D.ButtonItem, Object.assign({ layout: "below", onClick }, opts || {}), label), key);
 const Toggle = (label, checked, onChange, description) => Row(h(D.ToggleField, { label, checked: !!checked, onChange, description }));
 const Campo = (label, value, onChange, opts) => Row(h(D.TextField, Object.assign({ label, value: value || "",
     onChange: (e) => onChange(e.target.value) }, opts || {})));
 const Lista = (label, opcoes, sel, onChange) => Row(h(D.DropdownItem, { label, rgOptions: opcoes, selectedOption: sel,
     strDefaultLabel: "Escolha…", onChange: (o) => onChange(o.data) }));
-const Barra = (pct, texto, resto, key) => (D.ProgressBarWithInfo && pct !== null && pct !== undefined)
-    ? Row(h(D.ProgressBarWithInfo, { label: texto, description: resto || "", nProgress: pct }), key)
-    : Txt(texto + (pct !== null && pct !== undefined ? " — " + pct + "%" : "") + (resto ? " · " + resto : ""), null, key);
+// Barra de progresso própria: o texto aparece inteiro (a do Steam corta com "…")
+const Barra = (pct, texto, resto, key) => {
+    const tem = pct !== null && pct !== undefined;
+    const linhas = [h("div", { key: "t", style: { fontWeight: "bold" } }, texto + (tem ? " — " + pct + "%" : ""))];
+    if (tem) linhas.push(h("div", { key: "b", style: { height: "6px", background: "#ffffff22", borderRadius: "3px",
+        margin: "4px 0" } }, h("div", { style: { width: Math.max(0, Math.min(100, pct)) + "%", height: "100%",
+        background: "#1a9fff", borderRadius: "3px" } })));
+    if (resto) linhas.push(h("div", { key: "r", style: { opacity: 0.8 } }, resto));
+    return Txt(linhas, null, key);
+};
 const Qr = (src) => src ? Row(h("img", { src, style: { width: "220px", height: "220px", display: "block",
     margin: "6px auto", imageRendering: "pixelated", background: "#fff" } })) : null;
 const Msg = (m) => m ? Txt(m.erro ? "⚠️ " + m.erro : m.texto, { color: m.erro ? "#ff8a80" : "#8bc34a" }) : null;
