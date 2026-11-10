@@ -84,7 +84,9 @@ CONSOLES = {
 SEARCH = {
     "psx": {"globs": ["Applications/DuckStation*.AppImage", "Applications/duckstation*.AppImage",
                       "Downloads/DuckStation*.AppImage", "Downloads/*/DuckStation*.AppImage"],
-            "flatpak": "org.duckstation.DuckStation", "args": ["-fullscreen", "-batch", "--"]},
+            "flatpak": "org.duckstation.DuckStation", "args": ["-fullscreen", "-batch", "--"],
+            # o DuckStation saiu do Flathub: sem ele, o PS1 abre no RetroArch com o núcleo SwanStation (mesmo código)
+            "retroarch_core": "swanstation_libretro.so"},
     "switch": {"globs": ["Applications/publish/Ryujinx", "Applications/Ryujinx*/Ryujinx", "Applications/Ryujinx*.AppImage",
                          "Applications/ryujinx*.AppImage", "Downloads/publish/Ryujinx", "Downloads/*/publish/Ryujinx"],
                "flatpak": "io.github.ryubing.Ryujinx", "args": ["--fullscreen"]},
@@ -111,16 +113,20 @@ def detect(home: Path = H, check_flatpak: bool = True) -> dict[str, list[str]]:
             out[console] = [hits[0], *s["args"], "{rom}"]
         elif s["flatpak"] and check_flatpak and _flatpak_installed(s["flatpak"]):
             out[console] = [FLATPAK, "run", s["flatpak"], *s["args"], "{rom}"]
+        elif s.get("retroarch_core") and (RA_CORES / s["retroarch_core"]).exists() and                 (not check_flatpak or _flatpak_installed("org.libretro.RetroArch")):
+            out[console] = [FLATPAK, "run", "org.libretro.RetroArch", "-f", "-L", str(RA_CORES / s["retroarch_core"]), "{rom}"]
     return out
 
 
 RA_CORE_FILES = ["snes9x_libretro.so", "mupen64plus_next_libretro.so", "mgba_libretro.so", "nestopia_libretro.so",
                  "gambatte_libretro.so", "genesis_plus_gx_libretro.so", "mednafen_saturn_libretro.so",
-                 "mednafen_pce_fast_libretro.so", "fbneo_libretro.so"]
+                 "mednafen_pce_fast_libretro.so", "fbneo_libretro.so", "swanstation_libretro.so"]
 RA_CORE_URL = "https://buildbot.libretro.com/nightly/linux/x86_64/latest/{core}.zip"
 FLATPAK_IDS = ["net.pcsx2.PCSX2", "org.DolphinEmu.dolphin-emu", "org.libretro.RetroArch", "org.ppsspp.PPSSPP",
                "net.kuribo64.melonDS", "org.azahar_emu.Azahar", "info.cemu.Cemu", "net.rpcs3.RPCS3", "app.xemu.xemu",
                "org.flycast.Flycast"]
+# Instalados só se o Deck ainda não tiver o emulador desse console (ex.: Ryujinx em ~/Applications fica como está)
+FLATPAK_IF_MISSING = {"switch": "io.github.ryubing.Ryujinx"}
 # O que cada console precisa que VOCÊ coloque (o Deck Commander nunca baixa BIOS/firmware/chaves)
 NEEDS = {"ps3": "firmware oficial do PS3 (PS3UPDAT.PUP) instalada uma vez no RPCS3",
          "xbox": "BIOS, MCPX e imagem de HD do Xbox configurados uma vez no xemu",
