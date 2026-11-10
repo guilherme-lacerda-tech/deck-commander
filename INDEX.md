@@ -12,3 +12,4 @@
 - `docs/PC-REMOTO.md` — jogos do PC no Deck (aba Computador): `dc/pc_remoto.py` + `tools/pc/biblioteca-pc.ps1`
 - `dc/transferir.py` + `tools/pc/transferir-do-deck.ps1`/`.bat` — transferência segura de um jogo do Deck para o PC (`docs/TRANSFERENCIA.md`)
 - `docs/desenvolvimento/` — análise da spec v5.1, relatórios de spikes, histórico
+- `tools/pc/Assistente Deck Commander.bat` → `assistente.ps1` (janela WinForms das Partes 3–5 do `docs/TUTORIAL-INSTALACAO.md`) + `assistente-funcoes.psm1` (lógica testável; testes Pester em `assistente.Tests.ps1`)
