@@ -476,6 +476,75 @@ def _approval_needed(paths: Paths, cfg: dict, texts_estimate: int, job: dict) ->
 N3DS_TEXT = (".msbt", ".sarc", ".szs", ".arc", ".bcfnt", ".msbt.lz", ".zs")
 
 
+def _translate_unreal(paths, job, g, tid, rom, cfg, progress, should_pause):
+    """Jogo de Switch feito na Unreal Engine: traduz o .locres e instala um pak de mod "_P" por cima.
+    Devolve None se o jogo não for Unreal (aí segue o fluxo normal)."""
+    from .. import syncer
+    from . import converter, extract, nca, switch, unreal
+    kp = switch.keys_path()
+    if not kp:
+        return None
+    upd = extract.latest_update(converter.collect(syncer.rom_roots(), tid))
+    try:
+        rfs, handles = nca.open_romfs(rom, nca.load_keys(kp), upd)
+    except (nca.NcaError, OSError):
+        return None
+    try:
+        files = rfs.files()
+        paks = unreal.main_paks(files)
+        if not paks:
+            return None
+        found = {}
+        for pk in paks:
+            o, s = files[pk]
+            rd = (lambda base: lambda a, n: rfs.read_at(base + a, n))(o)
+            try:
+                pak = unreal.read_pak(rd, s)
+            except unreal.UnrealError as e:
+                return {"title_id": tid}, f"Jogo feito na Unreal Engine, mas não consegui abrir {pk}: {e}", False
+            for lp in unreal.game_locres(pak, cfg.get("idioma_origem", "en")):
+                ent = pak.entries[lp]
+                data = unreal.cached_plain(paths.data, tid, lp)
+                if data is None:
+                    try:
+                        data = unreal.read_entry(rd, ent)
+                    except unreal.UnrealError as e:
+                        job["status"] = "aguardando análise"
+                        return {"title_id": tid, "unreal": True}, (
+                            f"Jogo feito na Unreal Engine: achei os textos ({lp}), mas {e}. O PC descompacta "
+                            f"com o Oodle de um jogo seu (tools/pc/oodle_locres.py); depois mande /traduzir de novo."), False
+                found[lp] = data
+    finally:
+        for h in handles:
+            h.close()
+    if not found:
+        return None
+    from . import portugues
+    portugues.unmark(paths.data, job["game_id"], "formato")
+    project = next(iter(found)).split("/", 1)[0]
+    out, total, res_all = {}, 0, []
+    for lp, data in found.items():
+        new, res, changed = unreal.translate_locres(paths, cfg, data, f"unreal-{tid}", g.get("title", ""),
+                                                    progress=progress, should_pause=should_pause)
+        res_all.append(res)
+        total += changed
+        if changed:
+            out[lp] = new
+    if not out:
+        errs = "; ".join(e for r in res_all for e in r.errors[:2]) or "nenhuma frase traduzida"
+        return {"title_id": tid}, f"Não consegui traduzir: {errs}", False
+    mod_root = switch.mod_target(tid)
+    pak_path = unreal.build_mod(out, mod_root / "romfs", project)
+    unreal.save_version(mod_root, {"base": rom.name, "update": upd.name if upd else None, "arquivos": sorted(out)})
+    _refresh_tabs(paths)
+    prov = next((r.provider_used for r in res_all if r.provider_used), "")
+    msg = (f"Tradução pronta: {total} frases em português (jogo Unreal Engine). O mod substitui o texto em INGLÊS, "
+           f"então o jogo precisa estar em inglês (padrão do Ryujinx). Se aparecer quadradinho no lugar de ã/õ, "
+           f"me avise que eu troco esses acentos.")
+    return ({"traducao_pt_br": True, "translated": total, "provider": prov, "title_id": tid, "mod": str(pak_path),
+             "data": datetime.now(timezone.utc).isoformat()}, msg, True)
+
+
 def _translate_n3ds(paths, job, g, rom: Path, cfg, progress, should_pause) -> tuple[dict, str, bool]:
     """3DS: mesmo tradutor de MSBT do Switch; o mod vai para o Azahar (load/mods/<TitleID>/romfs)."""
     import shutil
@@ -627,6 +696,9 @@ def _dispatch(paths, store, job, cfg, progress, should_pause) -> tuple[dict, str
                 files = trinity_game.find_rom_files(rom, tid, syncer.rom_roots())
                 if files and trinity_game.is_trinity(files):  # Pokémon Legends Z-A / Scarlet-Violet
                     return _translate_trinity(paths, job, g, tid, rom, cfg, progress, should_pause)
+                ue = _translate_unreal(paths, job, g, tid, rom, cfg, progress, should_pause)
+                if ue:  # Unreal Engine (ex.: Final Fantasy Resonance): textos em .locres dentro do .pak
+                    return ue
                 romfs = switch.extract_with_hactool(rom, tid)
                 if not romfs and ("prod.keys" in str(e) or "ausente" in str(e)):
                     return {"title_id": tid}, (
