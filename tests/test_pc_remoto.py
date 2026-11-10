@@ -281,3 +281,22 @@ def test_bot_routes_pc_command(tmp_path, monkeypatch):
     seen = []
     monkeypatch.setattr(pc_remoto, "comando_pc", lambda b, args: seen.append(args) or "ok pc")
     assert x.handle(1, 1, "/pc status") == "ok pc" and seen == [["status"]]
+
+
+def test_sincronizar_usa_a_lista_que_o_pc_manda(tmp_path, monkeypatch):
+    from dc import pc_remoto
+    from dc.paths import get_paths
+    paths = get_paths(tmp_path / "dc").ensure()
+    (paths.data / "pc-apps.json").write_text('{"apps": ["Desktop", "Fortnite", "God of War Ragnarök"]}', "utf-8")
+    assert pc_remoto.lista_do_pc(paths) == ["Desktop", "Fortnite", "God of War Ragnarök"]
+    monkeypatch.setattr(pc_remoto, "listar_apps", lambda *a, **k: (_ for _ in ()).throw(AssertionError("não usa")))
+    monkeypatch.setattr(pc_remoto, "online", lambda *a, **k: None)  # PC dormindo: mesmo assim sincroniza
+    try:
+        pc_remoto.sincronizar(paths, cfg={}, shortcuts=[], plugin_ativo=False)
+    except AssertionError:
+        raise
+    except Exception:  # noqa: BLE001 - o resto da sincronização (atalhos) não é o foco aqui
+        pass
+    import json
+    lm = json.loads((paths.data / "launch-map.json").read_text("utf-8"))
+    assert any(e.get("title") == "Fortnite" for e in lm.values())

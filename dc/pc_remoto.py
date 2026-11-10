@@ -205,8 +205,38 @@ def parse_lista(saida: str) -> list[str]:
     return out
 
 
-def listar_apps(cfg: dict, host: str, run: Callable = subprocess.run) -> list[str]:
-    r = run(_moonlight("list", "--csv", host), capture_output=True, text=True, timeout=40)
+def _run_grupo(cmd: list[str], capture_output=True, text=True, timeout: float = 40):
+    """subprocess.run que, no tempo-limite, mata o grupo inteiro (o flatpak deixa o bwrap/moonlight órfãos)."""
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=text, start_new_session=True)
+    try:
+        out, err = p.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(p.pid, signal.SIGKILL)
+        except (OSError, AttributeError):
+            p.kill()
+        p.communicate()
+        raise
+    return subprocess.CompletedProcess(cmd, p.returncode, out, err)
+
+
+def lista_do_pc_path(paths: Paths) -> Path:
+    """Lista de jogos que o próprio PC manda para o Deck (tools/pc/transferir-fila.ps1, a cada 5 min)."""
+    return paths.data / "pc-apps.json"
+
+
+def lista_do_pc(paths: Paths) -> list[str]:
+    try:
+        d = json.loads(lista_do_pc_path(paths).read_text("utf-8-sig"))
+    except (OSError, ValueError):
+        return []
+    return [a for a in (d.get("apps") or []) if isinstance(a, str) and a.strip()]
+
+
+def listar_apps(cfg: dict, host: str, run: Optional[Callable] = None) -> list[str]:
+    # Obs.: sem tela (bot/ssh), o "moonlight list" TRAVA quando precisa baixar a capa de um app novo (defeito do
+    # Moonlight: QEventLoop sem QCoreApplication). Por isso a fonte principal é a lista que o PC manda.
+    r = (run or _run_grupo)(_moonlight("list", "--csv", host), capture_output=True, text=True, timeout=40)
     txt = (r.stdout or "") + "\n" + (r.stderr or "")
     if r.returncode != 0 or "Failed to connect" in txt:
         raise RuntimeError(f"o Moonlight não conseguiu listar os jogos de {host}")
@@ -327,10 +357,12 @@ def sincronizar(paths: Paths, cfg: Optional[dict] = None, apps: Optional[list[st
     from . import library, plugin_bridge
     cfg = cfg or carregar_config(paths)
     if apps is None:
+        apps = lista_do_pc(paths) or None  # o PC manda a lista dele (não depende do PC acordado nem do Moonlight)
+    if apps is None:
         host = online(cfg)
         if not host:
             raise RuntimeError("o PC está dormindo ou fora de alcance (mande /pc acordar e tente em ~1 min)")
-        apps = listar_apps(cfg, host, run=run)
+        apps = listar_apps(cfg, host, run=None if run is subprocess.run else run)
     lm_p = paths.data / "launch-map.json"
     lm = _load(lm_p, {})
     novos = entradas(apps, cfg)

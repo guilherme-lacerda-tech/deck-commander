@@ -13,6 +13,7 @@ param(
     [string]$Chave = (Join-Path $env:USERPROFILE '.ssh\deck_commander_ed25519')
 )
 $ErrorActionPreference = 'Stop'
+$OutputEncoding = New-Object Text.UTF8Encoding $false   # texto para o ssh em UTF-8 (senão "Ragnarök" vira "Ragnar?k")
 $aqui = Split-Path -Parent $MyInvocation.MyCommand.Path
 $tarefa = 'DeckCommander Transferencias'
 $logDir = 'D:\DeckCommander\logs'
@@ -33,6 +34,25 @@ New-Item -ItemType Directory -Force $logDir | Out-Null
 $log = Join-Path $logDir ('transferir-fila-' + (Get-Date -Format 'yyyyMMdd') + '.log')
 function L([string]$t) { Add-Content -Path $log -Value ((Get-Date -Format 'HH:mm:ss') + ' ' + $t) -Encoding UTF8 }
 $sshArgs = @('-i', $Chave, '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8', $Deck)
+
+# Lista de jogos do PC (apps do Sunshine) -> Deck, quando muda: é dela que sai a aba "Computador"
+# (o "moonlight list" sem tela trava ao baixar capas novas; esta lista não depende disso)
+try {
+    $appsJson = 'C:\Program Files\Sunshine\config\apps.json'
+    if (Test-Path $appsJson) {
+        $nomes = @((Get-Content $appsJson -Raw -Encoding UTF8 | ConvertFrom-Json).apps | ForEach-Object { $_.name } | Where-Object { $_ })
+        $corpo = (@{ apps = $nomes; em = (Get-Date -Format o) } | ConvertTo-Json -Compress)
+        $marca = Join-Path $logDir 'pc-apps.enviado'
+        $assin = ($nomes -join "`n")
+        if (-not (Test-Path $marca) -or (Get-Content $marca -Raw -Encoding UTF8) -ne $assin) {
+            $tmp = [IO.Path]::GetTempFileName()
+            [IO.File]::WriteAllText($tmp, $corpo, (New-Object Text.UTF8Encoding $false))
+            Get-Content $tmp -Raw | & ssh.exe @sshArgs 'cat > ~/.local/share/deck-commander/pc-apps.json && cd ~/deck-commander && python3 -m dc x pc sincronizar' 2>$null | Out-Null
+            if ($LASTEXITCODE -eq 0) { [IO.File]::WriteAllText($marca, $assin, (New-Object Text.UTF8Encoding $false)); L ("lista de jogos do PC enviada ao Deck (" + $nomes.Count + ")") }
+            Remove-Item $tmp -ErrorAction SilentlyContinue
+        }
+    }
+} catch { L ("lista de jogos: " + $_.Exception.Message) }
 
 # fila no Deck (só pedidos "na fila"/"copiando"); Deck desligado/fora de alcance = tenta na próxima rodada
 try {
