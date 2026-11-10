@@ -151,3 +151,5 @@ if __name__ == "__main__":
           "Deck Commander — Tutorial de instalação", "Como montar tudo do zero: Steam Deck, tradução, PC")
     build(root / "docs/MANUAL.md", out / "Deck Commander - Manual de uso.pdf",
           "Deck Commander — Manual de uso", "Tudo o que dá para fazer no dia a dia, pelo Telegram e pelo Deck")
+    build(root / "docs/VISAO-GERAL.md", out / "Deck Commander - Visao geral do projeto.pdf",
+          "Deck Commander — Visão geral do projeto", "Tudo o que o sistema faz hoje, o que foi testado e ideias do que adicionar")
