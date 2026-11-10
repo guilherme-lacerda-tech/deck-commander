@@ -276,7 +276,7 @@ def diagnose(paths: Paths, store: Store, repair: bool = False) -> list[Finding]:
         lm = json.loads((paths.data / "launch-map.json").read_text("utf-8"))
         emu_cfg = paths.config / "emulators.json"
         emu = json.loads(emu_cfg.read_text("utf-8")) if emu_cfg.exists() else {}
-        broken = [g for g in lm if not all(os.path.exists(x) for x in (library.build_command(g, lm, emu)[0], lm[g]["rom"]))]
+        broken = [g for g in lm if not lm[g].get("removed") and not all(os.path.exists(x) for x in (library.build_command(g, lm, emu)[0], lm[g]["rom"]))]
         f.append(Finding("config", "ask", not broken, f"{len(broken)} lançador(es) quebrado(s): {broken[:5]}" if broken else "ok",
                          "oferecer restauração: dc restore <snapshot>" if broken else ""))
     except (OSError, ValueError):
@@ -299,9 +299,13 @@ def diagnose(paths: Paths, store: Store, repair: bool = False) -> list[Finding]:
     # 8/10 DB divergente / jogo no Steam e não no DB
     from . import library, syncer
     games, _ = library.scan(syncer.rom_roots())
-    rep = ops.db_verify(store, games, vdf.read_shortcuts(syncer.shortcuts_path()))
+    try:
+        shortcuts = vdf.read_shortcuts(syncer.shortcuts_path())
+    except (OSError, ValueError):  # Steam ainda sem login (Deck novo): não derruba o diagnóstico
+        shortcuts = []
+    rep = ops.db_verify(store, games, shortcuts)
     div = {k: len(v) for k, v in rep.items() if v}
-    f.append(Finding("db", "ask", not div, json.dumps(div) if div else "ok", "dc db index (usuário decide)" if div else ""))
+    f.append(Finding("db", "ask", not div, json.dumps(div) if div else "ok", "python3 -m dc x db index (usuário decide)" if div else ""))
     f.append(Finding("steam-sem-db", "ask", not rep["shortcut_untracked"],
                      f"{rep['shortcut_untracked'][:5]}" if rep["shortcut_untracked"] else "ok"))
     # 11 controles sem mapeamento / 12 jogos duplicados
