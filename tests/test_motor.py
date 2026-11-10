@@ -13,6 +13,9 @@ def test_identify_engines():
     assert motor.identify(["Data/data.unity3d"])["motor"] == "Unity"
     assert motor.identify(["Message/Talk.msbt"])["traduzo"]
     assert motor.identify(["natives/stm/message/a.msg.539100710"])["motor"] == "RE Engine (Capcom)"
+    # pacote de áudio Wwise (.pck) num jogo Nintendo não é Godot (visto no Luigi's Mansion 3 / Pokémon Z-A reais)
+    assert motor.identify(["/sound/Init.bnk", "/sound/stream/bgm.pck", "/data/x.bin"])["motor"] != "Godot"
+    assert motor.identify(["/game.pck"])["motor"] == "Godot"
     u = motor.identify(["a/b.xyz", "a/c.xyz", "d.bin"])
     assert u["motor"] == "desconhecido" and ".xyz" in u["caminho"]
 

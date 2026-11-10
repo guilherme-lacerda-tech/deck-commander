@@ -36,12 +36,29 @@ _MOTORES = [
 ]
 
 
+# motores com adaptador: o rótulo só vale se o adaptador também reconhece o jogo (ex.: ".pck" também é pacote
+# de áudio Wwise — Luigi's Mansion 3 e Pokémon Z-A não são Godot)
+_ADAPTADOR = {"Unity": "eng_unity", "RE Engine (Capcom)": "eng_re", "CRI Middleware (CPK)": "eng_cri",
+              "Godot": "eng_godot", "GameMaker": "eng_gamemaker", "RPG Maker": "eng_rpgmaker"}
+
+
+def _adapter_agrees(nome: str, paths: list[str]) -> bool:
+    mod = _ADAPTADOR.get(nome)
+    if not mod:
+        return True
+    import importlib
+    try:
+        return bool(importlib.import_module(f".{mod}", __package__).detect(list(paths)))
+    except Exception:  # noqa: BLE001 - detector com defeito: fica com o teste simples
+        return True
+
+
 def identify(paths: list[str]) -> dict:
     """{'motor', 'traduzo', 'caminho'} a partir dos caminhos do RomFS."""
     n = [p.lower() for p in paths]
     e = {PurePosixPath(p).suffix for p in n}
     for nome, test, ok, caminho in _MOTORES:
-        if test(n, e):
+        if test(n, e) and _adapter_agrees(nome, paths):
             return {"motor": nome, "traduzo": ok, "caminho": caminho}
     top = sorted({PurePosixPath(p).suffix for p in n if PurePosixPath(p).suffix}, key=lambda s: -sum(
         x.endswith(s) for x in n))[:5]

@@ -606,6 +606,16 @@ def _translate_engine(paths, job, g, tid, rom, cfg, progress, should_pause):
         ad = motores.adapter_for(list(files))
         if not ad:
             return None
+        if getattr(ad, "ptbr_oficial", None) and ad.ptbr_oficial(list(files)):
+            # o próprio jogo já tem português do Brasil (só não aparece na lista de idiomas do console)
+            from .. import quality
+            portugues.mark(paths.data, job["game_id"], ptbr="oficial", ptbr_menu=True)
+            quality.set_language(paths, job["game_id"], portugues.OFFICIAL, "português do Brasil do próprio jogo")
+            _refresh_tabs(paths)
+            return ({"title_id": tid, "traducao_pt_br": True, "provider": "oficial", "motor": ad.NAME},
+                    "Esse jogo já tem português do Brasil OFICIAL (vem dentro do jogo). Configurei para ele abrir "
+                    "em português; se abrir em inglês, escolha Português (Brasil) no menu de idioma do jogo. "
+                    "Está na aba \"Em português\".", True)
 
         def read(path: str) -> bytes:
             o, n = files[path]

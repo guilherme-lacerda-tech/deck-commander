@@ -356,3 +356,14 @@ def test_unsupported_version_is_skipped_not_crashed():
     struct.pack_into(">I", blob, 8, 14)
     col = collect_from({"Data/resources.assets": bytes(blob)})
     assert col.textos == [] and any("versão 14" in p for p in col.extra["pulados"])
+
+
+def test_string_tables_only_english_is_read_and_ptbr_detected():
+    from dc.traducao import eng_unity as U
+    paths = ["Data/StreamingAssets/aa/Switch/narration-videos-1080p_assets_all_1.bundle",
+             "Data/StreamingAssets/aa/Switch/localization-string-tables-english(en)_assets_all_2.bundle",
+             "Data/StreamingAssets/aa/Switch/localization-string-tables-french(fr)_assets_all_3.bundle"]
+    assert U._candidates(paths) == [paths[1]]
+    assert not U.ptbr_oficial(paths)
+    assert U.ptbr_oficial(paths + ["Data/StreamingAssets/aa/Switch/localization-string-tables-portuguese(brazil)"
+                                   "(pt-br)_assets_all_4.bundle"])

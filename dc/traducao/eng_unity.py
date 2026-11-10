@@ -351,7 +351,14 @@ class _Walker:
                 raise _Pula(f"campo '{node.type}' sem tamanho")
             self.out += self._take(node.size)
         else:
-            for c in node.children:
+            for k, c in enumerate(node.children):
+                if c.type == "ManagedReferencesRegistry" and depth == 0 and k == len(node.children) - 1:
+                    # [SerializeReference] (ex.: tabela de textos do pacote Localization da Unity): o registro é o
+                    # ÚLTIMO campo do objeto e o formato de dentro depende das classes do jogo. Não traduzimos nada
+                    # lá dentro, então ele é copiado inteiro, byte a byte.
+                    self.out += self.s[self.i:]
+                    self.i = len(self.s)
+                    continue
                 cp = path if (c.flags & 1 or c.type == "Array") else (f"{path}.{c.name}" if path else c.name)
                 self.walk(c, cp, depth + 1)
         if align:
@@ -676,6 +683,9 @@ _I2_LANG = re.compile(r"^(?:mSource\.)?mLanguages\[(\d+)\]\.(Name|Code)$")
 _SKIP_FIELDS = {"m_Name", "m_EditorClassIdentifier"}
 
 
+_STRING_TABLE = re.compile(r"^m_TableData\[\d+\]\.m_Localized$")
+
+
 def _mono_strings(w: _Walker) -> tuple[dict[str, str], list[str], str]:
     """({caminho: texto}, caminhos para traduzir, observação)."""
     dec: dict[str, str] = {}
@@ -701,6 +711,9 @@ def _mono_strings(w: _Walker) -> tuple[dict[str, str], list[str], str]:
             en, nota = 0, "I2 Localization sem idioma inglês declarado: usei o primeiro idioma"
         want = [p for p, m in terms.items() if int(m.group(2)) == en and _letters(dec[p])]
         return dec, want, nota
+    table = [p for p in dec if _STRING_TABLE.match(p)]
+    if table:  # StringTable do pacote Localization da Unity: toda entrada é texto do jogo (até "Continuar")
+        return dec, [p for p in table if _letters(dec[p])], ""
     want = [p for p, s in dec.items()
             if re.sub(r"\[\d+\]", "", p).rsplit(".", 1)[-1] not in _SKIP_FIELDS and " " in s.strip() and _letters(s)]
     return dec, want, ""
@@ -898,7 +911,22 @@ def detect(paths: list[str]) -> bool:
     return False
 
 
+_TABELA = "localization-string-tables-"
+
+
+def ptbr_oficial(paths) -> bool:
+    """O jogo já traz a tabela de textos em português do Brasil (pacote Localization da Unity)."""
+    return any(_TABELA in p.lower() and ("(pt-br)" in p.lower() or "portuguese(brazil)" in p.lower()) for p in paths)
+
+
 def _candidates(paths) -> list[str]:
+    tabelas = [p for p in paths if _TABELA in p.lower()]
+    if tabelas:
+        # pacote Localization: TODO o texto do jogo está nas tabelas; basta a do inglês (lê ~100 KB em vez de
+        # gigabytes de bundles de vídeo/som — no Castlevania Belmont's Curse seriam ~2 h só lendo)
+        en = [p for p in tabelas if "english" in p.lower() or "(en)" in p.lower()]
+        if en:
+            return sorted(en)
     out = []
     for p in paths:
         q = _norm_path(p).lower()

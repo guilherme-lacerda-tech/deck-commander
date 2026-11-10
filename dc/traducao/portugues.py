@@ -119,8 +119,9 @@ def detect_switch(paths, launch_map: dict, roots: list[Path], log=lambda s: None
             idi[gid] = {"sig": sig, "erro": str(ex)}
             changed = True
             continue
-        ptbr = "oficial" if OFFICIAL in langs else "nao"
-        idi[gid] = {"sig": sig, "langs": langs, "ptbr": ptbr, "title_id": tid}
+        menu = bool(idi.get(gid, {}).get("ptbr_menu"))  # PT-BR achado dentro do jogo (não está na lista do console)
+        ptbr = "oficial" if OFFICIAL in langs or menu else "nao"
+        idi[gid] = {"sig": sig, "langs": langs, "ptbr": ptbr, "title_id": tid, **({"ptbr_menu": True} if menu else {})}
         if ptbr == "oficial":
             quality.set_language(paths, gid, OFFICIAL, "português oficial do jogo")
         elif quality.get_language(paths, gid) == OFFICIAL:
