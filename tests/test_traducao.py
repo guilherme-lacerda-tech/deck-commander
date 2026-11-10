@@ -456,3 +456,37 @@ def test_nested_sarc_translation_lands_inside(tmp_path, monkeypatch):
     assert t0[0] == "PT Hello ⟦0⟧!" and t0[1] == [tag()]
     assert nx.read_msbt(msg.files["ActorType/Item.msbt"]).texts()[0][0] == "PT Sword"
     assert not (mod / "Pack/Bootup_EUfr.pack").exists()
+
+
+def test_mod_remembers_its_version_and_launch_selects_it(tmp_path, monkeypatch):
+    """Mod feito sem atualização (BotW v0): baixar uma atualização depois NÃO pode fazer o Ryujinx abrir a
+    atualização com textos da base — seleciona a versão do mod e avisa como refazer."""
+    import json as _j
+    from dc.traducao import converter, extract
+    paths = get_paths(tmp_path / "dc").ensure()
+    ryu = tmp_path / "Ryujinx"
+    monkeypatch.setattr(switch, "RYU_DIRS", [ryu])
+    (ryu).mkdir()
+    romfs = _romfs(tmp_path)
+    tid = "0100ABCD12340000"
+    (romfs.parent / "extraido-por-deck-commander.json").write_text(_j.dumps({"base": "J.nsp", "update": None}))
+    cfg = ia.load_cfg(paths)
+    chain = [ia.Provider("ollama", {**cfg["providers"]["ollama"], "modelo": "qwen"}, "", FakeAI())]
+    assert switch.translate_game(paths, tid, romfs, "Jogo", chain=chain).applied
+    assert switch.mod_version(tid, paths.data) == {"base": "J.nsp", "update": None}
+    (ryu / "games" / tid.lower()).mkdir(parents=True)
+    v1, v2 = tmp_path / "J [v65536].nsp", tmp_path / "J [v131072].nsp"
+    tf = converter.TitleFiles(tid) if hasattr(converter, "TitleFiles") else None
+    monkeypatch.setattr(converter, "collect", lambda roots, t: tf)
+    tf.updates = [v1, v2]
+    monkeypatch.setattr(extract, "latest_update", lambda t: v2)
+    upd = ryu / "games" / tid.lower() / "updates.json"
+    upd.write_text(_j.dumps({"selected": str(v2), "paths": [str(v2)]}))
+    msg = switch.ensure_update_selected(tid, [tmp_path], paths.data)
+    assert "sem atualização" in msg and "--forcar" in msg and _j.loads(upd.read_text())["selected"] == ""
+    # mod feito da v1 com a v2 já baixada: fica na v1 (antes ia para a mais nova)
+    (paths.data / "traducao/mods" / tid / "versao.json").write_text(_j.dumps({"update": v1.name}))
+    assert v1.name in switch.ensure_update_selected(tid, [tmp_path], paths.data)
+    assert _j.loads(upd.read_text())["selected"] == str(v1)
+    tf.updates = [v2]  # a v1 sumiu: avisa em vez de abrir errado
+    assert "não está mais no Deck" in switch.ensure_update_selected(tid, [tmp_path], paths.data)
