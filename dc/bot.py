@@ -7,6 +7,7 @@ log em bot.log sem o token. Aprovação (M12.2) por /aprovar <id> com validade d
 from __future__ import annotations
 
 import json
+import re
 import secrets as pysecrets
 import time
 import urllib.parse
@@ -59,6 +60,10 @@ def parse_console(text: str):
         if re.fullmatch(rf"\s*(?:{rx})\s*", t) or re.search(rf"(?:^|\W)(?:{rx})(?:$|\W)", t):
             return c
     return None
+# comando citado numa mensagem (só palavras simples: ids de jogo, códigos de tarefa, opções)
+COMMAND_IN_TEXT = re.compile(
+    r"(/(?:traduzir|converter|sync|devolver|remover|qualidade|controles|status|disk|calibrar)"
+    r"(?: (?!<)[A-Za-z0-9_\-]+)*?)(?=[ 	]*(?:$|[—(.,:;→]| - ))", re.M)
 HELP = """Deck Commander — comandos
 Mais fácil: mande o nome do console (ex.: Switch 1, PS2) e depois encaminhe o .torrent ou cole o magnet.
 Aviso aqui quando o download terminar.
@@ -103,15 +108,55 @@ class Bot:
         with urllib.request.urlopen(self.api + method, data=data, timeout=70) as r:
             return json.loads(r.read())["result"]
 
-    def send(self, chat: int, text: str, buttons: list[str] | None = None) -> None:
+    def _button(self, label: str, command: str) -> dict:
+        """Botão que, ao tocar, executa `command` como se você tivesse digitado (guardado por um código curto,
+        porque o Telegram só aceita 64 bytes no botão)."""
+        import hashlib
+        key = hashlib.sha1(command.encode()).hexdigest()[:12]
+        bt = self.cfg.setdefault("botoes", {})
+        bt[key] = command
+        while len(bt) > 200:
+            bt.pop(next(iter(bt)))
+        return {"text": label[:60], "callback_data": "c:" + key}
+
+    def send(self, chat: int, text: str, buttons: list | None = None) -> None:
+        """`buttons`: lista de textos (o botão envia o próprio texto, ex.: "Sim") ou (rótulo, comando).
+        Todo comando citado na mensagem (ex.: "/traduzir aprovar 1a2b") também vira botão."""
         text = text.replace(self.token, "***")
+        btns = [(b, b) if isinstance(b, str) else tuple(b) for b in (buttons or [])]
+        found = [m for m in COMMAND_IN_TEXT.finditer(text)
+                 if " " in m.group(1) and not text[m.end():m.end() + 2] == " <"]  # só comando completo
+        if len(found) <= 6:  # mensagem de ajuda (cheia de comandos) não vira painel de botões
+            for m in found:
+                c = m.group(1).strip()
+                if c not in [x[1] for x in btns]:
+                    btns.append((c, c))
         chunks = [text[i:i + 3900] for i in range(0, len(text), 3900)] or [""]
         for n, chunk in enumerate(chunks):
             extra = {}
-            if buttons and n == len(chunks) - 1:  # botões de resposta rápida (viram texto ao tocar)
-                extra["reply_markup"] = json.dumps({"keyboard": [[{"text": b} for b in buttons]],
-                                                    "one_time_keyboard": True, "resize_keyboard": True})
+            if btns and n == len(chunks) - 1:
+                rows = [[self._button(lbl, cmd)] for lbl, cmd in btns] if len(btns) > 2 or any(
+                    len(lbl) > 12 for lbl, _ in btns) else [[self._button(lbl, cmd) for lbl, cmd in btns]]
+                extra["reply_markup"] = json.dumps({"inline_keyboard": rows})
+                self.save_cfg()
             self.call("sendMessage", chat_id=chat, text=chunk, **extra)
+
+    def handle_callback(self, cq: dict) -> None:
+        """Toque num botão: roda o comando guardado como se a pessoa tivesse digitado."""
+        try:
+            self.call("answerCallbackQuery", callback_query_id=cq["id"])
+        except Exception:  # noqa: BLE001
+            pass
+        data = cq.get("data") or ""
+        command = self.cfg.get("botoes", {}).get(data[2:]) if data.startswith("c:") else None
+        chat = (cq.get("message") or {}).get("chat", {}).get("id")
+        if not command or chat is None:
+            return
+        uid = cq["from"]["id"]
+        self.log(f"{uid}: botão {command}")
+        reply = self.handle(uid, chat, command)
+        if reply:
+            self.send(chat, reply)
 
     def save_cfg(self) -> None:
         tmp = self.cfg_path.with_name("telegram.json.tmp")
@@ -575,11 +620,18 @@ class Bot:
         self.log("bot iniciado")
         while True:
             try:
-                ups = self.call("getUpdates", offset=offset, timeout=50, allowed_updates='["message"]')
+                ups = self.call("getUpdates", offset=offset, timeout=50,
+                                allowed_updates='["message","callback_query"]')
             except Exception as e:  # noqa: BLE001 — sem rede: espera e tenta de novo
                 self.log(f"rede: {type(e).__name__}"); time.sleep(30); continue
             for u in ups:
                 offset = u["update_id"] + 1
+                if u.get("callback_query"):
+                    try:
+                        self.handle_callback(u["callback_query"])
+                    except Exception as e:  # noqa: BLE001
+                        self.log(f"erro no botão: {e}")
+                    continue
                 m = u.get("message") or {}
                 if "from" not in m:
                     continue

@@ -354,4 +354,4 @@ def notify(bot) -> None:
             continue
         j["notified"] = True
         run.save_job(bot.paths, j)
-        bot.send(chat, msg)
+        bot.send(chat, msg.replace("<jogo>", j.get("game_id", "<jogo>")))
