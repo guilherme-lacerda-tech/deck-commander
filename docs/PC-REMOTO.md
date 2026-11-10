@@ -45,7 +45,7 @@ Quando você fecha o jogo, o PC volta a dormir.
 
 ## Dentro e fora de casa
 - **Em casa:** o PC acorda pelo porteiro ou pelo sinal direto. O stream usa a Tailscale, que vai direto pelo WiFi,
-  e cai para o IP de casa (192.168.100.25) se a Tailscale estiver desligada.
+  e cai para o IP de casa (192.168.0.20) se a Tailscale estiver desligada.
 - **Fora de casa:** precisa da Tailscale ligada no Deck. Só o porteiro consegue acordar o PC (o Fire TV precisa estar
   ligado na tomada, com a Tailscale dele ativa).
 

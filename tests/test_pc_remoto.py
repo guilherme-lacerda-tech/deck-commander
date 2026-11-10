@@ -6,7 +6,7 @@ import pytest
 from dc import pc_remoto, tabs
 from dc.paths import get_paths
 
-# saída REAL do `flatpak run com.moonlight_stream.Moonlight list --csv 100.118.222.56` no Deck (2026-11-10),
+# saída REAL do `flatpak run com.moonlight_stream.Moonlight list --csv 100.64.0.10` no Deck (2026-11-10),
 # com o log do Qt misturado (stderr) e um jogo oculto acrescentado
 CSV_REAL = '''00:00:00 - Qt Info: Unable to detect Wayland or X11, so EGLFS will be used by default.
 _amdgpu_device_initialize: amdgpu_query_info(ACCEL_WORKING) failed (-13)
@@ -27,9 +27,9 @@ def paths(tmp_path, monkeypatch):
 @pytest.fixture
 def cfg():
     c = json.loads(json.dumps(pc_remoto.DEFAULT))
-    c.update(host_tailscale="100.118.222.56", host_casa="192.168.100.25", rede_casa="192.168.100.",
-             mac="24-B2-B9-0B-61-71", broadcast="192.168.100.255",
-             porteiro=["http://100.77.101.93:8766/acordar", "http://192.168.100.23:8766/acordar"])
+    c.update(host_tailscale="100.64.0.10", host_casa="192.168.0.20", rede_casa="192.168.0.",
+             mac="AA-BB-CC-DD-EE-FF", broadcast="192.168.0.255",
+             porteiro=["http://100.64.0.30:8766/acordar", "http://192.168.0.30:8766/acordar"])
     c["codigo"] = "SEGREDO"
     return c
 
@@ -50,9 +50,9 @@ def test_parse_lista_sem_csv():
 
 
 def test_listar_apps_erros(cfg):
-    run = lambda cmd, **k: R(0, "", "Failed to connect to 100.118.222.56")
+    run = lambda cmd, **k: R(0, "", "Failed to connect to 100.64.0.10")
     with pytest.raises(RuntimeError):
-        pc_remoto.listar_apps(cfg, "100.118.222.56", run=run)
+        pc_remoto.listar_apps(cfg, "100.64.0.10", run=run)
     seen = []
 
     def ok(cmd, **k):
@@ -64,14 +64,14 @@ def test_listar_apps_erros(cfg):
 
 # ---------------------------------------------------------------------------------------- acordar
 def test_magic_packet():
-    p = pc_remoto.magic_packet("24-B2-B9-0B-61-71")
-    assert len(p) == 102 and p[:6] == b"\xff" * 6 and p[6:12] == bytes.fromhex("24B2B90B6171")
+    p = pc_remoto.magic_packet("AA-BB-CC-DD-EE-FF")
+    assert len(p) == 102 and p[:6] == b"\xff" * 6 and p[6:12] == bytes.fromhex("AABBCCDDEEFF")
     with pytest.raises(ValueError):
         pc_remoto.magic_packet("zz")
 
 
 def test_acordar_ja_acordado_nao_chama_nada(cfg, monkeypatch):
-    monkeypatch.setattr(pc_remoto, "online", lambda c, timeout=2: "100.118.222.56")
+    monkeypatch.setattr(pc_remoto, "online", lambda c, timeout=2: "100.64.0.10")
     ok, msg = pc_remoto.acordar(cfg, http_get=lambda *a: pytest.fail("não devia"), wol=lambda *a: pytest.fail("x"))
     assert ok and "acordado" in msg
 
@@ -82,12 +82,12 @@ def test_acordar_porteiro_tailscale_falha_lan_ok(cfg, monkeypatch):
 
     def get(url, timeout):
         urls.append(url)
-        if "100.77.101.93" in url:
+        if "100.64.0.30" in url:
             raise OSError("sem rota")
         return 200, "ok, acordando o PC"
     ok, msg = pc_remoto.acordar(cfg, http_get=get, wol=lambda *a: pytest.fail("não devia mandar WoL"))
-    assert ok and "192.168.100.23" in msg and len(urls) == 2
-    assert urls[0] == "http://100.77.101.93:8766/acordar?t=SEGREDO"
+    assert ok and "192.168.0.30" in msg and len(urls) == 2
+    assert urls[0] == "http://100.64.0.30:8766/acordar?t=SEGREDO"
 
 
 def test_acordar_cai_no_wol(cfg, monkeypatch):
@@ -95,7 +95,7 @@ def test_acordar_cai_no_wol(cfg, monkeypatch):
     wols = []
     ok, msg = pc_remoto.acordar(cfg, http_get=lambda u, t: (403, "token invalido"),
                                 wol=lambda mac, bc: wols.append((mac, bc)))
-    assert ok and wols == [("24-B2-B9-0B-61-71", "192.168.100.255")] and "HTTP 403" in msg
+    assert ok and wols == [("AA-BB-CC-DD-EE-FF", "192.168.0.255")] and "HTTP 403" in msg
     cfg["codigo"] = ""
     ok, msg = pc_remoto.acordar(cfg, http_get=lambda *a: pytest.fail("sem código não chama"), wol=lambda *a: None)
     assert ok and "sem código" in msg
@@ -103,10 +103,10 @@ def test_acordar_cai_no_wol(cfg, monkeypatch):
 
 def test_esperar_pronto_relogio_falso(cfg, monkeypatch):
     t = [0.0]
-    respostas = iter([None, None, "100.118.222.56"])
+    respostas = iter([None, None, "100.64.0.10"])
     monkeypatch.setattr(pc_remoto, "online", lambda c, timeout=2: next(respostas))
     h = pc_remoto.esperar_pronto(cfg, sleep=lambda s: t.__setitem__(0, t[0] + s), relogio=lambda: t[0])
-    assert h == "100.118.222.56" and t[0] == 6
+    assert h == "100.64.0.10" and t[0] == 6
     monkeypatch.setattr(pc_remoto, "online", lambda c, timeout=2: None)
     t[0] = 0
     assert pc_remoto.esperar_pronto(cfg, limite=10, sleep=lambda s: t.__setitem__(0, t[0] + s), relogio=lambda: t[0]) is None
@@ -114,8 +114,8 @@ def test_esperar_pronto_relogio_falso(cfg, monkeypatch):
 
 # ---------------------------------------------------------------------------------------- jogar
 def test_comando_stream(cfg):
-    c = pc_remoto.comando_stream(cfg, "100.118.222.56", "Fortnite", casa=True)
-    assert c[:5] == ["/usr/bin/flatpak", "run", "com.moonlight_stream.Moonlight", "stream", "100.118.222.56"]
+    c = pc_remoto.comando_stream(cfg, "100.64.0.10", "Fortnite", casa=True)
+    assert c[:5] == ["/usr/bin/flatpak", "run", "com.moonlight_stream.Moonlight", "stream", "100.64.0.10"]
     assert c[5] == "Fortnite" and "--quit-after" in c and c[c.index("--bitrate") + 1] == "30000"
     assert pc_remoto.comando_stream(cfg, "h", "x", casa=False)[-1] == "15000"
 
@@ -133,10 +133,10 @@ def test_jogar_fluxo_completo(paths, cfg):
     code, msg = pc_remoto.jogar("VALORANT", paths, cfg, say=lambda m: None,
                                 popen=lambda cmd, **k: popens.append(cmd) or FakeChild(0),
                                 run=lambda cmd, **k: runs.append(cmd) or R(),
-                                acordar_fn=lambda c: (True, "ok"), esperar_fn=lambda c: "100.118.222.56")
+                                acordar_fn=lambda c: (True, "ok"), esperar_fn=lambda c: "100.64.0.10")
     assert (code, msg) == (0, "")
-    assert popens[0][3:6] == ["stream", "100.118.222.56", "VALORANT"]
-    assert any(c[-2:] == ["quit", "100.118.222.56"] for c in runs)  # o jogo fecha no PC
+    assert popens[0][3:6] == ["stream", "100.64.0.10", "VALORANT"]
+    assert any(c[-2:] == ["quit", "100.64.0.10"] for c in runs)  # o jogo fecha no PC
     assert any(c[0] == "systemd-run" for c in runs)  # lista atualizada depois de jogar
     assert (paths.logs / "moonlight.log").exists()
 
@@ -262,7 +262,7 @@ def test_comando_pc_bot(paths, cfg, monkeypatch):
     assert "dormindo" in pc_remoto.comando_pc(bot, ["status"])
     assert "Nenhum jogo" in pc_remoto.comando_pc(bot, ["listar"])
     assert "❌" in pc_remoto.comando_pc(bot, ["sincronizar"])
-    monkeypatch.setattr(pc_remoto, "acordar", lambda c: (True, "porteiro 100.77.101.93: ok"))
+    monkeypatch.setattr(pc_remoto, "acordar", lambda c: (True, "porteiro 100.64.0.30: ok"))
     assert pc_remoto.comando_pc(bot, ["acordar"]).startswith("⏰ porteiro")
     assert "Uso" in pc_remoto.comando_pc(bot, ["xyz"])
 
