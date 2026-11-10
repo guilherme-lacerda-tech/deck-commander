@@ -687,8 +687,31 @@ def shorten(paths: Paths, cfg: dict, items: list[tuple[str, str, int, int]],
     smart = [p for p in chain if _instructable(p)]
     dst = LANG_NAMES.get(cfg["idioma"], cfg["idioma"])
     out: dict[str, str] = {}
+    # 1º em lotes de 10 (uma chamada para várias frases: bem mais rápido); o que voltar errado vai uma a uma
+    batch_sys = (f"You shorten {dst} video game texts so they fit small text boxes. Input: JSON "
+                 '{"id": {"text": "...", "max_chars": N}}. Keep the meaning and the tone; use shorter words, drop '
+                 "filler words, abbreviate if needed; each ⟦n⟧ marker counts as 8 characters and must be kept "
+                 'exactly once. Answer ONLY with JSON {"id": "shortened text in one line"}.')
+    flat_of = {iid: text.replace("\n", " ") for iid, text, _l, _w in items}
+    for k in range(0, len(items), 10):
+        chunk = items[k:k + 10]
+        req = json.dumps({iid: {"text": flat_of[iid], "max_chars": lines * width} for iid, _t, lines, width in chunk},
+                         ensure_ascii=False)
+        for p in smart:
+            try:
+                raw, _tok = p.chat(batch_sys, req, timeout=240)
+                got = _parse_batch(raw)
+            except (ProviderError, ValueError):
+                continue
+            for iid, *_ in chunk:
+                v = got.get(iid)
+                if isinstance(v, str) and placeholders_ok(flat_of[iid], v.strip()) and fits(iid, v.strip()):
+                    out[iid] = v.strip()
+            break
     for iid, text, lines, width in items:
-        flat = text.replace("\n", " ")
+        if iid in out:
+            continue
+        flat = flat_of[iid]
         system = (f"You shorten {dst} video game texts so they fit a small text box: at most {lines} line(s) "
                   f"of {width} characters, {lines * width} characters in total (each ⟦n⟧ marker counts as 8). "
                   "Keep the meaning and the tone; use shorter words, drop filler words, abbreviate if needed. "

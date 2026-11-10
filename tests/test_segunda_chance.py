@@ -90,3 +90,19 @@ def test_second_chance_rescues_lost_codes(tmp_path):
     assert rep.rescued == 1 and "f#0" not in res.flagged
     assert re.search("selvagem", res.translated["f#0"])
     assert "2ª chance: 1 frases com códigos refeitas" in rep.text()
+
+
+def test_shorten_batches_then_single_for_the_rest(tmp_path):
+    paths, cfg = _cfg(tmp_path)
+    calls = []
+
+    def ans(system, user):
+        calls.append(user)
+        if user.startswith("{"):
+            d = json.loads(user)
+            return json.dumps({k: ("curto" if k == "a" else "ainda longo demais") for k in d})
+        return "curto b"
+    got = ia.shorten(paths, cfg, [("a", "longo a", 1, 10), ("b", "longo b", 1, 10)],
+                     fits=lambda iid, t: len(t) <= 10, chain=[_prov("pc", ans)])
+    assert got == {"a": "curto", "b": "curto b"}
+    assert len(calls) == 2  # 1 lote + 1 individual
