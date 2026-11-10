@@ -153,7 +153,8 @@ def test_out_of_standard_offer_asks_yes_no_and_runs_on_yes(b):
     assert run.offer_generic(b.paths, b.store, "switch-jogo", "Jogo", "de novo") is None  # não pergunta 2x
     comandos.notify(b)
     text, buttons = asked[-1]
-    assert "fora do padrão" in text and buttons == ["Sim", "Não"]
+    assert "fora do padrão" in text and buttons == [("Sim", f"/traduzir fora {job['op']} sim"),
+                                                    ("Não", f"/traduzir fora {job['op']} nao")]
     r = b.handle(1, 1, "Sim")
     assert "começou" in r and b.spawned == [job["op"]]
     assert run.load_job(b.paths, job["op"])["status"] == "na fila"
@@ -234,3 +235,22 @@ def test_runner_crash_log_has_date_and_task(b, monkeypatch):
     run.run(b.paths, job["op"])
     log = (b.paths.logs / "traducao.log").read_text("utf-8")
     assert f"tarefa {job['op']} (translate_switch) — Jogo" in log and "falha de teste" in log
+
+
+def test_out_of_standard_two_questions_each_button_answers_its_own(b):
+    """Duas perguntas abertas: antes o "Sim" valia só para a última; o botão leva o código da tarefa."""
+    lm = json.loads((b.paths.data / "launch-map.json").read_text())
+    lm["switch-outro"] = dict(lm["switch-jogo"], title="Outro")
+    (b.paths.data / "launch-map.json").write_text(json.dumps(lm))
+    sent = []
+    b.send = lambda chat, text, buttons=None: sent.append(buttons)
+    j1 = run.offer_generic(b.paths, b.store, "switch-jogo", "Jogo", "x")
+    j2 = run.offer_generic(b.paths, b.store, "switch-outro", "Outro", "x")
+    comandos.notify(b)
+    assert len(sent) == 2 and b.cfg["pergunta_op"] == j2["op"]
+    assert "começou" in b.handle(1, 1, sent[0][0][1])  # Sim da PRIMEIRA pergunta
+    assert run.load_job(b.paths, j1["op"])["status"] == "na fila"
+    assert run.load_job(b.paths, j2["op"])["status"] == "aguardando sim"
+    assert "fica como está" in b.handle(1, 1, sent[1][1][1])
+    assert "pergunta_op" not in b.cfg
+    assert "já foi respondida" in b.handle(1, 1, sent[0][0][1])  # tocar de novo não roda 2x
