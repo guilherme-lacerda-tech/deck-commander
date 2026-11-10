@@ -9,4 +9,5 @@
 - `setup-deck.sh` · `uninstall-module.sh` · `uninstall-deck-commander.sh` · `safe-mode.sh`
 - `tests/` — pytest (rodam no CI e semanalmente no Deck)
 - `tools/` — diagnóstico no Deck: `cef_eval.py`, `bootstrap_collections.py`, `deck_probe.py`, spikes `s1_reboot.py`/`s5_real_copy.py`
+- `dc/transferir.py` + `tools/pc/transferir-do-deck.ps1`/`.bat` — transferência segura de um jogo do Deck para o PC (`docs/TRANSFERENCIA.md`)
 - `docs/desenvolvimento/` — análise da spec v5.1, relatórios de spikes, histórico
