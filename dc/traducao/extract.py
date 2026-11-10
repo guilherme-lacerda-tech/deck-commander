@@ -16,7 +16,8 @@ from . import converter, nca, switch
 
 H = Path.home()
 TEXT_DIRS = re.compile(r"(^|/)(mals?|msg|message|messages|text|texts|lms|font|fonts|localize|localization|"
-                       r"language|languages)(/|$)|\.msbt(\.zs)?$|\.bffnt(\.zs)?$|(^|/)(mal|msg)[^/]*\.(sarc|szs|zs|pack)",
+                       r"language|languages)(/|$)|\.msbt(\.zs)?$|\.bffnt(\.zs)?$|(^|/)(mal|msg)[^/]*\.(sarc|szs|zs|pack)|"
+                       r"(^|/)Bootup_[A-Z]{2}[a-z]{2}\.pack$",
                        re.I)
 MAX_FILE = 64 << 20
 

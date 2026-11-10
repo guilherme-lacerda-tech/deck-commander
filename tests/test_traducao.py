@@ -391,3 +391,68 @@ def test_parallel_providers_share_work_and_survive_a_dead_one(tmp_path, monkeypa
     good.calls = 0
     res2 = ia.translate(paths, cfg, items, "par", chain=chain)
     assert len(res2.translated) == 130 and good.calls == 0
+
+
+# ============================================================ SARC dentro de SARC (Zelda BotW: Bootup_USen.pack)
+def _botw_like(tmp_path, compress_inner=True):
+    r = tmp_path / "romfs"
+    (r / "Pack").mkdir(parents=True)
+    msg = nx.Sarc("<", {"EventFlowMsg/Npc.msbt": make_msbt([["Hello ", tag(), "!"], ["Bye"]], ["a", "b"]),
+                        "ActorType/Item.msbt": make_msbt([["Sword"]], ["s"])},
+                  ["EventFlowMsg/Npc.msbt", "ActorType/Item.msbt"], {})
+    msg.align = {n: 4 for n in msg.order}
+    msg_raw = nx.write_sarc(msg)
+    inner = nx.yaz0_compress(msg_raw) if compress_inner else msg_raw
+    boot = nx.Sarc("<", {"Message/Msg_USen.product.ssarc": inner, "Font/x.bin": b"\x01" * 40},
+                   ["Message/Msg_USen.product.ssarc", "Font/x.bin"], {"Message/Msg_USen.product.ssarc": 0x80,
+                                                                       "Font/x.bin": 4})
+    (r / "Pack/Bootup_USen.pack").write_bytes(nx.write_sarc(boot))
+    (r / "Pack/Bootup_EUfr.pack").write_bytes(nx.write_sarc(boot))
+    return r, msg_raw
+
+
+def test_extract_picks_botw_bootup_pack():
+    from dc.traducao import extract
+    files = {"Pack/Bootup_USen.pack": (0, 4 << 20), "Pack/Bootup_EUfr.pack": (0, 4 << 20),
+             "Pack/Bootup.pack": (0, 30 << 20), "Pack/Dungeon000.pack": (0, 1 << 20)}
+    assert extract.text_files(files) == ["Pack/Bootup_USen.pack"]
+
+
+@pytest.mark.parametrize("compress_inner", [False, True])
+def test_nested_sarc_roundtrip_byte_identical(tmp_path, compress_inner):
+    """Sem tradução nenhuma, o mod regravado tem de ser idêntico ao original (byte a byte por dentro)."""
+    paths = get_paths(tmp_path / "dc").ensure()
+    romfs, msg_raw = _botw_like(tmp_path, compress_inner)
+    rep = switch.Report("01007EF00011E000")
+    files, containers = switch.scan(romfs, rep)
+    assert rep.msbt_count == 2 and {f.inner for f in files} == {
+        "Message/Msg_USen.product.ssarc|EventFlowMsg/Npc.msbt", "Message/Msg_USen.product.ssarc|ActorType/Item.msbt"}
+    assert all(f.rel == "Pack/Bootup_USen.pack" for f in files)
+    assert ("yaz0" in rep.compression) == compress_inner
+    switch._write_mod(paths, rep, files, containers, ia.load_cfg(paths), install=lambda t, p: p)
+    out = (paths.data / "traducao/mods/01007EF00011E000/romfs/Pack/Bootup_USen.pack").read_bytes()
+    orig = (romfs / "Pack/Bootup_USen.pack").read_bytes()
+    if not compress_inner:
+        assert out == orig
+    boot = nx.read_sarc(out)
+    assert nx.yaz0_decompress(boot.files["Message/Msg_USen.product.ssarc"]) == msg_raw if compress_inner \
+        else boot.files["Message/Msg_USen.product.ssarc"] == msg_raw
+    assert boot.files["Font/x.bin"] == b"\x01" * 40
+
+
+def test_nested_sarc_translation_lands_inside(tmp_path, monkeypatch):
+    paths = get_paths(tmp_path / "dc").ensure()
+    romfs, _ = _botw_like(tmp_path)
+    monkeypatch.setattr(switch, "RYU_DIRS", [tmp_path / "Ryujinx"])
+    (tmp_path / "Ryujinx").mkdir()
+    cfg = ia.load_cfg(paths)
+    chain = [ia.Provider("ollama", {**cfg["providers"]["ollama"], "modelo": "qwen"}, "", FakeAI())]
+    rep = switch.translate_game(paths, "01007EF00011E000", romfs, "Zelda", chain=chain)
+    assert rep.applied and rep.msbt_count == 2 and rep.translated == 3, rep.text()
+    mod = tmp_path / "Ryujinx/mods/contents/01007ef00011e000" / switch.MOD_NAME / "romfs"
+    boot = nx.read_sarc((mod / "Pack/Bootup_USen.pack").read_bytes())
+    msg = nx.read_sarc(nx.yaz0_decompress(boot.files["Message/Msg_USen.product.ssarc"]))
+    t0 = nx.read_msbt(msg.files["EventFlowMsg/Npc.msbt"]).texts()[0]
+    assert t0[0] == "PT Hello ⟦0⟧!" and t0[1] == [tag()]
+    assert nx.read_msbt(msg.files["ActorType/Item.msbt"]).texts()[0][0] == "PT Sword"
+    assert not (mod / "Pack/Bootup_EUfr.pack").exists()

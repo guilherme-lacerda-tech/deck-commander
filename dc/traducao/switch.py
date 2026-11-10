@@ -193,19 +193,7 @@ def scan(romfs: Path, report: Report, source: str = "en") -> tuple[list[TextFile
             except nx.FormatError as e:
                 report.skipped_files.append(f"{rel} ({e})")
                 continue
-            inner_txt = []
-            for name, data in s.files.items():
-                if name.lower().endswith(".msbt"):
-                    try:
-                        m = nx.read_msbt(data)
-                        if _roundtrip_ok(data, m):
-                            inner_txt.append(TextFile(rel, name, m))
-                        else:
-                            report.skipped_files.append(f"{rel}:{name} (formato não reproduzido)")
-                    except nx.FormatError as e:
-                        report.skipped_files.append(f"{rel}:{name} ({e})")
-                elif name.lower().endswith(".bffnt"):
-                    fonts.append((f"{rel}:{name}", data))
+            inner_txt = _scan_sarc(rel, s, "", report, fonts, containers)
             if inner_txt:
                 if kind:
                     report.compression.add(kind)
@@ -219,6 +207,78 @@ def scan(romfs: Path, report: Report, source: str = "en") -> tuple[list[TextFile
     report.msbt_count = len(files)
     _check_fonts(fonts, report)
     return files, containers
+
+
+NEST_SEP = "|"  # pacote dentro de pacote: inner = "Message/Msg_USen.product.ssarc|ActorType/Foo.msbt"
+NESTED_EXT = ARCHIVE_EXT | {".ssarc", ".sblarc", ".sbfarc", ".sgenvb", ".sbactorpack"}
+MAX_NEST = 3
+
+
+def _scan_sarc(rel: str, s: "nx.Sarc", prefix: str, report: Report, fonts: list, containers: dict,
+               depth: int = 0) -> list[TextFile]:
+    """MSBT dentro de um SARC, abrindo SARC (com ou sem Yaz0/zstd) que estejam dentro dele — ex.: Zelda BotW:
+    Pack/Bootup_USen.pack → Message/Msg_USen.product.ssarc (Yaz0) → *.msbt."""
+    out: list[TextFile] = []
+    for name, data in s.files.items():
+        low, key = name.lower(), prefix + name
+        if low.endswith(".msbt"):
+            try:
+                m = nx.read_msbt(data)
+                if _roundtrip_ok(data, m):
+                    out.append(TextFile(rel, key, m))
+                else:
+                    report.skipped_files.append(f"{rel}:{key} (formato não reproduzido)")
+            except nx.FormatError as e:
+                report.skipped_files.append(f"{rel}:{key} ({e})")
+        elif low.endswith(".bffnt"):
+            fonts.append((f"{rel}:{key}", data))
+        elif depth < MAX_NEST and (data[:4] == b"SARC" or Path(low).suffix in NESTED_EXT):
+            try:
+                body, kind = nx.unpack_layer(name, data)
+                if body[:4] != b"SARC":
+                    continue
+                sub = nx.read_sarc(body)
+            except nx.FormatError as e:
+                report.skipped_files.append(f"{rel}:{key} ({e})")
+                continue
+            inner = _scan_sarc(rel, sub, key + NEST_SEP, report, fonts, containers, depth + 1)
+            if not inner:
+                continue
+            if nx.read_sarc(nx.write_sarc(sub)).files != sub.files:
+                report.skipped_files.append(f"{rel}:{key} (pacote interno não reproduzido)")
+                continue
+            if kind:
+                report.compression.add(kind)
+            containers[rel + NEST_SEP + key] = (sub, kind, data)
+            out += inner
+    return out
+
+
+def _rebuild_sarc(rel: str, sarc: "nx.Sarc", prefix: str, fs: list[TextFile], containers: dict) -> None:
+    """Grava as traduções no SARC, remontando de dentro para fora os pacotes internos."""
+    children: dict[str, list[TextFile]] = {}
+    for f in fs:
+        sub = f.inner[len(prefix):]
+        if NEST_SEP in sub:
+            children.setdefault(sub.split(NEST_SEP, 1)[0], []).append(f)
+        else:
+            sarc.files[sub] = nx.write_msbt(f.msbt)
+    for name, cfs in children.items():
+        key = prefix + name
+        inner, kind, _raw = containers[rel + NEST_SEP + key]
+        _rebuild_sarc(rel, inner, key + NEST_SEP, cfs, containers)
+        data = nx.write_sarc(inner)
+        packed = nx.pack_layer(data, kind)
+        if nx.unpack_layer(name, packed)[0] != data:
+            raise nx.FormatError(f"recompressão de {rel}:{key} não confere")
+        sarc.files[name] = packed
+
+
+def _inner_bytes(sarc: "nx.Sarc", inner: str) -> bytes:
+    parts = inner.split(NEST_SEP)
+    for name in parts[:-1]:
+        sarc = nx.read_sarc(nx.unpack_layer(name, sarc.files[name])[0])
+    return sarc.files[parts[-1]]
 
 
 def _check_fonts(fonts: list[tuple[str, bytes]], report: Report) -> None:
@@ -361,12 +421,11 @@ def _write_mod(paths: Paths, rep: Report, files: list[TextFile], containers: dic
             dst.write_bytes(nx.pack_layer(data, kind))
         else:
             sarc, kind, _raw = containers[rel]
-            for f in fs:
-                sarc.files[f.inner] = nx.write_msbt(f.msbt)
+            _rebuild_sarc(rel, sarc, "", fs, containers)
             data = nx.write_sarc(sarc)
             back = nx.read_sarc(data)
             for f in fs:
-                nx.read_msbt(back.files[f.inner])
+                nx.read_msbt(_inner_bytes(back, f.inner))
             packed = nx.pack_layer(data, kind)
             if nx.unpack_layer(rel, packed)[0] != data:
                 raise nx.FormatError(f"recompressão de {rel} não confere")
