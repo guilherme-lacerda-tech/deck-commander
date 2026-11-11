@@ -45,9 +45,12 @@ def saves_do_deck(game_id: str) -> dict[str, dict]:
     for a in man.get("arquivos", []):
         if a.get("categoria") == "save":
             h = hashlib.sha256()
-            with open(a["origem"], "rb") as f:
-                for bloco in iter(lambda: f.read(1 << 20), b""):
-                    h.update(bloco)
+            try:
+                with open(a["origem"], "rb") as f:
+                    for bloco in iter(lambda f=f: f.read(1 << 20), b""):
+                        h.update(bloco)
+            except OSError:
+                continue  # o jogo apagou/trocou o arquivo entre a lista e a leitura: fica para a próxima vez
             out[a["destino"]] = {"sha256": h.hexdigest(), "mtime": int(a.get("mtime") or 0), "caminho": a["origem"]}
     return out
 
@@ -110,11 +113,15 @@ def main(argv: list[str]) -> int:
         print(__doc__, file=sys.stderr)
         return 2
     paths = get_paths()
-    if argv[0] == "escolher":
-        print(escolher(paths, argv[1], argv[2] if len(argv) > 2 else ""))
-        return 0
-    entrada = json.loads(sys.stdin.read().lstrip("﻿") or "{}")
-    out = plano(paths, argv[1], entrada) if argv[0] == "plano" else confirmar(paths, argv[1], entrada)
+    try:
+        if argv[0] == "escolher":
+            print(escolher(paths, argv[1], argv[2] if len(argv) > 2 else ""))
+            return 0
+        entrada = json.loads(sys.stdin.read().lstrip("﻿") or "{}")
+        out = plano(paths, argv[1], entrada) if argv[0] == "plano" else confirmar(paths, argv[1], entrada)
+    except (ValueError, KeyError, FileNotFoundError) as e:  # entrada ruim / jogo fora da biblioteca: mensagem clara
+        print(json.dumps({"erro": str(e), "acoes": [], "resumo": f"Não deu para sincronizar: {e}"}, ensure_ascii=False))
+        return 1
     print(json.dumps(out, ensure_ascii=False))
     return 0
 
