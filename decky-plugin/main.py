@@ -20,7 +20,7 @@ DONE = os.path.join(BASE, "plugin-done.json")
 ITEMS = os.path.join(BASE, "plugin-items.json")  # escrito pelo Deck Commander e pelo plugin
 REMOVE = os.path.join(BASE, "plugin-remove.json")  # pedidos de remoção (/remover no bot)
 # tempo-limite por ação do painel (s); as que usam rede ou varrem a biblioteca demoram mais
-PAINEL_TEMPO = {"diagnostico": 150, "pc_sincronizar": 150, "transferir_preparar": 150, "pc_acordar": 40, "pc_tv": 150, "espaco_sugestoes": 150, "musica_midia": 40, "musica_playlist": 40,
+PAINEL_TEMPO = {"diagnostico": 150, "pc_sincronizar": 150, "transferir_preparar": 150, "pc_acordar": 40, "pc_tv": 150, "espaco_sugestoes": 150, "familia": 40, "familia_atualizar": 60, "familia_puxar": 600, "musica_midia": 40, "musica_playlist": 40,
                 "telegram_token": 60, "telegram": 30, "telegram_parear": 30, "traducao": 90, "safe_mode": 90}
 
 

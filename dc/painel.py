@@ -307,6 +307,48 @@ def remover(p: Ponte, a: dict) -> dict:
     return {"texto": _sem_comandos(p._remove(args)), "feito": bool(a.get("confirmar"))}
 
 
+def familia(p: Ponte, a: dict) -> dict:
+    from . import familia as fm, familia_servico as fs
+    cfg = fs.config(p.paths)
+    par = cfg.get("par") or {}
+    return {"configurado": bool(par), "par": par.get("nome", ""), "alvo": par.get("alvo", ""),
+            "online": fs.online(p.paths) if par else False, "meu_nome": cfg.get("meu_nome", ""),
+            "chave": fs.minha_chave_publica(p.paths),
+            "jogos": fs.catalogo_guardado(p.paths).get("jogos", []),
+            "pedidos": fm.pedidos(fs._dir(p.paths) / "pedidos.json")[-10:]}
+
+
+def familia_salvar(p: Ponte, a: dict) -> dict:
+    from . import familia_servico as fs
+    nome, alvo = (a.get("nome") or "").strip(), (a.get("alvo") or "").strip()
+    if not nome or "@" not in alvo:
+        raise Erro("Preencha o nome e o endereço (ex.: deck@100.x.y.z, o IP da Tailscale do outro Deck).")
+    cfg = fs.config(p.paths)
+    cfg["par"] = {"nome": nome, "alvo": alvo, "chave": fs.CHAVE_PADRAO}
+    fs.salvar_config(p.paths, cfg)
+    return {"texto": "Par guardado. Mande a sua chave para ele autorizar (botão abaixo mostra a chave)."}
+
+
+def familia_atualizar(p: Ponte, a: dict) -> dict:
+    from . import familia_servico as fs
+    try:
+        fs.publicar(p.paths, p.qbt)
+        n = len(fs.catalogo_do_par(p.paths).get("jogos", []))
+    except (ValueError, RuntimeError) as e:
+        raise Erro(str(e))
+    return {"texto": f"{n} jogo(s) no Deck do par."}
+
+
+def familia_puxar(p: Ponte, a: dict) -> dict:
+    from . import familia_servico as fs
+    if not a.get("gid"):
+        raise Erro("Escolha um jogo.")
+    try:
+        return {"texto": fs.puxar(p.paths, p.qbt, a["gid"])}
+    except (ValueError, RuntimeError) as e:
+        raise Erro(str(e))
+
+
 def espaco_sugestoes(p: Ponte, a: dict) -> dict:
     """Jogos grandes parados há 3+ meses (última vez aberto pelo dc-launch; nunca aberto = data do arquivo)."""
     from . import espaco, remove, syncer
@@ -757,7 +799,8 @@ ACOES = {f.__name__: f for f in (
     traducao_responder, pc, pc_salvar, pc_testar, pc_acordar, pc_sincronizar, transferir, transferir_preparar,
     transferir_enviar, trazer_preparar, trazer_enviar, qualidade, qualidade_definir, controle_definir,
     downloads_limpar, traducao_limpar, desinstalar_lista, devolver, removido_perguntado, musica, musica_volume,
-    musica_midia, musica_playlist, musica_salvar, pc_tv, espaco_sugestoes)}
+    musica_midia, musica_playlist, musica_salvar, pc_tv, espaco_sugestoes, familia, familia_salvar,
+    familia_atualizar, familia_puxar)}
 ACOES["downloads_pausar"] = lambda p, a: _pausar(p, a, True)
 ACOES["downloads_retomar"] = lambda p, a: _pausar(p, a, False)
 

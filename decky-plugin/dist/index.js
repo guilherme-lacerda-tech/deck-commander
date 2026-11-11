@@ -426,6 +426,7 @@ function TelaInicio({ ir }) {
         Bt("🎚️ Qualidade e controles", () => ir("qualidade")),
         Bt("🗑️ Desinstalar jogos", () => ir("desinstalar")),
         Bt("🎵 Música", () => ir("musica")),
+        Bt("👪 Família", () => ir("familia")),
         Bt("📚 Biblioteca e desempenho", () => ir("atalhos")));
     if (!d || !d.ok) return h("div", null, Sec("Status", Carregando(d)), menu);
     const ativos = d.downloads.filter((x) => !x.concluido);
@@ -737,6 +738,38 @@ function SugestoesEspaco({ desinstalar, fazer, ocupado }) {
                 Bt("🗑️ Desinstalar", () => desinstalar(it.gid), { disabled: ocupado }, "d" + it.gid)]));
 }
 
+// ---- 10. Família (Deck do irmão: catálogo com magnet + tradução pronta) --------------------------------
+function TelaFamilia() {
+    const [d, recarregar] = useDados("familia", {}, 15000);
+    const [msg, ocupado, fazer] = useAcao(recarregar);
+    const [nome, setNome] = SP_REACT.useState("");
+    const [alvo, setAlvo] = SP_REACT.useState("");
+    const [busca, setBusca] = SP_REACT.useState("");
+    const [gid, setGid] = SP_REACT.useState(null);
+    if (!d || !d.ok) return Sec("Família", Carregando(d));
+    const config = Sec("Configurar o par",
+        Campo("Nome dele", nome || d.par, setNome),
+        Campo("Endereço do Deck dele (deck@IP da Tailscale)", alvo || d.alvo, setAlvo),
+        Bt("Guardar", () => fazer("familia_salvar", { nome: nome || d.par, alvo: alvo || d.alvo }), { disabled: ocupado }),
+        Txt("Sua chave (mande para ele colar no bot dele com /familia autorizar):\n" + d.chave, { fontSize: "11px" }));
+    if (!d.configurado) return h("div", null, Sec("Família", Txt("Ligue o seu Deck ao do seu irmão para ver os jogos "
+        + "dele e puxar jogo + tradução pronta (o jogo baixa pelo link do torrent; a tradução vem pronta).")), config, Sec("", Msg(msg)));
+    const achados = filtrar(d.jogos, busca);
+    const j = d.jogos.find((x) => x.gid === gid);
+    return h("div", null,
+        Sec("Família — " + d.par,
+            Txt(d.online ? "🟢 Online" : "⚫ Offline — peça para ele ligar o Deck"),
+            Bt("🔄 Atualizar lista dele", () => fazer("familia_atualizar"), { disabled: ocupado || !d.online }),
+            Campo("Buscar jogo", busca, setBusca, { description: achados.length + " jogo(s)" }),
+            Lista("Jogo", opcoesJogos(achados), gid, setGid),
+            j ? Txt((j.magnet ? "⬇️ baixa pelo link do torrent" : "sem link de download") + (j.tem_traducao ? " · 🇧🇷 tradução pronta" : "")) : null,
+            j ? Bt("👪 Puxar jogo + tradução", () => fazer("familia_puxar", { gid: j.gid }), { disabled: ocupado || !d.online }) : null,
+            Msg(msg)),
+        Sec("Pedidos", d.pedidos.length ? d.pedidos.map((p) => Txt("• " + p.titulo + ": " + p.status, null, "pd" + p.gid))
+            : Txt("Nenhum pedido ainda.")),
+        config);
+}
+
 // ---- 9. Música (Spotify + volume do jogo × música) -----------------------------------------------
 function TelaMusica() {
     const [d, recarregar] = useDados("musica", {}, 5000);
@@ -769,7 +802,7 @@ function TelaMusica() {
                 { disabled: ocupado || !nome || !link }, "add")));
 }
 
-const TELAS = { telegram: TelaTelegram, downloads: TelaDownloads, traducao: TelaTraducao, pc: TelaPC, musica: TelaMusica,
+const TELAS = { telegram: TelaTelegram, downloads: TelaDownloads, traducao: TelaTraducao, pc: TelaPC, musica: TelaMusica, familia: TelaFamilia,
     transferir: TelaTransferir, qualidade: TelaQualidade, desinstalar: TelaDesinstalar, atalhos: AtalhosPanel };
 
 function Panel() {
