@@ -46,7 +46,7 @@ def test_aplicar_e_desfazer(tmp_path):
     r = retro.preparar(h, MAPA)  # o painel escolhe este modelo em cada jogo, ao vivo (testado no Deck em 11/11)
     assert r["appids"] == [1] and r["modelo"] == "template://controller_neptune_dc_retro.vdf"
     modelo = (h / ".local/share/Steam/controller_base/templates/controller_neptune_dc_retro.vdf").read_text()
-    assert "key_press F12, Turbo" in modelo  # (o título "Deck Commander Retro" troca o do modelo real do Steam)
+    assert "key_press F12, Turbo liga-desliga" in modelo  # (o título "Deck Commander Retro" troca o do modelo real do Steam)
     assert retro.estado(h)["aplicado"] and retro.estado(h)["turbo"] == 2.0
     assert "RetroArch" in retro.desfazer(h)
     assert 'input_save_state = "f2"' in (h / retro.ARQUIVOS["RetroArch"]).read_text()

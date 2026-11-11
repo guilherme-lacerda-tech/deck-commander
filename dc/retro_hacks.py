@@ -25,7 +25,8 @@ def cfg_retroarch(texto: str, turbo: float = 2.0) -> str:
         "input_save_state": "f9",
         "input_load_state": "f10",
         "input_rewind": "f11",
-        "input_hold_fast_forward": "f12",
+        "input_toggle_fast_forward": "f12",  # um toque liga o turbo, outro desliga (pedido do usuário)
+        "input_hold_fast_forward": "nul",
         "fastforward_ratio": f"{turbo:.6f}",
         "rewind_enable": "true",
         "rewind_granularity": "2",
@@ -156,7 +157,7 @@ def ini_duckstation(texto: str, turbo: float = 2.0) -> str:
         "SaveSelectedSaveState": "Keyboard/F9",
         "LoadSelectedSaveState": "Keyboard/F10",
         "Rewind": "Keyboard/F11",
-        "FastForward": "Keyboard/F12"
+        "ToggleFastForward": "Keyboard/F12"  # liga/desliga com um toque
     }
     
     main = {
@@ -185,7 +186,7 @@ def ini_pcsx2(texto: str, turbo: float = 2.0) -> str:
     hotkeys = {
         "SaveStateToSlot": "Keyboard/F9",
         "LoadStateFromSlot": "Keyboard/F10",
-        "HoldTurbo": "Keyboard/F12"
+        "ToggleTurbo": "Keyboard/F12"  # liga/desliga com um toque
     }
     
     framerate = {
@@ -216,10 +217,10 @@ def hotkeys_dolphin(texto: Optional[str]) -> str:
     return ini_definir(texto, "Hotkeys", valores)
 
 BOTOES_DE_TRAS = {
-    "button_back_left": ["key_press F9, Salvar estado"],
-    "button_back_right": ["key_press F10, Carregar estado"],
-    "button_back_left_upper": ["key_press F11, Voltar no tempo"],
-    "button_back_right_upper": ["key_press F12, Turbo"],
+    "button_back_left_upper": ["key_press F9, Salvar estado"],
+    "button_back_right_upper": ["key_press F10, Carregar estado"],
+    "button_back_left": ["key_press F11, Voltar no tempo"],
+    "button_back_right": ["key_press F12, Turbo liga-desliga"],
 }
 
 

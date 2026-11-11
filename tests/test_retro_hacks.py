@@ -82,7 +82,7 @@ def test_retroarch():
     r = R.cfg_retroarch(t)
     assert r.startswith('a = "1"\nfastforward_ratio = "2.000000"\n')
     for k, v in (("input_save_state", "f9"), ("input_load_state", "f10"), ("input_rewind", "f11"),
-                 ("input_hold_fast_forward", "f12"), ("rewind_enable", "true"), ("network_cmd_enable", "true"),
+                 ("input_toggle_fast_forward", "f12"), ("input_hold_fast_forward", "nul"), ("rewind_enable", "true"), ("network_cmd_enable", "true"),
                  ("apply_cheats_after_load", "true")):
         assert f'{k} = "{v}"' in r
     assert r.count("input_rewind") == 1 and '"r"' not in r
@@ -104,12 +104,12 @@ def test_override_e_shader():
 def test_duckstation_e_pcsx2():
     i = "[Hotkeys]\nFastForward = Keyboard/Tab\nScreenshot = Keyboard/F12\n\n[Main]\nX = 1\n"
     d = R.ini_duckstation(i)
-    assert "FastForward = Keyboard/F12" in d and "Screenshot" not in d and "X = 1" in d and "RewindEnable = false" in d
+    assert "ToggleFastForward = Keyboard/F12" in d and "Screenshot" not in d and "X = 1" in d and "RewindEnable = false" in d
     assert d.index("SaveSelectedSaveState") < d.index("[Main]")  # entrou na seção certa
     assert R.ini_duckstation(d) == d
     p = R.ini_pcsx2("[Hotkeys]\nToggleTurbo = Keyboard/Tab\nHoldTurbo = Keyboard/Period\n\n[Pad]\nA = 1\n")
-    assert "HoldTurbo = Keyboard/F12" in p and "SaveStateToSlot = Keyboard/F9" in p and "[Framerate]" in p
-    assert "TurboScalar = 2.000000" in p and "ToggleTurbo = Keyboard/Tab" in p
+    assert "ToggleTurbo = Keyboard/F12" in p and "SaveStateToSlot = Keyboard/F9" in p and "[Framerate]" in p
+    assert "TurboScalar = 2.000000" in p
 
 
 def test_dolphin():
