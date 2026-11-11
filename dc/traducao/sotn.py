@@ -139,6 +139,52 @@ def _completar(paths, cfg, chain, faltam: dict[str, str], por_texto, ids, res, p
     return ok
 
 
+NOMES = {"alucard", "dracula", "maria", "richter", "trevor", "grant", "sypha", "shaft", "death", "lisa", "slogra",
+         "gaibon", "akmodan", "galamoth", "beelzebub", "olrox", "granfaloon", "doppleganger", "karasuman", "succubus",
+         "scylla", "minotaur", "werewolf", "hippogryph", "lesser", "medusa", "cerberus", "orlox"}
+
+
+def _so_nome(texto: str) -> bool:
+    """Nome próprio / créditos / texto interno: fica igual em português (não é 'resto em inglês')."""
+    palavras = [w.lower() for w in re.findall(r"[A-Za-z]+", texto)]
+    if palavras and all(w in NOMES for w in palavras):
+        return True
+    if texto.isupper() and len(palavras) >= 2:  # nomes da equipe nos créditos (SHIGERU FUKUTAKE…)
+        return True
+    return bool(re.search(r"\b(load|set ok|dummy|debug|test)\b", texto, re.I) and len(palavras) <= 3)
+
+
+def retoque(paths: Paths, rom_original: Path, rom_pt: Path, chain=None, progress=lambda d, t: None) -> dict:
+    """Passa de novo na cópia PT-BR: tudo que ainda está igual ao inglês (menos nomes) é traduzido SOZINHO, com o
+    limite exato de letras e até 3 encurtamentos. Regrava a cópia (o original nunca é tocado)."""
+    cfg = ia.load_cfg(paths)
+    b_orig = _bin_da_cue(rom_original) if rom_original.suffix.lower() == ".cue" else rom_original
+    b_pt = _bin_da_cue(rom_pt) if rom_pt.suffix.lower() == ".cue" else rom_pt
+    originais = {t.texto for t in coletar(Disco(b_orig))}
+    disco_pt = Disco(b_pt)
+    resto = [t for t in coletar(disco_pt) if t.texto in originais and not _so_nome(t.texto)]
+    if not resto:
+        return {"restavam": 0, "traduzidos": 0}
+    por_texto: dict[str, list[S.Trecho]] = {}
+    for t in resto:
+        por_texto.setdefault(t.texto, []).append(t)
+    ids = {f"r{n}": txt for n, txt in enumerate(por_texto)}
+    grupos = {iid: [min(por_texto[txt], key=lambda t: t.tam)] for iid, txt in ids.items()}
+    feitos = _completar(paths, cfg, chain, dict(ids), {txt: [grupos[i]] for i, txt in ids.items()}, ids, None,
+                        progress)
+    trocas: dict[str, list[tuple[S.Trecho, str]]] = {}
+    for iid, novo in feitos.items():
+        if novo.strip() and S.sem_acento(novo).strip().lower() != ids[iid].strip().lower():
+            for t in por_texto[ids[iid]]:
+                trocas.setdefault(t.arquivo, []).append((t, distribuir(novo, [t])[0]))
+    if trocas:
+        novos = {nome: S.aplicar(disco_pt.ler(nome), ts) for nome, ts in trocas.items()}
+        tmp = b_pt.with_name(b_pt.name + ".retoque")
+        disco_pt.gravar_copia(tmp, novos)
+        tmp.replace(b_pt)
+    return {"restavam": len(por_texto), "traduzidos": len(feitos)}
+
+
 def translate_rom(paths: Paths, rom: Path, title: str = "", chain=None, progress=lambda d, t: None,
                   should_pause=lambda: False) -> RtsReport:
     cfg = ia.load_cfg(paths)

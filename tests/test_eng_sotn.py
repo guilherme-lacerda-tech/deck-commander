@@ -147,3 +147,11 @@ def test_patch_da_rotina_de_letras_das_falas():
     dra[0x66CA0] ^= 1  # outra versão do jogo: recusa sem mexer em nada
     with pytest.raises(ValueError):
         F.aplicar(bytes(dra), bytes(exe), bios)
+
+
+def test_nomes_ficam():
+    from dc.traducao import sotn
+    for nome in ("Alucard!?", "Trevor&Grant&Sypha", "SHIGERU FUKUTAKE", "iga load", "100sword set ok"):
+        assert sotn._so_nome(nome), nome
+    for frase in ("Dark shield", "says he's the lord", "Select the file"):
+        assert not sotn._so_nome(frase), frase
