@@ -157,7 +157,7 @@ def ini_duckstation(texto: str, turbo: float = 2.0) -> str:
     }
     
     main = {
-        "RewindEnable": "true",
+        "RewindEnable": "false",  # ligado deixou o Castlevania MUITO travado no Deck (salvava 10x por segundo)
         "RewindFrequency": "0.100000",
         "RewindSaveSlots": "100",
         "FastForwardSpeed": f"{turbo:.6f}"

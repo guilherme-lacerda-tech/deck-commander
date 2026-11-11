@@ -863,7 +863,7 @@ def retro_definir(p: Ponte, a: dict) -> dict:
     turbo = float(a.get("turbo") or 2.0)
     if turbo not in (2.0, 3.0, 4.0):
         raise Erro("Turbo: 2x, 3x ou 4x.")
-    return {"texto": RT.aplicar(turbo=turbo)}
+    return RT.preparar(turbo=turbo)  # {texto, appids, modelo}: o painel escolhe o modelo em cada jogo no Steam
 
 
 def melhorias_definir(p: Ponte, a: dict) -> dict:

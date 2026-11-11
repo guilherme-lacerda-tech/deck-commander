@@ -64,7 +64,7 @@ Constante:
 6) def ini_duckstation(texto: str, turbo: float = 2.0) -> str
    [Hotkeys]: SaveSelectedSaveState = Keyboard/F13, LoadSelectedSaveState = Keyboard/F14, Rewind = Keyboard/F15,
               FastForward = Keyboard/F16
-   [Main]: RewindEnable = true, RewindFrequency = 0.100000, RewindSaveSlots = 100,
+   [Main]: RewindEnable = false (ligado travou o jogo no Deck), RewindFrequency = 0.100000, RewindSaveSlots = 100,
            FastForwardSpeed = <turbo com 6 casas>
    Depois remove de [Hotkeys] outras ações que usem as mesmas teclas (ini_remover_tecla com manter = as 4 acima).
 
@@ -113,4 +113,4 @@ Exemplo de teste (o arquivo precisa passar):
    assert 'fastforward_ratio = "2.000000"' in r and r.startswith('a = "1"\n') and 'input_save_state = "f13"' in r
    i = "[Hotkeys]\nFastForward = Keyboard/Tab\nScreenshot = Keyboard/F16\n\n[Main]\nX = 1\n"
    d = ini_duckstation(i)
-   assert "FastForward = Keyboard/F16" in d and "Screenshot" not in d and "X = 1" in d and "RewindEnable = true" in d
+   assert "FastForward = Keyboard/F16" in d and "Screenshot" not in d and "X = 1" in d and "RewindEnable = false" in d

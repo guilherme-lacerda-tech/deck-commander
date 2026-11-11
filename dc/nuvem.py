@@ -162,7 +162,9 @@ class Nuvem:
 
 def _baixar(url: str) -> bytes:
     import urllib.request
-    with urllib.request.urlopen(url, timeout=120) as r:  # noqa: S310 — endereço fixo do site oficial
+    # o downloads.rclone.org recusa (403) o "Python-urllib" padrão: identifica como o próprio rclone faz
+    req = urllib.request.Request(url, headers={"User-Agent": "rclone/v1.76.0 deck-commander"})
+    with urllib.request.urlopen(req, timeout=120) as r:  # noqa: S310 — endereço fixo do site oficial
         return r.read()
 
 

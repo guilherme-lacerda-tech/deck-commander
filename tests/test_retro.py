@@ -34,7 +34,7 @@ MAPA = {"psx-cv": {"console": "psx"}, "switch-z": {"console": "switch"}}
 def test_aplicar_e_desfazer(tmp_path):
     h, base = _deck(tmp_path)
     msg = retro.aplicar(h, MAPA)
-    assert "1 jogo" in msg and "RetroArch" in msg and "DuckStation" in msg and "Dolphin" in msg
+    assert "em 1 jogo" in msg and "RetroArch" in msg and "DuckStation" in msg and "Dolphin" in msg
     ra = (h / retro.ARQUIVOS["RetroArch"]).read_text()
     assert 'input_save_state = "f13"' in ra and 'video_shader_enable = "true"' in ra
     assert (h / retro.RA / "config/Snes9x/Snes9x.slangp").exists()
@@ -43,7 +43,10 @@ def test_aplicar_e_desfazer(tmp_path):
     assert "key_press F13" in lay and not (base / "zelda botw").exists()  # Switch não usa estes emuladores
     cs = vdf.load_text((base / "configset_controller_neptune.vdf").read_text())["controller_config"]
     assert cs["castlevania sotn"] == {"autosave": "1"} and cs["pcsx2"] == {"autosave": "1"}
-    assert "0 jogo" in retro.aplicar(h, MAPA)  # de novo: nada a fazer
+    r = retro.preparar(h, MAPA)  # o painel escolhe este modelo em cada jogo, ao vivo (testado no Deck em 11/11)
+    assert r["appids"] == [1] and r["modelo"] == "template://controller_neptune_dc_retro.vdf"
+    modelo = (h / ".local/share/Steam/controller_base/templates/controller_neptune_dc_retro.vdf").read_text()
+    assert "key_press F16, Turbo" in modelo  # (o título "Deck Commander Retro" troca o do modelo real do Steam)
     assert retro.estado(h)["aplicado"] and retro.estado(h)["turbo"] == 2.0
     assert "RetroArch" in retro.desfazer(h)
     assert 'input_save_state = "f2"' in (h / retro.ARQUIVOS["RetroArch"]).read_text()

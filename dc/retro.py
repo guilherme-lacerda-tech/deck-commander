@@ -117,30 +117,52 @@ def steam_input(home: Path, jogos: list[str]) -> list[str]:
     return feitos
 
 
-def jogos_dos_emuladores(home: Path, mapa: dict) -> list[str]:
-    """Nomes dos atalhos do Steam cujos jogos abrem nos emuladores configurados aqui."""
-    nomes = []
+MODELO = "controller_neptune_dc_retro.vdf"
+
+
+def gravar_modelo(home: Path) -> str:
+    """Modelo de layout "Deck Commander Retrô" na pasta de modelos do Steam (ele enxerga na hora, sem reiniciar).
+    Devolve o endereço que o Steam usa para escolher o modelo num jogo."""
+    texto = R.layout_com_botoes_de_tras(_modelo(home)).replace(
+        "Gamepad with Mouse Trackpad", "Deck Commander Retro (L4 salva, R4 carrega, L5 volta, R5 turbo)", 1)
+    _gravar(home / ".local/share/Steam/controller_base/templates" / MODELO, texto)
+    return "template://" + MODELO
+
+
+def jogos_dos_emuladores(home: Path, mapa: dict) -> list[tuple[str, int]]:
+    """(nome, appid) dos atalhos do Steam cujos jogos abrem nos emuladores configurados aqui."""
+    jogos = set()
     for sc in glob.glob(str(home / ".local/share/Steam/userdata/*/config/shortcuts.vdf")):
         try:
             for s in vdf.read_shortcuts(Path(sc)):
                 e = mapa.get(s.get("LaunchOptions", "")) or {}
                 if e.get("console") in EMULADOR_DO_CONSOLE and s.get("AppName"):
-                    nomes.append(s["AppName"])
+                    jogos.add((s["AppName"], int(s.get("appid", 0)) & 0xFFFFFFFF))
         except (OSError, ValueError, KeyError):
             continue
-    return sorted(set(nomes))
+    return sorted(jogos)
 
 
-def aplicar(home: Path | None = None, mapa: dict | None = None, turbo: float = 2.0) -> str:
+def preparar(home: Path | None = None, mapa: dict | None = None, turbo: float = 2.0) -> dict:
+    """Ajusta os emuladores e deixa o modelo pronto. O painel (que roda dentro do Steam) escolhe o modelo em cada
+    jogo de `appids` na hora; o layout salvo de cada jogo também ganha os botões (vale quando o Steam reiniciar)."""
     home = home or Path.home()
     if mapa is None:
         from . import transferir
         mapa = transferir.carregar_mapa()
     emus = emuladores(home, turbo)
-    jogos = steam_input(home, jogos_dos_emuladores(home, mapa))
-    return (f"🕹️ Botões de trás: {len(jogos)} jogo(s) novos no Steam Input"
-            + (f"; emuladores ajustados: {', '.join(emus)}" if emus else "; emuladores já estavam prontos")
-            + ". L4 salva · R4 carrega · L5 (segurar) volta no tempo · R5 (segurar) turbo.")
+    jogos = jogos_dos_emuladores(home, mapa)
+    steam_input(home, [n for n, _ in jogos])
+    modelo = gravar_modelo(home) if (home / ".local/share/Steam/controller_base/templates").exists() else None
+    texto = (f"🕹️ Botões de trás em {len(jogos)} jogo(s)"
+             + (f"; emuladores ajustados: {', '.join(emus)}" if emus else "; emuladores já estavam prontos")
+             + ". L4 salva · R4 carrega · L5 (segurar) volta no tempo · R5 (segurar) turbo.")
+    return {"texto": texto, "appids": [a for _, a in jogos if a], "modelo": modelo}
+
+
+def aplicar(home: Path | None = None, mapa: dict | None = None, turbo: float = 2.0) -> str:
+    r = preparar(home, mapa, turbo)
+    return r["texto"] + " Para valer já, abra o painel do Deck → Retrô → Ligar (ou reinicie o Steam)."
 
 
 def desfazer(home: Path | None = None) -> str:

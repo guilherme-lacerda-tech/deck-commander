@@ -851,9 +851,28 @@ function TelaMusica() {
 }
 
 // ---- 10. Retrô (0.8): botões de trás, turbo, voltar no tempo, filtros de tela -----------------------
+// escolhe o modelo "Deck Commander Retro" nos jogos, ao vivo (o Steam só lê o layout salvo quando reinicia)
+function escolherModelo(appids, modelo) {
+    let n = 0;
+    for (const appid of appids || []) {
+        for (let i = 0; i < 4; i++) {
+            try { SteamClient.Input.SetSelectedConfigForApp(appid, i, modelo, false, 0); if (i === 0) n++; } catch (e) { /* controle ausente */ }
+        }
+    }
+    return n;
+}
+
 function TelaRetro() {
     const [d, recarregar] = useDados("retro", {}, 0);
-    const [msg, ocupado, fazer] = useAcao(recarregar);
+    const [msg, ocupado, fazer0, setMsg] = useAcao(recarregar);
+    const fazer = async (acao, args) => {
+        const r = await fazer0(acao, args);
+        if (r && r.ok && r.modelo) {
+            const n = escolherModelo(r.appids, r.modelo);
+            setMsg({ texto: r.texto + " Layout aplicado agora em " + n + " jogo(s)." });
+        }
+        return r;
+    };
     if (!d || !d.ok) return Sec("Retrô", Carregando(d));
     const aberto = !!runningAppId();
     return h("div", null,
