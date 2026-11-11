@@ -7,8 +7,8 @@ especificações curtas; revisão, testes e integração feitos depois. Ordem: d
 |---|---|---|---|
 | 1 | dc-power | TDP automático por console ao abrir o jogo (SteamOS Manager, sem root) e volta ao fechar; dock/TV detectada → TDP máximo | ✅ no ar (testado: 12→7→12 W) |
 | 2 | dc-audio | Mixer jogo × música (PipeWire/pactl), play/pause/próxima e "tocando agora" (MPRIS pelo busctl), playlists rápidas, `/musica` | ✅ no ar (Spotify instalado; falta você entrar na conta) |
-| 3 | TV | Botão "Jogar na TV" e `/tv`: o agente da casa liga a TV no PC e o Sunshine transmite | agente já tem o modo TV |
-| 4 | Limpeza de disco | "Não joga X há 3 meses e ocupa 20 GB: levar para o PC ou desinstalar?" (último jogo pelo log do dc-launch) | — |
+| 3 | TV | Botão "Jogar na TV" e `/tv`: o agente da casa liga a TV no PC e o Sunshine transmite | ✅ no ar (/pc tv e botão no painel; só em casa) |
+| 4 | Limpeza de disco | "Não joga X há 3 meses e ocupa 20 GB: levar para o PC ou desinstalar?" (último jogo pelo log do dc-launch) | ✅ no ar (painel → Desinstalar jogos → Liberar espaço) |
 | 5 | Glossário de franquia | Termos guardados por série (ex.: Mario) e usados em todos os jogos dela | — |
 | 6 | `/corrigir` | Frase estranha → corrige só ela no mod, sem refazer o jogo (por texto primeiro; por foto exige um modelo de visão local) | — |
 | 7 | Patches de melhoria | 60 fps / widescreen pelos bancos de patch que os próprios emuladores já trazem (PCSX2, DuckStation, Dolphin), sem baixar ROM modificada | — |
