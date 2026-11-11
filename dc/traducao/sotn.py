@@ -164,6 +164,13 @@ GLOSSARIO = {
     "Hard iron shield": "Escudo de ferro", "Holy Symbol": "Símbolo S.", "Immune to curses": "Imune a feitiço",
     "Merman Statue": "Est. Tritão", "No game": "Vazio", "Skill of Wolf": "Técnica Lobo", "Soul of Bat": "Alma Morc.",
     "Summon Spirit": "Invocar Alma", "Tetra Spirit": "Tetra Alma", "Unholy dark shield": "Escudo profano",
+    "Zwei hander": "Montante", "no data": "Vazio", "not yet": "Espere",
+    # pedaços de fala que ficam sozinhos (o resto da caixa vem depois de um código de pausa/cor) — à mão, no contexto
+    "Open Hell's gate!": "Abram o Inferno!", "So he": "Ele", "sure he's here.": "ele está aqui.",
+    "true feelings then": "seu sentimento,", "meet again": "nos vemos", "I'll feast on": "devorarei",
+    "Well met,": "Salve,", "human side": "humanidade", "but my goal is": "mas meu fim é",
+    "This world must be": "Este mundo será", "How is": "Como", "learn what caused": "saber a causa da",
+    "Richter's madness.": "loucura de Richter", "I'm glad your": "Que bom que", "I can't let him": "Não o deixarei",
 }
 IGUAIS = {"CON", "INT", "EXP", "Exp", "STR", "LCK", "DEF", "ATT", "HP", "MP", "Def HP", "Mono", "Long"}  # iguais em PT
 
