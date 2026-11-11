@@ -169,7 +169,8 @@ def ini_duckstation(texto: str, turbo: float = 2.0) -> str:
     texto = ini_definir(texto, "Hotkeys", hotkeys)
     texto = ini_definir(texto, "Main", main)
     # avisos na tela ("estado salvo no espaço 1", ícone de turbo) — pedido do usuário: saber que funcionou
-    texto = ini_definir(texto, "Display", {"ShowOSDMessages": "true", "ShowStatusIndicators": "true"})
+    # e a velocidade no canto ("100%"; com turbo "200%"): mostra na hora se o turbo e o jogo estão na velocidade certa
+    texto = ini_definir(texto, "Display", {"ShowOSDMessages": "true", "ShowStatusIndicators": "true", "ShowSpeed": "true"})
 
     manter = set(hotkeys.keys())
     texto = ini_remover_tecla(texto, "Hotkeys", "Keyboard/F9", manter)
@@ -193,7 +194,7 @@ def ini_pcsx2(texto: str, turbo: float = 2.0) -> str:
     
     texto = ini_definir(texto, "Hotkeys", hotkeys)
     texto = ini_definir(texto, "Framerate", framerate)
-    texto = ini_definir(texto, "EmuCore/GS", {"OsdShowMessages": "true", "OsdShowIndicators": "true"})  # avisos na tela
+    texto = ini_definir(texto, "EmuCore/GS", {"OsdShowMessages": "true", "OsdShowIndicators": "true", "OsdShowSpeed": "true"})  # avisos na tela
 
     manter = set(hotkeys.keys())
     for f in ("F9", "F10", "F11", "F12"):  # F9 era "renderização por software" no PCSX2
