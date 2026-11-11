@@ -104,8 +104,18 @@ def main(argv: list[str]) -> None:
             cmd, log_dir = perf.wrap_command(cmd, seconds=secs)
         except Exception as e:  # noqa: BLE001 — medição nunca impede o jogo de abrir
             say(f"desempenho: medição desligada ({e})"); measure = False
+    tdp_ctl = None
+    try:  # TDP (energia) do console; sobra de um jogo fechado à força volta antes
+        from . import tdp
+        tdp_ctl = tdp.Tdp(paths.state / "tdp-anterior.json")
+        if not (paths.config / "tdp-desligado").exists():
+            say(f"energia: {tdp_ctl.aplicar_console(console, tdp.em_dock())}")
+        else:
+            tdp_ctl = None
+    except Exception as e:  # noqa: BLE001 — energia nunca impede o jogo de abrir
+        say(f"energia: ignorado ({e})"); tdp_ctl = None
     say(f"lançando {game_id}: {cmd}")
-    if not rec and not measure:
+    if not rec and not measure and not tdp_ctl:
         os.execvp(cmd[0], cmd)
     if rec:
         say(f"qualidade deste jogo: {rec['key']} {rec['old']} -> {rec['new']} (volta ao fechar)")
@@ -145,6 +155,11 @@ def main(argv: list[str]) -> None:
                     say(f"auto-ajuste: {change}")
             except Exception as e:  # noqa: BLE001
                 say(f"desempenho: não registrado ({e})")
+        if tdp_ctl:
+            try:
+                say(f"energia: {tdp_ctl.restaurar()}")
+            except Exception as e:  # noqa: BLE001
+                say(f"energia: devolução falhou ({e})")
         if rec:
             try:
                 say(f"qualidade: {quality.restore(paths)}")
