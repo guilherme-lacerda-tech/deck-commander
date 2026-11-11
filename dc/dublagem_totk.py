@@ -86,7 +86,45 @@ def instalar(cena: str, rotulo: str, arquivo: Path) -> Path:
     return destino
 
 
+def originais_tar(cena: str, saida: Path) -> int:
+    """Todas as vozes originais da cena num .tar (uma ida só para o PC)."""
+    import io
+    import tarfile
+    rfs, _tid = _romfs()
+    n = 0
+    with tarfile.open(saida, "w") as tf:
+        for p in sorted(rfs.files()):
+            if p.startswith(f"{VOZ}/{cena}_Stream/") and p.endswith(".bwav"):
+                dados = _ler(p)
+                ti = tarfile.TarInfo(Path(p).name)
+                ti.size = len(dados)
+                tf.addfile(ti, io.BytesIO(dados))
+                n += 1
+    return n
+
+
+def instalar_tar(cena: str, arquivo: Path) -> int:
+    """Instala todas as vozes dubladas de um .tar (só arquivos .bwav soltos, conferidos um a um)."""
+    import tarfile
+    import tempfile
+    n = 0
+    with tarfile.open(arquivo) as tf, tempfile.TemporaryDirectory() as t:
+        for m in tf.getmembers():
+            if m.isfile() and "/" not in m.name and m.name.endswith(".bwav"):
+                p = Path(t) / m.name
+                p.write_bytes(tf.extractfile(m).read())
+                instalar(cena, Path(m.name).stem, p)
+                n += 1
+    return n
+
+
 def main(argv: list[str]) -> int:
+    if argv[:1] == ["originais"] and len(argv) == 3:
+        print(originais_tar(argv[1], Path(argv[2])))
+        return 0
+    if argv[:1] == ["instalar_tar"] and len(argv) == 3:
+        print(instalar_tar(argv[1], Path(argv[2])))
+        return 0
     if argv[:1] == ["cenas"]:
         print(json.dumps(cenas()))
     elif argv[:1] == ["falas"] and len(argv) == 2:

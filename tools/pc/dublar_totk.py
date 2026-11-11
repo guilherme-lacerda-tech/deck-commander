@@ -11,6 +11,7 @@ confere tocando de volta e manda para o Deck instalar como mod do Ryujinx.
 from __future__ import annotations
 
 import argparse
+import re
 import asyncio
 import json
 import subprocess
@@ -43,13 +44,32 @@ def scp(o: str, d: str) -> None:
     subprocess.run(["scp", "-q", "-i", CHAVE, "-o", "BatchMode=yes", o, d], check=True, timeout=600)
 
 
+ESPANHOL = re.compile(r"\b(recuerdos?|también|usted(es)?|ahora|entonces|mientras|nosotros|muy|ella|hasta|siempre|"
+                      r"porque|pero|aquí|allí|cuando|donde|tiempo atrás|señor|señora|gracias|bueno)\b|[¿¡ñ]", re.I)
+
+
 def traduzir(textos: list[str], modelo: str = "qwen2.5:7b") -> list[str]:
+    """Tradução da cena; refaz (até 3x) se escapar espanhol — falha real: 'recuerdo' numa fala da Zelda."""
+    aviso = ""
+    for _ in range(3):
+        saida = _traduzir1(textos, modelo, aviso)
+        ruins = [i for i, t in enumerate(saida) if ESPANHOL.search(t)]
+        if not ruins:
+            return saida
+        aviso = (" ATENÇÃO: a resposta anterior teve palavras em ESPANHOL (" +
+                 ", ".join(ESPANHOL.search(saida[i]).group(0) for i in ruins[:5]) +
+                 "). Use SOMENTE português do Brasil (lembrança, também, você, agora, então…).")
+    return saida
+
+
+def _traduzir1(textos: list[str], modelo: str, aviso: str = "") -> list[str]:
     prompt = ("Você dubla The Legend of Zelda para o português do Brasil. Traduza cada fala de forma natural e fiel, "
               "com o vocabulário oficial da série (Hyrule, Link, Zelda, Ganondorf, Rauru, Sonia, Rei Demônio, Espada "
               "Mestra, Pedra Secreta, blood moon = Lua de Sangue, Demon King = Rei Demônio, Sage = Sábio). "
               "Português correto e falado no Brasil (nada de 'ameaça-se': use 'está ameaçado'; 'Witness' = 'Vejam'). "
-              "Tamanho parecido com o original (é dublagem). Responda SOMENTE um JSON "
-              '{"falas": [...]} com a mesma quantidade e ordem.\n' + json.dumps(textos, ensure_ascii=False))
+              "Nunca escreva em espanhol. Tamanho parecido com o original (é dublagem)." + aviso +
+              ' Responda SOMENTE um JSON {"falas": [...]} com a mesma quantidade e ordem.\n'
+              + json.dumps(textos, ensure_ascii=False))
     corpo = json.dumps({"model": modelo, "prompt": prompt, "stream": False, "format": "json",
                         "options": {"temperature": 0.2}}).encode()
     req = urllib.request.Request("http://127.0.0.1:11434/api/generate", corpo, {"Content-Type": "application/json"})
@@ -106,28 +126,35 @@ def dublar_cena(ff: str, cena: str, voz_f: str, voz_m: str) -> int:
         return 0
     pt = traduzir([f["texto"] for f in falas])
     voz = voz_f if any(n.lower() in cena.lower() for n in ("_ZE_", "Zelda")) else voz_m  # Lua de Sangue (_SY_) é o Ganondorf
+    import tarfile
     feitas = 0
     with tempfile.TemporaryDirectory() as t:
         t = Path(t)
-        for f, texto in zip(falas, pt):
-            if not any(c.isalpha() for c in texto):  # "..." / só pontuação: fica a voz original
-                continue
-            orig = t / "orig.bwav"
-            ssh(f"cd ~/deck-commander && python3 -m dc.dublagem_totk original '{cena}' '{f['rotulo']}' /tmp/dc-dub/o.bwav")
-            scp(f"{alvo()}:/tmp/dc-dub/o.bwav", str(orig))
-            canais = 1 + len(bwav.ler(orig.read_bytes()).outros)
-            try:
-                dados = voz_bwav(ff, texto, voz, f["amostras"], canais, t)
-            except Exception as e:  # noqa: BLE001 — uma fala ruim não para a cena: fica a voz original
-                print(f"  {f['rotulo']}: pulei ({str(e)[:80]})")
-                continue
-            novo = t / f"{f['rotulo']}.bwav"
-            novo.write_bytes(dados)
-            scp(str(novo), f"{alvo()}:/tmp/dc-dub/{novo.name}")
-            ssh(f"cd ~/deck-commander && python3 -m dc.dublagem_totk instalar '{cena}' '{f['rotulo']}' /tmp/dc-dub/{novo.name}"
-                f" && rm -f /tmp/dc-dub/{novo.name} /tmp/dc-dub/o.bwav")
-            print(f"  {f['rotulo']}: {f['texto'][:50]!r} -> {texto[:50]!r}")
-            feitas += 1
+        # uma ida e uma volta por cena (antes eram 3 conexões por fala)
+        ssh(f"cd ~/deck-commander && python3 -m dc.dublagem_totk originais '{cena}' /tmp/dc-dub/{cena}.tar")
+        scp(f"{alvo()}:/tmp/dc-dub/{cena}.tar", str(t / "orig.tar"))
+        with tarfile.open(t / "orig.tar") as tf:
+            originais = {Path(m.name).stem: tf.extractfile(m).read() for m in tf.getmembers() if m.isfile()}
+        novos = t / "novos.tar"
+        with tarfile.open(novos, "w") as saida:
+            for f, texto in zip(falas, pt):
+                if not any(c.isalpha() for c in texto) or f["rotulo"] not in originais:
+                    continue  # "..." / só pontuação: fica a voz original
+                canais = 1 + len(bwav.ler(originais[f["rotulo"]]).outros)
+                try:
+                    dados = voz_bwav(ff, texto, voz, f["amostras"], canais, t)
+                except Exception as e:  # noqa: BLE001 — uma fala ruim não para a cena: fica a voz original
+                    print(f"  {f['rotulo']}: pulei ({str(e)[:80]})")
+                    continue
+                arq = t / f"{f['rotulo']}.bwav"
+                arq.write_bytes(dados)
+                saida.add(arq, arcname=arq.name)
+                print(f"  {f['rotulo']}: {f['texto'][:50]!r} -> {texto[:50]!r}")
+                feitas += 1
+        if feitas:
+            scp(str(novos), f"{alvo()}:/tmp/dc-dub/{cena}-pt.tar")
+            ssh(f"cd ~/deck-commander && python3 -m dc.dublagem_totk instalar_tar '{cena}' /tmp/dc-dub/{cena}-pt.tar")
+        ssh(f"rm -f /tmp/dc-dub/{cena}.tar /tmp/dc-dub/{cena}-pt.tar")
     return feitas
 
 
