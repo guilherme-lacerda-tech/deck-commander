@@ -11,14 +11,21 @@ VALIDADE = 300
 
 def ip_tailscale(run=subprocess.run) -> Optional[str]:
     """Obtém o IP Tailscale IPv4 ou None se não disponível."""
-    try:
-        result = run(["tailscale", "ip", "-4"], capture_output=True, text=True, timeout=10)
-        if result.returncode == 0:
-            match = re.search(r"\d+\.\d+\.\d+\.\d+", result.stdout)
-            return match.group() if match else None
+    # no Steam Deck a Tailscale fica em /opt/tailscale (fora do PATH) — falha real no teste de 11/11
+    for exe in ("tailscale", "/opt/tailscale/tailscale"):
+        try:
+            result = run([exe, "ip", "-4"], capture_output=True, text=True, timeout=10)
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            continue
+        match = re.search(r"\d+\.\d+\.\d+\.\d+", result.stdout or "") if result.returncode == 0 else None
+        if match:
+            return match.group()
+    try:  # último recurso: o endereço da interface tailscale0
+        r = run(["ip", "-4", "addr", "show", "tailscale0"], capture_output=True, text=True, timeout=10)
+        m = re.search(r"inet (\d+\.\d+\.\d+\.\d+)", r.stdout or "")
+        return m.group(1) if m else None
     except (FileNotFoundError, subprocess.TimeoutExpired):
-        pass
-    return None
+        return None
 
 
 def pedir(estado: Path, game_id: str, papel: str, ip: Optional[str] = None, agora: Optional[float] = None) -> None:
@@ -66,15 +73,10 @@ def aplicar_no_comando(cmd: List[str], extra: List[str]) -> List[str]:
     retroarch = any("org.libretro.RetroArch" in c or c.endswith("retroarch") for c in cmd)
     if not retroarch:
         return cmd
-    novo_cmd = cmd.copy()
-    idx_rom = -1
-    for i, c in enumerate(cmd):
-        if c.endswith((".sfc", ".iso", ".bin")):
-            idx_rom = i
-            break
-    if idx_rom >= 0:
-        novo_cmd.insert(idx_rom, *extra)
-    return novo_cmd
+    if not extra or not cmd:
+        return cmd
+    # a ROM é sempre o último item do comando (corrigido: a 1ª versão procurava por extensão e esquecia .nes/.gba…)
+    return cmd[:-1] + list(extra) + cmd[-1:]
 
 
 def convite(estado: Path, de: str, game_id: str, titulo: str, ip: str, agora: Optional[float] = None) -> None:

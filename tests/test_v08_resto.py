@@ -69,6 +69,8 @@ def test_netplay(tmp_path):
     assert netplay.argumentos(tmp_path, "snes-mario", agora=2000) == []  # vencido
     ra = ["/usr/bin/flatpak", "run", "org.libretro.RetroArch", "-L", "x.so", "/r.sfc"]
     assert netplay.aplicar_no_comando(ra, ["--host"])[-2:] == ["--host", "/r.sfc"]
+    nes = ["/usr/bin/flatpak", "run", "org.libretro.RetroArch", "-L", "n.so", "/Nova.nes"]  # falha real: .nes
+    assert netplay.aplicar_no_comando(nes, ["--host", "--port", "55435"])[-4:] == ["--host", "--port", "55435", "/Nova.nes"]
     ds = ["/a/DuckStation-x64.AppImage", "/r.cue"]
     assert netplay.aplicar_no_comando(ds, ["--host"]) == ds
     import time
