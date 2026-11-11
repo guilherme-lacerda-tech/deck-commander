@@ -155,3 +155,11 @@ def test_nomes_ficam():
         assert sotn._so_nome(nome), nome
     for frase in ("Dark shield", "says he's the lord", "Select the file"):
         assert not sotn._so_nome(frase), frase
+
+
+def test_glossario_cabe_no_espaco():
+    """Cada tradução escrita à mão cabe no espaço do original (nomes: acento 1 byte; falas: 2 bytes)."""
+    from dc.traducao import sotn
+    for en, pt in sotn.GLOSSARIO.items():
+        tipo_menor = min(len(S.codificar(pt, 999, "menos20").rstrip(b"\x00")), len(S.codificar(pt, 999, "ascii").rstrip()))
+        assert tipo_menor <= len(en), (en, pt)

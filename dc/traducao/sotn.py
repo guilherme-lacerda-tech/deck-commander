@@ -144,9 +144,37 @@ NOMES = {"alucard", "dracula", "maria", "richter", "trevor", "grant", "sypha", "
          "scylla", "minotaur", "werewolf", "hippogryph", "lesser", "medusa", "cerberus", "orlox"}
 
 
+# Glossário escrito à mão (11/11/2026) para nomes curtos de itens/menus onde a IA não acerta a abreviação: cada
+# tradução foi contada para caber no espaço do original (nomes: acento = 1 byte; falas/descrições: acento = 2 bytes).
+GLOSSARIO = {
+    "Alucard mail": "Cota Alucard", "Alucard sword": "Esp. Alucard", "Axe": "Mch", "Axe Knight": "Cav. Mach.",
+    "Bone Ark": "Ossuário", "Cancel": "Voltar", "Castle map": "Mapa", "Curse Zone": "Zona Mald.", "CURSE": "MALD.",
+    "Dark shield": "Esc. Sombra", "Defeat Akmodan II": "Vença Akmodan II", "Defeat Galamoth": "Vença Galamoth",
+    "Defeat Medusa": "Vença Medusa", "Defeat Trevor, Grant & Sypha": "Vença Trevor, Grant & Sypha",
+    "Discus Lord": "Lorde Disco", "Dracula tunic": "Túnica Drác.", "Equip": "Armar", "Flail Guard": "Mangualeiro",
+    "Flea Man": "Pulgão", "Heart Refresh": "Cura Corações", "Hide cuirass": "Couraça Pele", "Holy mail": "Cota Sta.",
+    "Holy rod": "Cetro S.", "Holy sword": "Esp. Santa", "Ice mail": "CotaGelo", "Opal circlet": "Tiara Opala",
+    "Phantom Skull": "Caveira Fant.", "Puppet Sword": "Esp. Boneco", "Resist dark": "Res. Trevas",
+    "Resist holy": "Res. Santo", "STATUS": "ESTADO", "Spear Guard": "Lanceiro", "Stereo": "Estér.",
+    "Stone mask": "Másc.Pedra", "Topaz circlet": "Tiara Topázio",
+    "Magic scroll 1": "Pergaminho 1", "Magic scroll 2": "Pergaminho 2", "Magic scroll 3": "Pergaminho 3",
+    "Magic scroll 4": "Pergaminho 4", "Magic scroll 5": "Pergaminho 5",
+    "-Special Thanks-": "-Agradecimentos-", "Bat Card": "Morcego", "Buy item": "Comprar",
+    "Dark Metamorphosis": "Metamorfose Negra", "Demon Card": "C.Demônio", "Ghost Card": "C.Fantasma",
+    "Hard iron shield": "Escudo de ferro", "Holy Symbol": "Símbolo S.", "Immune to curses": "Imune a feitiço",
+    "Merman Statue": "Est. Tritão", "No game": "Vazio", "Skill of Wolf": "Técnica Lobo", "Soul of Bat": "Alma Morc.",
+    "Summon Spirit": "Invocar Alma", "Tetra Spirit": "Tetra Alma", "Unholy dark shield": "Escudo profano",
+}
+IGUAIS = {"CON", "INT", "EXP", "Exp", "STR", "LCK", "DEF", "ATT", "HP", "MP", "Def HP", "Mono", "Long"}  # iguais em PT
+
+
 def _so_nome(texto: str) -> bool:
     """Nome próprio / créditos / texto interno: fica igual em português (não é 'resto em inglês')."""
     palavras = [w.lower() for w in re.findall(r"[A-Za-z]+", texto)]
+    if texto.strip() in IGUAIS:
+        return True
+    if not S.parece_texto(texto) or re.search(r"[0-9].*[A-Z].*[0-9]|[a-z][A-Z][a-z]", texto):  # dado, não texto
+        return True
     if palavras and all(w in NOMES for w in palavras):
         return True
     if texto.isupper() and len(palavras) >= 2:  # nomes da equipe nos créditos (SHIGERU FUKUTAKE…)
@@ -165,24 +193,54 @@ def retoque(paths: Paths, rom_original: Path, rom_pt: Path, chain=None, progress
     resto = [t for t in coletar(disco_pt) if t.texto in originais and not _so_nome(t.texto)]
     if not resto:
         return {"restavam": 0, "traduzidos": 0}
-    por_texto: dict[str, list[S.Trecho]] = {}
-    for t in resto:
-        por_texto.setdefault(t.texto, []).append(t)
-    ids = {f"r{n}": txt for n, txt in enumerate(por_texto)}
-    grupos = {iid: [min(por_texto[txt], key=lambda t: t.tam)] for iid, txt in ids.items()}
-    feitos = _completar(paths, cfg, chain, dict(ids), {txt: [grupos[i]] for i, txt in ids.items()}, ids, None,
-                        progress)
     trocas: dict[str, list[tuple[S.Trecho, str]]] = {}
-    for iid, novo in feitos.items():
+    feitos: dict[str, str] = {}
+    # 1) glossário feito à mão (nomes curtos de itens/menus), só se couber de verdade
+    sobra = []
+    for t in resto:
+        pt = GLOSSARIO.get(t.texto)
+        if pt and len(S.codificar(pt, 10 ** 4, t.tipo).rstrip(b" \x00")) <= t.tam:
+            trocas.setdefault(t.arquivo, []).append((t, pt))
+            feitos[t.texto] = pt
+        else:
+            sobra.append(t)
+    # 2) pedaços de fala: a caixa de fala INTEIRA (do disco original) é traduzida de novo, com contexto
+    dados_orig = {}
+    disco_orig = Disco(b_orig)
+    todos_orig = coletar(disco_orig)
+    for nome in {t.arquivo for t in sobra if t.tipo == "ascii"}:
+        dados_orig[nome] = disco_orig.ler(nome)
+    grupo_de: dict[tuple[str, int], list[S.Trecho]] = {}
+    for g in agrupar([t for t in todos_orig if t.arquivo in dados_orig], dados_orig):
+        for t in g:
+            grupo_de[(t.arquivo, t.pos)] = g
+    grupos_fala, avulsos = {}, []
+    for t in sobra:
+        g = grupo_de.get((t.arquivo, t.pos))
+        if t.tipo == "ascii" and g and len(g) > 1:
+            grupos_fala[" ".join(x.texto for x in g)] = g
+        else:
+            avulsos.append(t)
+    # 3) o resto (e as caixas de fala) passam pela 2ª chance + encurtar, conferindo que cabe
+    por_texto: dict[str, list[list[S.Trecho]]] = {}
+    for txt, g in grupos_fala.items():
+        por_texto.setdefault(txt, []).append(g)
+    for t in avulsos:
+        por_texto.setdefault(t.texto, []).append([t])
+    ids = {f"r{n}": txt for n, txt in enumerate(por_texto)}
+    novos_txt = _completar(paths, cfg, chain, dict(ids), por_texto, ids, None, progress)
+    for iid, novo in novos_txt.items():
         if novo.strip() and S.sem_acento(novo).strip().lower() != ids[iid].strip().lower():
-            for t in por_texto[ids[iid]]:
-                trocas.setdefault(t.arquivo, []).append((t, distribuir(novo, [t])[0]))
+            feitos[ids[iid]] = novo
+            for g in por_texto[ids[iid]]:
+                for t, linha in zip(g, distribuir(novo, g)):
+                    trocas.setdefault(t.arquivo, []).append((t, linha))
     if trocas:
         novos = {nome: S.aplicar(disco_pt.ler(nome), ts) for nome, ts in trocas.items()}
         tmp = b_pt.with_name(b_pt.name + ".retoque")
         disco_pt.gravar_copia(tmp, novos)
         tmp.replace(b_pt)
-    return {"restavam": len(por_texto), "traduzidos": len(feitos)}
+    return {"restavam": len(resto), "traduzidos": len(feitos)}
 
 
 def translate_rom(paths: Paths, rom: Path, title: str = "", chain=None, progress=lambda d, t: None,
