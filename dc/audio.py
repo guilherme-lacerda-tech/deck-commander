@@ -233,3 +233,17 @@ if __name__ == "__main__":
         print(json.dumps(abrir(uri)))
     else:
         sys.exit(1)
+
+
+def atalho_spotify(paths) -> str:
+    """Põe o Spotify na biblioteca do Steam (para entrar na conta e abrir no modo de jogo, sem o modo Desktop)."""
+    from . import plugin_bridge
+    bin_dir = paths.data / "bin"
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    sh = bin_dir / "spotify.sh"
+    sh.write_text("#!/bin/sh\n# aberto pelo atalho \"Spotify\" do Deck Commander (o argumento é o id do atalho)\n"
+                  "exec /usr/bin/flatpak run com.spotify.Client\n", "utf-8")
+    sh.chmod(0o755)
+    n = plugin_bridge.enqueue(paths, [{"LaunchOptions": "app-spotify", "AppName": "Spotify", "exe": str(sh),
+                                       "StartDir": str(bin_dir)}])
+    return "Spotify vai aparecer na biblioteca em ~10 s." if n else "O Spotify já está na biblioteca."

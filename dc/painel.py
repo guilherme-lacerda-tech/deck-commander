@@ -429,7 +429,7 @@ def musica_playlist(p: Ponte, a: dict) -> dict:
 
 def _uri_spotify(link: str) -> str:
     """Aceita o link de compartilhar (https://open.spotify.com/playlist/ID?si=...) ou o spotify:playlist:ID."""
-    m = re.search(r"open\.spotify\.com/(playlist|album|artist|track)/([A-Za-z0-9]+)", link or "")
+    m = re.search(r"open\.spotify\.com/(?:intl-[a-z]+/)?(playlist|album|artist|track)/([A-Za-z0-9]+)", link or "")
     return f"spotify:{m.group(1)}:{m.group(2)}" if m else (link or "").strip()
 
 

@@ -97,7 +97,7 @@ Aviso aqui quando o download terminar.
 /devolver <nome> — traz de volta um jogo que você tirou pelo Steam
 /bateria sim|nao — baixar também fora da tomada (padrão: só na tomada)
 /pc listar | sincronizar | acordar | status — jogos do PC no Deck (aba "Computador")
-/musica [playlist | pausar | proxima | anterior] — Spotify no Deck
+/musica [playlist | pausar | proxima | anterior] — Spotify no Deck · cole o link de uma playlist para guardar
 /transferir <jogo> — leva o jogo com tudo (emulador, config, saves) para o PC
 /trazer — jogos do PC · /trazer <jogo> — traz do PC para o Deck (instala o emulador se faltar)
 /traduzir <jogo> — tradução pt-BR com IA (Switch e Pokémon GBA) · /traduzir lista | status | config
@@ -298,6 +298,11 @@ class Bot:
         if cmd == "/trazer":  # traz um jogo do PC (jogo + dados do emulador) para o Deck
             from .receber import comando_trazer
             return comando_trazer(self, args)
+        if cmd == "/playlist":  # /playlist <nome> <link do Spotify>
+            link = next((x for x in args if "open.spotify.com" in x or x.startswith("spotify:")), "")
+            if not link:
+                return "Uso: /playlist <nome> <link da playlist> (ou só cole o link do Spotify aqui)"
+            return self._guardar_playlist(" ".join(x for x in args if x != link), link)
         if cmd == "/musica":  # Spotify no Deck: tocar playlist, pausar, próxima, o que está tocando
             return self._musica(args)
         if cmd == "/pc":  # jogos do PC transmitidos para o Deck (aba "Computador")
@@ -403,6 +408,9 @@ class Bot:
         pend = self.cfg.setdefault("pending_console", {})
         doc = m.get("document")
         caption = m.get("caption") or ""
+        sp = re.search(r"https?://open\.spotify\.com/(?:intl-[a-z]+/)?(playlist|album|artist|track)/[A-Za-z0-9]+\S*", text)
+        if sp:  # link do Spotify colado: vira playlist rápida (nome = o resto da mensagem)
+            return self._guardar_playlist(text[:sp.start()] + " " + text[sp.end():], sp.group(0))
         mm = MAGNET_RX.search(text)
         if mm:  # magnet colado, sozinho ou junto do console ("Switch magnet:?…")
             rest = (text[:mm.start()] + " " + text[mm.end():]).strip()
@@ -529,6 +537,20 @@ class Bot:
             return remove.effective_map(self.paths)
         except (OSError, ValueError):
             return {}
+
+    def _guardar_playlist(self, nome: str, link: str) -> str:
+        from . import painel
+        from .painel import Erro
+        p = painel.Ponte(self.paths, self.qbt, self.store)
+        nome = " ".join(nome.replace("/playlist", " ").split())
+        if not nome:
+            nome = f"Playlist {len(painel.musica(p, {})['playlists']) + 1}"
+        try:
+            painel.musica_salvar(p, {"nome": nome, "uri": link})
+        except Erro as e:
+            return f"🎵 {e}"
+        self.next_buttons = [("▶ Tocar agora", f"/musica {nome}")]
+        return f"🎵 Playlist guardada como \"{nome}\". Toque com /musica {nome} ou no painel (Música)."
 
     def _musica(self, args) -> str:
         """/musica (o que toca) · /musica pausar|tocar|proxima|anterior · /musica <playlist guardada no painel>."""

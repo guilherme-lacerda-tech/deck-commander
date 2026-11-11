@@ -53,3 +53,17 @@ def test_link_de_playlist_vira_uri_e_bot(tmp_path, monkeypatch):
     monkeypatch.setattr(audio, "abrir", lambda uri, run=None: abertos.append(uri) or True)
     assert "Foco" in x.handle(1, 1, "/musica")
     assert "Tocando" in x.handle(1, 1, "/musica foco") and abertos == ["spotify:playlist:AAA"]
+
+
+def test_link_colado_no_bot_vira_playlist(tmp_path):
+    from dc import bot, painel
+    from dc.paths import get_paths
+    paths = get_paths(tmp_path).ensure()
+    x = bot.Bot(paths, "T"); x.cfg["allowed"] = [1]
+    msg = lambda t: {"from": {"id": 1}, "chat": {"id": 1}, "text": t}
+    r = x.handle_message(msg("Foco https://open.spotify.com/intl-pt/playlist/37i9dQZF1DX8NTLI2TtZa6?si=abc"))
+    assert 'guardada como "Foco"' in r
+    pls = audio.playlists(painel._playlists_path(painel.Ponte(paths)))
+    assert pls == [{"nome": "Foco", "uri": "spotify:playlist:37i9dQZF1DX8NTLI2TtZa6"}]
+    assert "Playlist 2" in x.handle_message(msg("https://open.spotify.com/album/AAA"))
+    assert 'como "Rock"' in x.handle(1, 1, "/playlist Rock https://open.spotify.com/playlist/BBB")
