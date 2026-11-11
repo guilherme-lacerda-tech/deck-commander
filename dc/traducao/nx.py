@@ -353,13 +353,36 @@ def unpack_layer(name: str, data: bytes) -> tuple[bytes, Optional[str]]:
         try:
             return z[0](data), "zstd"
         except Exception as ex:  # noqa: BLE001 — ex.: jogo que usa dicionário zstd próprio
+            for nome, dic in DICIONARIOS_ZSTD.items():  # Zelda TotK: Pack/ZsDic.pack.zs (registrar_dicionarios)
+                try:
+                    from compression import zstd
+                    return zstd.decompress(data, zstd_dict=zstd.ZstdDict(dic)), "zstd:" + nome
+                except Exception:  # noqa: BLE001 — não era este dicionário
+                    continue
             raise FormatError(f"zstd não abriu ({ex}); o jogo pode usar dicionário próprio") from ex
     return data, None
+
+
+# Dicionários zstd do próprio jogo (nome -> bytes). Falha real 11/11/2026: o Zelda TotK nunca foi traduzido porque
+# todo texto dele (Mals/*.sarc.zs) é zstd COM dicionário, e o leitor desistia. O jogo grava o dicionário no RomFS.
+DICIONARIOS_ZSTD: dict[str, bytes] = {}
+
+
+def registrar_dicionarios(pacote_zsdic: bytes) -> list[str]:
+    """Lê Pack/ZsDic.pack.zs (SARC em zstd) e registra cada *.zsdic. Devolve os nomes."""
+    s = read_sarc(unpack_layer("ZsDic.pack.zs", pacote_zsdic)[0])
+    for nome, dados in s.files.items():
+        if nome.endswith(".zsdic"):
+            DICIONARIOS_ZSTD[nome] = dados
+    return sorted(DICIONARIOS_ZSTD)
 
 
 def pack_layer(data: bytes, kind: Optional[str]) -> bytes:
     if kind == "yaz0":
         return yaz0_compress(data)
+    if kind and kind.startswith("zstd:"):  # mesmo dicionário na volta: o jogo só abre assim
+        from compression import zstd
+        return zstd.compress(data, level=15, zstd_dict=zstd.ZstdDict(DICIONARIOS_ZSTD[kind[5:]]))
     if kind == "zstd":
         return _zstd()[1](data)
     return data

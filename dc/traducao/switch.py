@@ -167,6 +167,8 @@ def scan(romfs: Path, report: Report, source: str = "en") -> tuple[list[TextFile
     files: list[TextFile] = []
     containers: dict[str, tuple[nx.Sarc, Optional[str], bytes]] = {}
     fonts: list[tuple[str, bytes]] = []
+    if (romfs / "Pack/ZsDic.pack.zs").exists():  # Zelda TotK e outros: zstd com dicionário do jogo
+        nx.registrar_dicionarios((romfs / "Pack/ZsDic.pack.zs").read_bytes())
     for rel in rels:
         low = rel.lower()
         p = romfs / rel
