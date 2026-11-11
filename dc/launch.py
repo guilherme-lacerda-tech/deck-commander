@@ -70,6 +70,8 @@ def main(argv: list[str]) -> None:
         emu_cfg = paths.config / "emulators.json"
         emulators = json.loads(emu_cfg.read_text("utf-8")) if emu_cfg.exists() else {}
         cmd = sem_wsi_do_gamescope(build_command(game_id, launch_map, emulators))
+        from . import netplay  # "Jogar com o irmão": pedido de abrir em rede (vale uma vez, 5 min)
+        cmd = netplay.aplicar_no_comando(cmd, netplay.argumentos(paths.state, game_id))
     except Exception as e:  # noqa: BLE001
         fail(f"erro ao resolver {game_id}: {e}", "Esse jogo foi removido ou não está mais na biblioteca.")
     title = launch_map[game_id].get("title", game_id)

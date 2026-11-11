@@ -109,6 +109,8 @@ Aviso aqui quando o download terminar.
 /status · /queue · /disk · /diagnostico
 /retro [2x|3x|4x] — botões de trás: L4 salva, R4 carrega, L5 volta no tempo, R5 turbo · /retro desfazer
 /nuvem [agora] — saves no Google Drive (ligar pelo PC: tools/pc/nuvem-google.ps1)
+/texturas <jogo> <link> — texturas HD (PS2, GameCube, Wii)
+/netplay <jogo> — jogar em rede com o Deck do par (RetroArch) · /netplay aceitar
 /voltar — desfaz a última atualização do Deck Commander (se algo parou de funcionar)
 /pause · /resume — downloads
 /quarantine list | review <id> | clear <id>
@@ -318,6 +320,9 @@ class Bot:
                 return RT.desfazer()
             turbo = float(args[0].rstrip("x")) if args and args[0].rstrip("x") in ("2", "3", "4") else 2.0
             return RT.aplicar(turbo=turbo)
+        if cmd in ("/texturas", "/netplay"):  # 0.8: texturas HD (PS2/GC/Wii) e jogo em rede com o par
+            from . import v08_comandos as V
+            return V.texturas(self, args) if cmd == "/texturas" else V.netplay(self, args)
         if cmd == "/nuvem":  # saves no Google Drive (ligar: tools/pc/nuvem-google.ps1 no PC)
             from . import nuvem
             n, _ = nuvem.do_deck()
@@ -1011,6 +1016,11 @@ class Bot:
                             self.send(self.cfg["notify_chat"], aviso)
             except Exception as e:  # noqa: BLE001
                 self.log(f"guardião: {e}")
+            try:
+                from . import v08_comandos
+                v08_comandos.avisar_convite(self)
+            except Exception as e:  # noqa: BLE001
+                self.log(f"netplay: {e}")
             try:  # saves na nuvem (Google Drive): de hora em hora, se o PC já ligou a conta
                 marca = self.paths.state / "nuvem-rodou"
                 if (self.paths.config / "rclone.conf").exists() and (
