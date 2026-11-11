@@ -307,6 +307,28 @@ def remover(p: Ponte, a: dict) -> dict:
     return {"texto": _sem_comandos(p._remove(args)), "feito": bool(a.get("confirmar"))}
 
 
+def espaco_sugestoes(p: Ponte, a: dict) -> dict:
+    """Jogos grandes parados há 3+ meses (última vez aberto pelo dc-launch; nunca aberto = data do arquivo)."""
+    from . import espaco, remove, syncer
+    lm = remove.effective_map(p.paths)
+    roots = syncer.rom_roots()
+
+    def tamanho(g: str) -> int:
+        try:
+            return remove.plan(p.paths, g, roots).size
+        except Exception:  # noqa: BLE001
+            return 0
+
+    def instalado(g: str):
+        try:
+            return datetime.fromtimestamp(Path(lm[g]["rom"]).stat().st_mtime, timezone.utc)
+        except (OSError, KeyError):
+            return None
+    itens = espaco.sugestoes(lm, espaco.ultimas_jogadas(p.paths.logs / "launch.log"), tamanho,
+                             datetime.now(timezone.utc), data_instalacao=instalado)
+    return {"itens": [dict(i, texto=espaco.texto(i)) for i in itens[:10]]}
+
+
 def desinstalar_lista(p: Ponte, a: dict) -> dict:
     """Jogos do Deck que dá para desinstalar + os que você já tirou do Steam e ainda ocupam espaço."""
     from . import plugin_bridge, remove
@@ -620,6 +642,14 @@ def pc_acordar(p: Ponte, a: dict) -> dict:
     return {"texto": f"{como}. O PC leva de 20 a 40 segundos; depois toque em \"Testar conexão\"."}
 
 
+def pc_tv(p: Ponte, a: dict) -> dict:
+    from . import pc_remoto
+    ok, como = pc_remoto.na_tv(pc_remoto.carregar_config(p.paths))
+    if not ok:
+        raise Erro(como)
+    return {"texto": f"{como}. Jogue com um controle ligado no PC."}
+
+
 def pc_sincronizar(p: Ponte, a: dict) -> dict:
     from . import pc_remoto
     try:
@@ -727,7 +757,7 @@ ACOES = {f.__name__: f for f in (
     traducao_responder, pc, pc_salvar, pc_testar, pc_acordar, pc_sincronizar, transferir, transferir_preparar,
     transferir_enviar, trazer_preparar, trazer_enviar, qualidade, qualidade_definir, controle_definir,
     downloads_limpar, traducao_limpar, desinstalar_lista, devolver, removido_perguntado, musica, musica_volume,
-    musica_midia, musica_playlist, musica_salvar)}
+    musica_midia, musica_playlist, musica_salvar, pc_tv, espaco_sugestoes)}
 ACOES["downloads_pausar"] = lambda p, a: _pausar(p, a, True)
 ACOES["downloads_retomar"] = lambda p, a: _pausar(p, a, False)
 

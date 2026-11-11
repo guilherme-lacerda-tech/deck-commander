@@ -601,6 +601,9 @@ function TelaPC() {
         Sec("PC",
             Bt("📡 Testar conexão", () => fazer("pc_testar"), { disabled: ocupado }),
             Bt("⏰ Acordar PC", () => fazer("pc_acordar"), { disabled: ocupado }),
+            Bt("📺 Jogar na TV (PC na TV)", () => confirmar("Pôr o PC na TV?", "Acorda o PC e muda a imagem dele para a TV "
+                + "(só em casa). Para voltar à mesa, use o botão de energia do PC ou o atalho de sempre.", "Pôr na TV",
+                () => fazer("pc_tv")), { disabled: ocupado }),
             Bt("🔄 Sincronizar jogos do PC", () => fazer("pc_sincronizar"), { disabled: ocupado }),
             Msg(msg)),
         Sec("Configuração do PC",
@@ -715,7 +718,23 @@ function TelaDesinstalar() {
                 Txt(t.titulo + " (" + t.console + ")", null, "t" + t.gid),
                 Bt("🗑️ Apagar os arquivos", () => desinstalar(t.gid), { disabled: ocupado }, "a" + t.gid),
                 Bt("↩ Trazer de volta para a biblioteca", () => fazer("devolver", { gid: t.gid }), { disabled: ocupado }, "v" + t.gid)])
-            : Txt("Nenhum: tudo que você tirou do Steam já foi apagado.")));
+            : Txt("Nenhum: tudo que você tirou do Steam já foi apagado.")),
+        h(SugestoesEspaco, { desinstalar, fazer, ocupado }));
+}
+
+// Sugestões: jogos grandes que você não joga há 3+ meses (calcula só quando você pede: pode levar ~1 min)
+function SugestoesEspaco({ desinstalar, fazer, ocupado }) {
+    const [s, setS] = SP_REACT.useState(null);
+    const ver = async () => { setS("carregando"); setS(await painel("espaco_sugestoes")); };
+    return Sec("Liberar espaço",
+        !s ? Bt("🔎 Ver jogos parados há 3+ meses", ver, null, "ver")
+            : s === "carregando" ? Txt("Calculando tamanhos… (até 1 min)")
+            : !s.ok ? Txt("⚠️ " + s.erro, { color: "#ff8a80" })
+            : !s.itens.length ? Txt("✅ Nenhum jogo grande parado há mais de 3 meses.")
+            : s.itens.map((it) => [
+                Txt(it.texto, null, "s" + it.gid),
+                Bt("📦 Levar para o PC", () => fazer("transferir_enviar", { gid: it.gid }), { disabled: ocupado }, "p" + it.gid),
+                Bt("🗑️ Desinstalar", () => desinstalar(it.gid), { disabled: ocupado }, "d" + it.gid)]));
 }
 
 // ---- 9. Música (Spotify + volume do jogo × música) -----------------------------------------------

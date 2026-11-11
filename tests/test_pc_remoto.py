@@ -303,3 +303,16 @@ def test_sincronizar_usa_a_lista_que_o_pc_manda(tmp_path, monkeypatch):
     import json
     lm = json.loads((paths.data / "launch-map.json").read_text("utf-8"))
     assert any(e.get("title") == "Fortnite" for e in lm.values())
+
+
+def test_na_tv(cfg):
+    c = dict(cfg)
+    assert not pc_remoto.na_tv(c)[0]  # sem agente configurado
+    c.update(agente_url="http://192.168.0.20:8765", agente_token="TK")
+    pedidos = []
+
+    def get(url, timeout):
+        pedidos.append(url)
+        return 200, "ok tv"
+    ok, msg = pc_remoto.na_tv(c, http_get=get, acordar_fn=lambda cfg: (True, "x"), esperar_fn=lambda cfg: "h")
+    assert ok and pedidos == ["http://192.168.0.20:8765/tv?t=TK"]

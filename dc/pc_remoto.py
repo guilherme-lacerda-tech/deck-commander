@@ -534,6 +534,26 @@ def _resumo(r: dict) -> str:
     return "\n".join(out)
 
 
+def na_tv(cfg: dict, http_get: Callable = _http_get, acordar_fn: Callable = None,
+          esperar_fn: Callable = None) -> tuple[bool, str]:
+    """"Jogar na TV": acorda o PC, espera ficar pronto e pede ao agente da casa (opcional, config "agente_url" e
+    "agente_token") para pôr a imagem do PC na TV. Só funciona em casa (o agente escuta só a rede local)."""
+    url, token = cfg.get("agente_url") or "", cfg.get("agente_token") or ""
+    if not url or not token:
+        return False, ("Este PC não tem o agente da casa configurado (agente_url e agente_token). "
+                       "Sem ele, ligue a TV no PC pelo controle da TV.")
+    ok, como = (acordar_fn or acordar)(cfg)
+    if not ok:
+        return False, f"não consegui acordar o PC ({como})"
+    if not (esperar_fn or esperar_pronto)(cfg):
+        return False, "o PC não respondeu a tempo; tente de novo em 1 min"
+    try:
+        st, corpo = http_get(f"{url.rstrip('/')}/tv?{urllib.parse.urlencode({'t': token})}", 20)
+    except Exception as e:  # noqa: BLE001
+        return False, f"o agente da casa não respondeu ({type(e).__name__}) — o Deck está no WiFi de casa?"
+    return (st == 200), ("📺 PC na TV" if st == 200 else f"o agente respondeu {st}: {corpo.strip()[:80]}")
+
+
 def comando_pc(bot, args: list[str]) -> str:
     """/pc listar | sincronizar | acordar | status — para ligar no bot (handle devolve o texto)."""
     paths = getattr(bot, "paths", None) or get_paths()
@@ -549,9 +569,12 @@ def comando_pc(bot, args: list[str]) -> str:
             return (f"⏰ {como}. O PC leva ~20–40 s; depois: /pc status" if ok else f"❌ {como}")
         if sub == "status":
             return status(paths, cfg)
+        if sub == "tv":
+            ok, como = na_tv(cfg)
+            return (f"{como}. Jogue com um controle ligado no PC." if ok else f"❌ {como}")
     except Exception as e:  # noqa: BLE001
         return f"❌ /pc {sub}: {e}"
-    return "Uso: /pc listar | /pc sincronizar | /pc acordar | /pc status"
+    return "Uso: /pc listar | /pc sincronizar | /pc acordar | /pc status | /pc tv"
 
 
 def cli(paths: Paths, args: list[str]) -> str:
