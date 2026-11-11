@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import tarfile
@@ -187,7 +188,7 @@ def puxar(paths: Paths, qbt, gid: str, run=subprocess.run) -> str:
             if r and not any(r.lower().endswith(e) for e in familia.EXT_JOGO)]
     if rels:
         dest = _dir(paths) / "pacotes" / gid
-        r = run(familia.ssh_base(p["alvo"], p["chave"]) + ["tar", "-c", "-C", "/home/deck", "--", *rels],
+        r = run(familia.ssh_base(p["alvo"], p["chave"]) + ["tar", "-c", "-C", "/home/deck", "--", *map(shlex.quote, rels)],  # o ssh junta tudo numa linha de shell: espaço no nome quebrava
                 capture_output=True, timeout=600)
         if r.returncode != 0:
             raise RuntimeError("não consegui copiar o pacote de tradução do par")
@@ -196,7 +197,7 @@ def puxar(paths: Paths, qbt, gid: str, run=subprocess.run) -> str:
         with tarfile.open(fileobj=io.BytesIO(r.stdout)) as tf:
             for m in tf.getmembers():  # extração segura: só arquivos comuns, sem caminho absoluto nem ".."
                 if m.isfile() and not m.name.startswith("/") and ".." not in Path(m.name).parts:
-                    tf.extract(m, dest)
+                    tf.extract(m, dest, **({"filter": "data"} if hasattr(tarfile, "data_filter") else {}))
         partes.append(f"tradução recebida ({len(rels)} arquivo(s))")
     familia.registrar_pedido(_dir(paths) / "pedidos.json", it, p["nome"])
     return f"{it['titulo']}: " + " + ".join(partes or ["nada para puxar"]) + "."
@@ -228,7 +229,10 @@ def aplicar_prontos(paths: Paths) -> list[str]:
                 rom = _rom_do_pedido(paths, pd, ing)
                 if rom:
                     from . import patches
-                    feitos.append(str(patches.apply_file(rom, bps)))
+                    try:
+                        feitos.append(str(patches.apply_file(rom, bps)))
+                    except Exception as e:  # noqa: BLE001  patch ruim não pode travar os outros pedidos
+                        avisos.append(f"⚠️ patch {bps.name} não aplicou em {pd['titulo']}: {e}")
                 bps.unlink()
             feitos += familia.aplicar_pacote(pac, Path.home())
         familia.marcar(est, pd["gid"], "pronto", f"{len(feitos)} arquivo(s) de tradução aplicados")

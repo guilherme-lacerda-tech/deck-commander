@@ -62,3 +62,34 @@ def test_autorizar(tmp_path, monkeypatch):
     import pytest
     with pytest.raises(ValueError):
         fs.autorizar("rm -rf /")
+
+
+def test_nome_com_espaco_e_patch_ruim(tmp_path, monkeypatch):
+    """Revisão noturna: o ssh junta os argumentos numa linha de shell (nome com espaço quebrava o tar);
+    um patch .bps ruim não pode derrubar o laço do bot nem travar o pedido."""
+    paths = get_paths(tmp_path / "dc").ensure()
+    monkeypatch.setattr(fs.Path, "home", lambda: tmp_path / "home")
+    monkeypatch.setattr(fs, "_par", lambda p: {"nome": "Irmão", "alvo": "deck@h", "chave": "/k"})
+    import dc.syncer as sy
+    monkeypatch.setattr(sy, "_cfg", lambda p: {"downloads_root": str(tmp_path / "dl")})
+    cat = {"jogos": [{"gid": "gba-x", "titulo": "Jogo X", "console": "gba", "hash": "h2", "magnet": "magnet:?xt=urn:btih:h2",
+                      "pacote": ["/home/deck/Patches PT/jogo x.bps"]}]}
+    pedidos = []
+
+    def run(args, **kw):
+        pedidos.append(args)
+        if "cat" in args:
+            return SimpleNamespace(returncode=0, stdout=json.dumps(cat))
+        return SimpleNamespace(returncode=0, stdout=_tar({"Patches PT/jogo x.bps": b"BPS1ruim"}))
+
+    fs.puxar(paths, SimpleNamespace(add=lambda *a, **k: None), "gba-x", run=run)
+    tar = next(a for a in pedidos if "tar" in a)
+    assert "'Patches PT/jogo x.bps'" in tar
+    rom = tmp_path / "x.gba"
+    rom.write_bytes(b"rom")
+    (paths.state / "sync-state.json").write_text(json.dumps({"ingested": {"h2": {"files": [str(rom)]}}}))
+    from dc import patches
+    monkeypatch.setattr(patches, "apply_file", lambda r, b: (_ for _ in ()).throw(ValueError("checksum")))
+    av = fs.aplicar_prontos(paths)
+    assert any("não aplicou" in a for a in av)
+    assert fs.aplicar_prontos(paths) == []  # pedido marcado: não repete o erro a cada volta

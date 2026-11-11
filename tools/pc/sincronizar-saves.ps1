@@ -49,7 +49,9 @@ foreach ($a in @($m.arquivos | Where-Object { $_.destino -like '{EMU}/*' -and $_
 }
 
 $plano = (Para-Deck $pc) | & ssh.exe @ssh "cd ~/deck-commander && python3 -m dc.saves_sync plano '$Jogo'" | ConvertFrom-Json
+if (-not $plano) { Write-Host "Não consegui falar com o Deck (ligado e na mesma rede?). Nada foi copiado."; exit 1 }
 Write-Host $plano.resumo
+if ($plano.erro) { exit 1 }  # jogo fora da biblioteca / entrada ruim: não registra nada
 $tmp = Join-Path $env:TEMP "dc-saves-$data"; New-Item -ItemType Directory -Force $tmp | Out-Null
 foreach ($a in @($plano.acoes)) {
     if ($a.acao -eq 'deck->pc') {
