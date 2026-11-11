@@ -19,8 +19,10 @@ def test_achar():
 
 
 def test_codificar_e_aplicar():
-    assert S.codificar("Poção", 6, "menos20") == bytes(c - 0x20 for c in b"Pocao ")
-    assert S.codificar("D'água", 7, "ascii") == b"D\x81\x66agua"
+    from dc.traducao.sotn_fonte import INDICE
+    POCAO = bytes([0x30, 0x4F, INDICE["ç"], INDICE["ã"], 0x4F, 0x00])  # nomes: acentos na fonte 8x8 redesenhada
+    assert S.codificar("Poção", 6, "menos20") == POCAO
+    assert S.codificar("D'água", 8, "ascii") == bytes.fromhex("44816685406775 61")  # á = código 0x8540
     assert S.codificar("Uma frase grande demais", 10, "ascii") == b"Uma frase "  # corta em palavra inteira
     a = S.achar_ascii("X", FALA)
     m = S.achar_menos20("X", FALA)
@@ -29,7 +31,8 @@ def test_codificar_e_aplicar():
     assert novo[2:21] == b"A humanidade       " or novo[2:21].startswith(b"A humanidade")
     assert novo[:2] == FALA[:2] and novo[21:24] == FALA[21:24]  # códigos de controle intactos
     p = m[0].pos
-    assert novo[p:p + 6] == bytes(c - 0x20 for c in b"Pocao ") and novo[p + 6] == 0xFF  # o fim (0xFF) fica
+    from dc.traducao.sotn_fonte import INDICE
+    assert novo[p:p + 6] == bytes([0x30, 0x4F, INDICE["ç"], INDICE["ã"], 0x4F, 0x00]) and novo[p + 6] == 0xFF
 
 
 def test_filtro_do_disco_real():
@@ -95,7 +98,7 @@ def test_fala_inteira_vai_junta_e_volta_nas_linhas():
     assert [len(g) for g in grupos] == [2, 1]  # as 2 linhas da fala juntas; a descrição sozinha
     linhas = sotn.distribuir("Precisamos de alguém como você!", grupos[0])
     assert len(linhas) == 2 and all(len(S.codificar(l, 999, "ascii").rstrip()) <= t.tam for l, t in zip(linhas, grupos[0]))
-    assert linhas == ["Precisamos de", "alguem como voce!"]
+    assert linhas == ["Precisamos de", "alguém como você!"]  # o acento fica até a gravação
 
 
 def test_sem_sobreposicao():
@@ -105,3 +108,42 @@ def test_sem_sobreposicao():
     b = S.Trecho("X", 8, 10, "xxPotion", "ascii")
     c = S.Trecho("X", 30, 5, "Sword", "ascii")
     assert sotn.sem_sobreposicao([a, b, c]) == [a, c]
+
+
+def test_fonte_8x8_com_acentos():
+    """Células de katakana (0x70..0x87) viram as 24 letras acentuadas, no traço das letras do jogo."""
+    from dc.traducao import sotn_fonte as F
+    d = bytearray(F.BASE + (F.LINHA0 + 16 * 8) * F.LARG)
+    F._grava(d, ord("a") - 0x20, [[0] * 8, [0] * 8] + [[0, 0, 6, 6, 6, 0, 0, 0]] * 5 + [[0] * 8])
+    n = F.com_acentos(bytes(d))
+    assert len(n) == len(d)
+    assert F.desenho(n, F.INDICE["á"]).splitlines()[0] == "....#..." and "###" in F.desenho(n, F.INDICE["á"])
+    assert len(set(F.INDICE.values())) == 24 and min(F.INDICE.values()) == 0x70
+
+
+def test_cabe():
+    from dc.traducao import sotn
+    g = [S.Trecho("X", 0, 10, "a", "ascii"), S.Trecho("X", 20, 10, "b", "ascii")]
+    assert sotn.cabe("Uma frase curta", g)
+    assert not sotn.cabe("Uma frase comprida demais para duas linhas", g)
+
+
+def test_patch_da_rotina_de_letras_das_falas():
+    """Laço de 1 para 25 letras e tabela nova na área livre (SsUtKeyOn) — só se o disco for o esperado."""
+    import struct
+    import pytest
+    from dc.traducao import sotn_falas_fonte as F
+    dra = bytearray(0x70000)
+    for end, ins in F.PATCH_DRA.items():
+        struct.pack_into("<I", dra, end - F.DRA_BASE, ins)
+    struct.pack_into("<H", dra, 0x800AC910 - F.DRA_BASE, 0x9F54)
+    exe = bytearray(0x20000)
+    exe[F.AREA - F.EXE_BASE:F.AREA - F.EXE_BASE + 4] = bytes.fromhex("c8ffbd27")
+    bios = bytes(0x70000)
+    d2, e2 = F.aplicar(bytes(dra), bytes(exe), bios)
+    assert struct.unpack_from("<I", d2, 0x80106CDC - F.DRA_BASE)[0] == 0x2F220019  # sltiu v0, t9, 25
+    o = F.AREA - F.EXE_BASE
+    assert struct.unpack_from("<2H", e2, o) == (0x9F54, 0x8540)  # © original + á
+    dra[0x66CA0] ^= 1  # outra versão do jogo: recusa sem mexer em nada
+    with pytest.raises(ValueError):
+        F.aplicar(bytes(dra), bytes(exe), bios)

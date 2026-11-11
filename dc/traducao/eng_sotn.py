@@ -10,6 +10,7 @@ Cada trecho traduzido ocupa exatamente os bytes do original (fonte só ASCII: se
 from __future__ import annotations
 
 import re
+import struct
 import unicodedata
 from dataclasses import dataclass
 
@@ -143,16 +144,24 @@ def sem_acento(s: str) -> str:
 
 def _bytes(texto: str, tipo: str) -> list[bytes]:
     """Cada caractere vira os bytes dele no formato (o "'" em ASCII ocupa 2)."""
-    if tipo == "ascii":
-        return [APOSTROFO if c == "'" else c.encode("ascii") for c in texto]
-    if tipo == "menos20":
-        return [bytes([ord(c) - 0x20]) for c in texto]
+    if tipo == "ascii":  # falas/descrições: acentos pelos códigos 0x8540.. (dc.traducao.sotn_falas_fonte)
+        from .sotn_falas_fonte import CODIGO
+        return [APOSTROFO if c == "'" else struct.pack(">H", CODIGO[c]) if c in CODIGO else c.encode("ascii")
+                for c in texto]
+    if tipo == "menos20":  # acentos: células da fonte 8x8 redesenhadas (dc.traducao.sotn_fonte)
+        from .sotn_fonte import INDICE
+        return [bytes([INDICE[c]]) if c in INDICE else bytes([ord(c) - 0x20]) for c in texto]
     raise ValueError(f"tipo inválido: {tipo}")
 
 
 def codificar(texto: str, tam: int, tipo: str) -> bytes:
     """Exatamente `tam` bytes: corta em palavra inteira se precisar e completa com espaço."""
-    pedacos = _bytes(sem_acento(texto), tipo)
+    if tipo == "menos20":  # a fonte 8x8 tem as letras acentuadas do português: só tira o que ela não tem
+        from .sotn_fonte import INDICE as tem
+    else:  # falas: letras novas na tabela do jogo (patch da rotina de letras)
+        from .sotn_falas_fonte import CODIGO as tem
+    texto = "".join(c if c in tem else sem_acento(c) for c in texto)
+    pedacos = _bytes(texto, tipo)
     espaco = b" " if tipo == "ascii" else b"\x00"
     total, corte, ultimo_espaco = 0, len(pedacos), None
     for k, p in enumerate(pedacos):

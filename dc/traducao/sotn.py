@@ -69,7 +69,9 @@ def agrupar(trechos: list[S.Trecho], dados: dict[str, bytes]) -> list[list[S.Tre
         g = grupos[-1] if grupos else None
         if g and t.tipo == "ascii" and g[-1].tipo == "ascii" and g[-1].arquivo == t.arquivo:
             vao = dados[t.arquivo][g[-1].pos + g[-1].tam:t.pos]
-            if 0 < len(vao) <= 4 and all(0 < b < 0x20 for b in vao):
+            # até 12 bytes só de códigos de controle (quebra de linha + recuo, pausa, cor…): mesma caixa de fala.
+            # Juntas, as linhas somam o espaço de todas — a frase traduzida se espalha por elas.
+            if 0 < len(vao) <= 12 and all(0 < b < 0x20 for b in vao):
                 g.append(t)
                 continue
         grupos.append([t])
@@ -78,7 +80,7 @@ def agrupar(trechos: list[S.Trecho], dados: dict[str, bytes]) -> list[list[S.Tre
 
 def distribuir(texto: str, grupo: list[S.Trecho]) -> list[str]:
     """Reparte a frase traduzida pelas linhas originais (cada linha cabe no espaço dela; palavra inteira)."""
-    palavras = S.sem_acento(texto).split()
+    palavras = texto.split()  # (os acentos ficam: codificar() decide o que cada fonte consegue mostrar)
     saida = []
     for k, t in enumerate(grupo):
         linha = ""
@@ -94,6 +96,47 @@ def distribuir(texto: str, grupo: list[S.Trecho]) -> list[str]:
     if palavras and saida:  # sobrou: vai para a última linha (codificar corta no espaço que couber)
         saida[-1] = (saida[-1] + " " + " ".join(palavras)).strip()
     return saida
+
+
+def _bios() -> bytes | None:
+    """BIOS do PS1 do próprio usuário (DuckStation): as letras acentuadas das falas nascem das letras dele."""
+    for pasta in (Path.home() / "Emulation/bios", Path.home() / ".local/share/duckstation/bios"):
+        for nome in ("SCPH1001.BIN", "scph1001.bin", "SCPH7502.BIN", "scph7502.bin", "SCPH5501.BIN", "scph5501.bin"):
+            p = pasta / nome
+            if p.exists() and p.stat().st_size == 512 * 1024:
+                return p.read_bytes()
+    return None
+
+
+def cabe(texto: str, grupo: list[S.Trecho]) -> bool:
+    """A frase inteira cabe nas linhas do grupo, sem cortar palavra?"""
+    linhas = distribuir(texto, grupo)
+    return len(linhas) == len(grupo) and all(
+        len(S.codificar(l, 10 ** 4, t.tipo).rstrip(b" \x00")) <= t.tam for l, t in zip(linhas, grupo))
+
+
+def _completar(paths, cfg, chain, faltam: dict[str, str], por_texto, ids, res, progress) -> dict[str, str]:
+    """2ª e 3ª chance para o que ficou em inglês: tradução sem limite + encurtar (até 3 vezes) até caber de
+    verdade. Devolve {id: tradução que cabe}."""
+    if not faltam:
+        return {}
+    itens = [ia.Item(iid, ids[iid]) for iid in faltam]
+    longa = ia.translate(paths, cfg, itens, "sotn-2a-chance", chain=chain, progress=progress).translated
+    ok: dict[str, str] = {}
+    grupo_de = {iid: min(por_texto[ids[iid]], key=lambda g: sum(t.tam for t in g)) for iid in faltam}
+    for iid, txt in longa.items():
+        if txt.strip() and cabe(txt, grupo_de[iid]):
+            ok[iid] = txt
+    pendentes = {iid: longa[iid] for iid in longa if iid not in ok and longa[iid].strip()}
+    for _ in range(3):  # encurtar com o limite real (letras de cada linha), conferindo com cabe()
+        if not pendentes:
+            break
+        pedidos = [(iid, txt, len(grupo_de[iid]), max(t.tam for t in grupo_de[iid])) for iid, txt in pendentes.items()]
+        curtos = ia.shorten(paths, cfg, pedidos, lambda i, s: cabe(s, grupo_de[i]), chain=chain)
+        for iid, txt in curtos.items():
+            ok[iid] = txt
+            pendentes.pop(iid, None)
+    return ok
 
 
 def translate_rom(paths: Paths, rom: Path, title: str = "", chain=None, progress=lambda d, t: None,
@@ -116,8 +159,11 @@ def translate_rom(paths: Paths, rom: Path, title: str = "", chain=None, progress
     res = ia.translate(paths, cfg, itens, f"sotn-{rom.stem}", ia.load_glossary_jogo(paths, cfg, itens, title),
                        chain=chain, progress=progress, should_pause=should_pause)
     rep.provider = res.provider_used
+    traduzidos = dict(res.translated)
+    faltam = {iid: txt for iid, txt in ids.items() if iid not in traduzidos or not traduzidos[iid].strip()}
+    traduzidos.update(_completar(paths, cfg, chain, faltam, por_texto, ids, res, progress))
     trocas: dict[str, list[tuple[S.Trecho, str]]] = {}
-    for iid, novo in res.translated.items():
+    for iid, novo in traduzidos.items():
         orig = ids.get(iid)
         if not orig or not novo.strip() or S.sem_acento(novo).strip() == orig.strip():
             continue
@@ -131,6 +177,17 @@ def translate_rom(paths: Paths, rom: Path, title: str = "", chain=None, progress
         rep.errors.append("nenhuma frase traduzida")
         return rep
     novos = {nome: S.aplicar(dados[nome], ts) for nome, ts in trocas.items()}
+    from . import sotn_fonte  # nomes e menus com acento: letras novas na fonte 8x8
+    novos["BIN/F_GAME.BIN"] = sotn_fonte.com_acentos(disco.ler("BIN/F_GAME.BIN"))
+    from . import sotn_falas_fonte  # falas com acento: tabela de letras novas + rotina de letras com 25 voltas
+    bios = _bios()
+    if bios:
+        dra = novos.get("DRA.BIN") or disco.ler("DRA.BIN")
+        exe_nome = next(n for n in disco.arquivos() if n.upper().startswith("SLES_") or n.upper().startswith("SLUS_"))
+        novos["DRA.BIN"], novos[exe_nome] = sotn_falas_fonte.aplicar(dra, disco.ler(exe_nome), bios)
+    else:
+        rep.errors.append("BIOS do PS1 não achado: falas ficaram sem acento")
+    rep.flagged = len([i for i in ids if i not in traduzidos])
     stem = rom.stem
     bin_pt = bin_.with_name(f"{stem} (PT-BR).bin")
     disco.gravar_copia(bin_pt, novos)
