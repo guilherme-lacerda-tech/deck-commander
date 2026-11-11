@@ -247,6 +247,24 @@ def test_transfer_list_prepare_and_send(P, tmp_path, monkeypatch):
     assert run(P, "transferir")["fila"][0]["status"] == "na fila"
 
 
+def test_trazer_do_pc_list_prepare_and_send(P, monkeypatch):
+    lista = {"em": "agora", "emuladores_pc": {"duckstation": {}},
+             "jogos": [{"id": "psx-hercules", "titulo": "Hercules", "console": "psx", "emulador": "duckstation",
+                        "tamanho": 391_000_000, "arquivos": 3, "resumo": {"jogo": {"arquivos": 2, "bytes": 390_000_000}}}]}
+    (P.data / "pc-jogos-transferiveis.json").write_text(json.dumps(lista), "utf-8")
+    monkeypatch.setattr("dc.receber.flatpak_info", lambda i: None)
+    r = run(P, "transferir")
+    assert r["jogos_pc"] == [{"gid": "psx-hercules", "titulo": "Hercules", "console": "psx", "tamanho": "0.39 GB"}]
+    r = run(P, "trazer_preparar", {"gid": "psx-hercules"})
+    assert r["ok"] and r["tamanho"] == "0.39 GB" and "vai ser instalado no Deck" in r["resumo"]
+    assert not run(P, "trazer_preparar", {"gid": "nao-existe"})["ok"]
+    monkeypatch.setattr("dc.transferir._acordar_pc", lambda bot: "")
+    r = run(P, "trazer_enviar", {"gid": "psx-hercules"})
+    assert "na fila para vir do PC" in r["texto"] and "/trazer" not in r["texto"]
+    f = run(P, "transferir")["fila"]
+    assert f[0]["direcao"] == "pc->deck" and f[0]["status"] == "na fila"
+
+
 def test_quality_list_and_set(P):
     _lm(P, {"ps2-a": {"title": "A", "console": "ps2", "rom": "/x"}, "gba-b": {"title": "B", "console": "gba", "rom": "/y"}})
     r = run(P, "qualidade")

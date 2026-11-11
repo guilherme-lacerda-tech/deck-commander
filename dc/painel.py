@@ -562,9 +562,14 @@ def transferir(p: Ponte, a: dict) -> dict:
     jogos = [{"gid": g, "titulo": e.get("title", g), "console": e.get("console", "")}
              for g, e in tr.carregar_mapa().items() if e.get("console") != "pc"]
     jogos.sort(key=lambda j: j["titulo"].casefold())
-    fila = [{"titulo": e["titulo"], "status": e["status"], "nota": (e.get("nota") or "")[-200:]}
-            for e in reversed(tr.ler_fila()[-10:])]
-    return {"jogos": jogos, "fila": fila}
+    from . import receber
+    fila = [{"titulo": e["titulo"], "status": e["status"], "nota": (e.get("nota") or "")[-200:],
+             "direcao": e.get("direcao", "deck->pc")} for e in reversed(tr.ler_fila()[-10:])]
+    lista_pc = receber.ler_jogos_pc()
+    jogos_pc = [{"gid": j["id"], "titulo": j.get("titulo", j["id"]), "console": j.get("console", ""),
+                 "tamanho": receber.gb(j.get("tamanho", 0))} for j in (lista_pc.get("jogos") or []) if j.get("id")]
+    jogos_pc.sort(key=lambda j: j["titulo"].casefold())
+    return {"jogos": jogos, "fila": fila, "jogos_pc": jogos_pc, "lista_pc_em": lista_pc.get("em", "")}
 
 
 def transferir_preparar(p: Ponte, a: dict) -> dict:
@@ -574,7 +579,7 @@ def transferir_preparar(p: Ponte, a: dict) -> dict:
     except (KeyError, OSError) as e:
         raise Erro(f"Não deu para preparar: {str(e).strip(chr(39))}")
     return {"titulo": man["titulo"], "tamanho": tr.gb(man["total_bytes"]), "arquivos": len(man["arquivos"]),
-            "resumo": tr.texto_resumo(man)}
+            "resumo": tr.texto_resumo(man) + tr._linha_emulador_pc(man)}
 
 
 def transferir_enviar(p: Ponte, a: dict) -> dict:
@@ -582,6 +587,23 @@ def transferir_enviar(p: Ponte, a: dict) -> dict:
     if not a.get("gid"):
         raise Erro("Escolha um jogo.")
     return {"texto": _sem_comandos(tr.comando_transferir(p, [a["gid"], "enviar"]))}
+
+
+def trazer_preparar(p: Ponte, a: dict) -> dict:
+    """Do PC para o Deck: o que vem (tamanho, o que vai junto, emulador que será instalado no Deck)."""
+    from . import receber
+    j = next((x for x in receber.ler_jogos_pc().get("jogos") or [] if x.get("id") == a.get("gid")), None)
+    if not j:
+        raise Erro("Esse jogo não está na lista do PC (a lista chega quando o PC liga).")
+    return {"titulo": j.get("titulo", j["id"]), "tamanho": receber.gb(j.get("tamanho", 0)),
+            "arquivos": j.get("arquivos", 0), "resumo": receber.texto_jogo_pc(j)}
+
+
+def trazer_enviar(p: Ponte, a: dict) -> dict:
+    from . import receber
+    if not a.get("gid"):
+        raise Erro("Escolha um jogo do PC.")
+    return {"texto": _sem_comandos(receber.comando_trazer(p, [a["gid"], "enviar"]))}
 
 
 # ----------------------------------------------------------------------------------------------- qualidade
@@ -630,7 +652,8 @@ ACOES = {f.__name__: f for f in (
     status, diagnostico, safe_mode, telegram, telegram_botfather, telegram_token, telegram_parear, downloads,
     bateria, duplicados, remover, traducao, traducao_automatica, traduzir, traducao_parar, traducao_retomar,
     traducao_responder, pc, pc_salvar, pc_testar, pc_acordar, pc_sincronizar, transferir, transferir_preparar,
-    transferir_enviar, qualidade, qualidade_definir, controle_definir, downloads_limpar, traducao_limpar, desinstalar_lista, devolver, removido_perguntado)}
+    transferir_enviar, trazer_preparar, trazer_enviar, qualidade, qualidade_definir, controle_definir,
+    downloads_limpar, traducao_limpar, desinstalar_lista, devolver, removido_perguntado)}
 ACOES["downloads_pausar"] = lambda p, a: _pausar(p, a, True)
 ACOES["downloads_retomar"] = lambda p, a: _pausar(p, a, False)
 

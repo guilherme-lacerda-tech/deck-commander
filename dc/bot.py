@@ -97,7 +97,8 @@ Aviso aqui quando o download terminar.
 /devolver <nome> — traz de volta um jogo que você tirou pelo Steam
 /bateria sim|nao — baixar também fora da tomada (padrão: só na tomada)
 /pc listar | sincronizar | acordar | status — jogos do PC no Deck (aba "Computador")
-/transferir <jogo> — prepara o jogo com tudo (emulador, config, saves) para o PC
+/transferir <jogo> — leva o jogo com tudo (emulador, config, saves) para o PC
+/trazer — jogos do PC · /trazer <jogo> — traz do PC para o Deck (instala o emulador se faltar)
 /traduzir <jogo> — tradução pt-BR com IA (Switch e Pokémon GBA) · /traduzir lista | status | config
 /traduzir biblioteca — traduz todos os jogos que ainda não estão em português (pergunta antes)
 /converter <jogo> [organizar|descompactar] — Switch: update/DLC e NSZ
@@ -293,6 +294,9 @@ class Bot:
         if cmd == "/transferir":  # leva um jogo + emulador + config + saves do Deck para o PC
             from .transferir import comando_transferir
             return comando_transferir(self, args)
+        if cmd == "/trazer":  # traz um jogo do PC (jogo + dados do emulador) para o Deck
+            from .receber import comando_trazer
+            return comando_trazer(self, args)
         if cmd == "/pc":  # jogos do PC transmitidos para o Deck (aba "Computador")
             from . import pc_remoto
             return pc_remoto.comando_pc(self, args)

@@ -35,6 +35,8 @@ param(
     [switch]$SemEmuladorLinux,
     [switch]$SoConfig,
     [switch]$SemCacheNoDeck,
+    [switch]$SemBaixarEmulador,   # não baixa o emulador Windows oficial quando falta no PC
+    [switch]$SimularEmulador,     # só mostra qual emulador baixaria e de onde (consulta a página oficial)
     [int]$Tentativas = 3,
     [int]$Lote = 1500
 )
@@ -303,7 +305,7 @@ function Escrever-LeiaMe($man, [string]$raiz, $emu, $inst, [int]$falhas) {
     if (-not $emu) {
         $L.Add('')
         $L.Add('>>> O EMULADOR AINDA NÃO ESTÁ NESTE PC. Faça assim:')
-        $L.Add("  1. Baixe o $($ew.projeto) da página acima (versão portátil) e descompacte em $Emuladores\<nome> (você baixa; este script não baixa nada).")
+        $L.Add("  1. Baixe o $($ew.projeto) da página acima (versão portátil) e descompacte em $Emuladores\<nome> (ou rode tools\pc\emulador-oficial.ps1 -Emulador $($m.emulador), que baixa a versão oficial).")
         $L.Add("  2. Rode:  tools\pc\transferir-do-deck.bat -Jogo $($m.game_id) -Destino `"$(Split-Path $raiz)`" -Jogos `"$Jogos`" -SoInstalar")
         $L.Add('     (instala saves/config/mods/keys no emulador, com backup do que já existir, e acerta os caminhos)')
         $L.Add('     Emuladores em outra pasta: -Emuladores "<pasta>"; pasta de dados fora do comum: -EmuDir "<pasta de dados>".')
@@ -377,6 +379,8 @@ if ($SoInstalar) {
 }
 $Man = Ler-Manifesto $texto
 $Meta = $Man.Meta
+# sha256 do emulador do Deck (antes do filtro): acha a MESMA build oficial para o Windows quando falta no PC
+$ShaLinux = ($Man.Arquivos | Where-Object { $_.Cat -eq 'emulador-linux' -and $_.Destino -match '\.AppImage$' } | Select-Object -First 1).Sha
 $fora = @()
 if ($SemEmuladorLinux) { $fora += 'emulador-linux' }
 if ($SoConfig) { $fora += @('jogo', 'update', 'dlc', 'emulador-linux') }   # só saves/config/mods/keys
@@ -413,6 +417,17 @@ if ($falhas.Count) {
 $Emu = $null; $Inst = $null
 if (-not $SemInstalar -and -not $falhas.Count) {
     $Emu = Achar-Emulador $Meta.emulador
+    if (-not $Emu -and -not $SemBaixarEmulador -and -not $EmuDir) {
+        # o PC não tem o emulador: baixa a versão Windows OFICIAL (mesma build do Deck quando dá), modo portátil
+        Import-Module (Join-Path $PSScriptRoot 'transferencia-funcoes.psm1') -Force -DisableNameChecking
+        try {
+            $tabEmu = Get-TabelaEmuladores
+            $versaoDeck = if ($Meta.emulador_deck) { $Meta.emulador_deck.versao } else { $null }
+            $plano = Get-PlanoEmuladorPC -Emu $Meta.emulador -Versao $versaoDeck -Sha256Linux $ShaLinux -Tab $tabEmu -Emuladores $Emuladores
+            Msg ((Install-EmuladorPC -Plano $plano -Emuladores $Emuladores -Tab $tabEmu -Simular:$SimularEmulador)) 'Cyan'
+            if (-not $SimularEmulador) { $Emu = Achar-Emulador $Meta.emulador }
+        } catch { Msg "Não consegui instalar o emulador oficial: $($_.Exception.Message)" 'Yellow' }
+    }
     if ($Emu) {
         Msg "Instalando no emulador do PC: $($Emu.Dados)" 'Cyan'
         $Inst = Instalar $Man $Raiz $Emu

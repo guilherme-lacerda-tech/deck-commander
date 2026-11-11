@@ -43,9 +43,11 @@ COMANDO_PC = r"tools\pc\transferir-do-deck.bat -Jogo {gid}"
 
 # Emulador de cada console + o que o script do PC procura no Windows
 EMU_DO_CONSOLE = {"switch2": "lichii", "switch": "ryujinx", "psx": "duckstation", "ps2": "pcsx2", "psp": "ppsspp",
-                  "x360": "xenia"}
+                  "x360": "xenia", "gc": "dolphin", "wii": "dolphin", "wiiu": "cemu", "ps3": "rpcs3", "n3ds": "azahar",
+                  "nds": "melonds", "xbox": "xemu", "dc": "flycast"}
 RA_CONSOLES = {"snes", "n64", "gba", "nes", "gb", "gbc", "genesis", "sms", "gg", "segacd", "saturn", "pce", "arcade"}
-# Versão Windows oficial de cada emulador (só a indicação: o Deck Commander NÃO baixa nada)
+# Versão Windows oficial de cada emulador (indicação no LEIA-ME; o download oficial, quando falta no PC, usa
+# config/emuladores-oficiais.json pela tools/pc/transferencia-funcoes.psm1)
 EMU_WINDOWS = {
     "lichii": {"projeto": "Lichii (Switch 2; mesma build do Deck, ex.: build-83)",
                "releases": "https://github.com/zortos293/Lichii/releases",
@@ -582,6 +584,19 @@ def _cfg_valor(p: Path, chave: str) -> str | None:
     return v.strip('"') if v else None
 
 
+def _emulador_deck(emu: str, home: Path) -> dict:
+    """Onde está e qual versão do emulador no Deck (o PC usa para baixar a mesma build quando falta lá)."""
+    try:
+        from dc import receber
+    except ImportError:  # mandado pela entrada padrão sem o pacote: o PC procura pela build mais recente
+        return {}
+    try:
+        d = receber.emulador_no_deck(emu, home)
+    except Exception:  # noqa: BLE001 - informação extra; nunca impede a transferência
+        return {}
+    return {k: d.get(k) for k in ("instalado", "tipo", "onde", "versao")}
+
+
 # ------------------------------------------------------------------ preparar -----------
 def preparar(game_id: str, home=None, launch_map: dict | None = None, com_hash: bool = True,
              cache: Path | str | None | bool = True) -> dict:
@@ -619,6 +634,7 @@ def preparar(game_id: str, home=None, launch_map: dict | None = None, com_hash: 
         else:
             m.avisos.append(f"config do emulador de {console} ainda não entra na transferência (só o jogo)")
 
+    m.info["emulador_deck"] = _emulador_deck(emu, home)
     b = _binario(home, console, emu)
     if b:
         if b.is_file() and b.parent.name == "publish":  # Ryujinx sem AppImage: a pasta inteira
@@ -668,7 +684,7 @@ def preparar(game_id: str, home=None, launch_map: dict | None = None, com_hash: 
         "emulador": emu, "emulador_windows": EMU_WINDOWS.get(emu, {}), "gerado_em": int(time.time()),
         "title_id": m.info.get("title_id"), "serial": m.info.get("serial"),
         "dados_emulador": m.info.get("dados_emulador", {}), "saves": m.info.get("saves", []),
-        "saves_ryujinx": m.info.get("saves_ryujinx", []),
+        "saves_ryujinx": m.info.get("saves_ryujinx", []), "emulador_deck": m.info.get("emulador_deck") or {},
         "total_bytes": sum(a["tamanho"] for a in arquivos), "resumo": resumo,
         "reescrever": [{"de": k, "para": v} for k, v in sorted(m.trocas.items(), key=lambda kv: -len(kv[0]))],
         "avisos": m.avisos, "notas": m.notas, "excluidos": m.excluidos, "arquivos": arquivos,
@@ -736,14 +752,20 @@ def _gravar_fila(fila: list[dict], home=None) -> None:
     os.replace(tmp, p)
 
 
-def enfileirar(game_id: str, titulo: str, home=None) -> dict:
+DIRECOES = ("deck->pc", "pc->deck")
+
+
+def enfileirar(game_id: str, titulo: str, home=None, direcao: str = "deck->pc") -> dict:
+    """Pedido na fila. direcao "deck->pc" (/transferir) ou "pc->deck" (/trazer: game_id é o id do jogo NO PC)."""
+    if direcao not in DIRECOES:
+        raise ValueError(f"direção inválida: {direcao}")
     fila = ler_fila(home)
     for e in fila:
-        if e["game_id"] == game_id and e["status"] in ("na fila", "copiando"):
+        if e["game_id"] == game_id and e.get("direcao", "deck->pc") == direcao and e["status"] in ("na fila", "copiando"):
             return e
     from datetime import datetime, timezone
     e = {"id": f"{game_id}-{int(time.time())}", "game_id": game_id, "titulo": titulo, "status": "na fila",
-         "pedido": datetime.now(timezone.utc).isoformat(), "avisado": False}
+         "direcao": direcao, "pedido": datetime.now(timezone.utc).isoformat(), "avisado": False}
     _gravar_fila(fila + [e], home)
     return e
 
@@ -770,7 +792,8 @@ def notificar(bot, home=None) -> None:
         if e["status"] in ("pronto", "falhou") and not e.get("avisado"):
             if chat:
                 ic = "✅" if e["status"] == "pronto" else "❌"
-                bot.send(chat, f"{ic} Transferência para o PC — {e['titulo']}: {e['status']}.\n{e.get('nota', '')}".strip())
+                onde = "Do PC para o Deck" if e.get("direcao") == "pc->deck" else "Transferência para o PC"
+                bot.send(chat, f"{ic} {onde} — {e['titulo']}: {e['status']}.\n{e.get('nota', '')}".strip())
             e["avisado"] = True
             mudou = True
     if mudou:
@@ -789,6 +812,15 @@ def _acordar_pc(bot) -> str:
         return ""
 
 
+def _linha_emulador_pc(man: dict) -> str:
+    try:
+        from . import receber
+        t = receber.texto_emulador_lado_pc(man["emulador"], (man.get("emulador_deck") or {}).get("versao"))
+    except Exception:  # noqa: BLE001
+        t = None
+    return f"\n🧩 {t}" if t else ""
+
+
 def comando_transferir(bot, args: list[str]) -> str:
     """/transferir <jogo>: mostra o que vai (tamanho) e o botão "Enviar pro PC"; /transferir <jogo> enviar põe na
     fila e acorda o PC; /transferir fila mostra o andamento."""
@@ -797,7 +829,8 @@ def comando_transferir(bot, args: list[str]) -> str:
                 "/transferir fila — o que está indo / já foi para o PC")
     if args[0].lower() == "fila":
         f = ler_fila()[-10:]
-        return "\n".join(f"• {e['titulo']}: {e['status']}" for e in reversed(f)) or "Nenhuma transferência pedida."
+        return "\n".join(f"• {e['titulo']}{' (do PC)' if e.get('direcao') == 'pc->deck' else ''}: {e['status']}"
+                         for e in reversed(f)) or "Nenhuma transferência pedida."
     enviar = args[-1].lower() == "enviar"
     if enviar:
         args = args[:-1]
@@ -818,7 +851,7 @@ def comando_transferir(bot, args: list[str]) -> str:
     except (KeyError, OSError) as ex:
         return f"Não deu para preparar: {ex}"
     bot.next_buttons = [("Enviar pro PC", f"/transferir {gid} enviar")]
-    return (texto_resumo(man) + "\n\nEnviar para o PC agora? O PC acorda, busca e copia sozinho: confere cada "
+    return (texto_resumo(man) + _linha_emulador_pc(man) + "\n\nEnviar para o PC agora? O PC acorda, busca e copia sozinho: confere cada "
             "arquivo, retoma se cair, faz backup da config do PC antes de sobrescrever; nada é apagado no Deck.")
 
 
@@ -828,10 +861,14 @@ def main(argv: list[str]) -> int:
     if argv and argv[0] == "fila-json":  # usado pela tarefa do PC
         print(json.dumps([e for e in ler_fila() if e["status"] in ("na fila", "copiando")], ensure_ascii=False))
         return 0
+    if argv and argv[0] in ("receber", "conferir", "emuladores", "emulador-plano"):  # PC -> Deck (dc/receber.py)
+        from dc import receber
+        return receber.main(argv)
     if argv and argv[0] == "marcar" and len(argv) >= 3:  # marcar <id> <status> [-]  (nota pela entrada padrão)
         return 0 if marcar(argv[1], argv[2], sys.stdin.read() if argv[3:] == ["-"] else "") else 1
     if not argv or argv[0] not in ("manifesto", "resumo", "lista"):
-        print("uso: python3 -m dc.transferir manifesto <jogo> [--tsv] [--sem-hash] [--sem-cache] | resumo <jogo> | lista",
+        print("uso: python3 -m dc.transferir manifesto <jogo> [--tsv] [--sem-hash] [--sem-cache] | resumo <jogo> | lista"
+              " | receber <id> [--destino-teste ~/pasta] [--simular] | conferir <id> | emuladores | emulador-plano <emu>",
               file=sys.stderr)
         return 2
     if argv[0] == "lista":
