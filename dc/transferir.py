@@ -752,7 +752,7 @@ def _gravar_fila(fila: list[dict], home=None) -> None:
     os.replace(tmp, p)
 
 
-DIRECOES = ("deck->pc", "pc->deck")
+DIRECOES = ("deck->pc", "pc->deck", "saves")  # "saves": só sincronizar os saves (dc.saves_sync)
 
 
 def enfileirar(game_id: str, titulo: str, home=None, direcao: str = "deck->pc") -> dict:

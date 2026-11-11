@@ -100,6 +100,7 @@ Aviso aqui quando o download terminar.
 /musica [playlist | pausar | proxima | anterior] — Spotify no Deck · cole o link de uma playlist para guardar
 /familia — Deck do irmão: status, jogos, puxar <jogo> (magnet + tradução pronta), par, chave, autorizar
 /corrigir — mande a foto de uma frase traduzida estranha com /corrigir <jogo> na legenda
+/saves <jogo> [deck|pc] — deixa os saves iguais no Deck e no PC (o mais novo vale; conflito você escolhe)
 /transferir <jogo> — leva o jogo com tudo (emulador, config, saves) para o PC
 /trazer — jogos do PC · /trazer <jogo> — traz do PC para o Deck (instala o emulador se faltar)
 /traduzir <jogo> — tradução pt-BR com IA (Switch e Pokémon GBA) · /traduzir lista | status | config
@@ -308,6 +309,8 @@ class Bot:
         if cmd == "/corrigir":
             return ("Mande uma FOTO (ou print) da frase estranha com a legenda /corrigir <nome do jogo>. "
                     "Pode dizer o que está errado depois de uma barra: /corrigir Zelda | o certo é Reino Cogumelo")
+        if cmd == "/saves":  # sincronizar saves Deck <-> PC de um jogo (o PC busca o pedido em até 5 min)
+            return self._saves(args)
         if cmd == "/familia":  # dois Decks pareados: catálogo (magnet + tradução pronta) do par
             from . import familia_servico
             return familia_servico.comando(self, args)
@@ -564,6 +567,25 @@ class Bot:
         if res.get("feito"):
             trad.traduzir(self, [res["gid"], "--forcar"])  # refaz o mod a partir do cache (rápido)
         return res["texto"]
+
+    def _saves(self, args) -> str:
+        from . import saves_sync, transferir
+        from .remove import find
+        if not args:
+            pend = saves_sync.conflitos(self.paths)
+            return ("Uso: /saves <jogo> — deixa os saves iguais no Deck e no PC (o mais novo vale).\n"
+                    + ("Conflitos esperando você: " + ", ".join(pend) + " → /saves <jogo> deck  ou  /saves <jogo> pc"
+                       if pend else "Nenhum conflito pendente."))
+        lado = args[-1].lower() if args[-1].lower() in ("deck", "pc") else None
+        q = " ".join(args[:-1] if lado else args)
+        lm = self._map()
+        hits = find(lm, q)
+        if len(hits) != 1:
+            return "Não achei um só jogo com esse nome." if not hits else "Achei mais de um: seja mais específico."
+        gid = hits[0]
+        msg = (saves_sync.escolher(self.paths, gid, lado) + " ") if lado else ""
+        transferir.enfileirar(gid, lm[gid].get("title", gid), direcao="saves")
+        return f"💾 {msg}Sincronização dos saves de {lm[gid].get('title', gid)} na fila: o PC faz em até 5 min e eu aviso."
 
     def _guardar_playlist(self, nome: str, link: str) -> str:
         from . import painel

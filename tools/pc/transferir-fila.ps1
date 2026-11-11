@@ -102,7 +102,10 @@ try {
         L ("pedido " + $p.id + " (" + $p.titulo + ")")
         Marcar $p.id 'copiando' $(if ($p.direcao -eq 'pc->deck') { 'o PC está enviando para o Deck' } else { 'o PC está copiando' })
         $saida = Join-Path $logDir ('transferir-' + $p.game_id + '.log')
-        if ($p.direcao -eq 'pc->deck') {
+        if ($p.direcao -eq 'saves') {
+            $saida = Join-Path $logDir ('saves-' + $p.game_id + '.log')
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $aqui 'sincronizar-saves.ps1') -Jogo $p.game_id -Deck $Deck -Chave $Chave *> $saida
+        } elseif ($p.direcao -eq 'pc->deck') {
             $saida = Join-Path $logDir ('enviar-' + $p.game_id + '.log')
             & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $aqui 'enviar-para-deck.ps1') -Jogo $p.game_id -Deck $Deck -Chave $Chave *> $saida
         } else {

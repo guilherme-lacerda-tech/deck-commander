@@ -139,4 +139,9 @@ errado, aparece uma mensagem simples na própria tela; detalhes ficam em `~/.loc
 | `/trazer` · `/trazer <jogo>` · `/trazer fila` | trazer jogo do PC para o Deck |
 | `/status` · `/diagnostico` · `/sos` · `/sos off` | saúde |
 | `/reiniciar` | reiniciar o Steam |
+| `/musica [playlist\|pausar\|proxima]` · cole o link de uma playlist | Spotify no Deck |
+| `/pc tv` | PC na TV (em casa) |
+| `/familia` · `/familia puxar <jogo>` | jogos + tradução pronta do Deck do irmão |
+| `/corrigir` (foto com a legenda) | corrigir uma frase traduzida estranha |
+| `/saves <jogo> [deck\|pc]` | saves iguais no Deck e no PC |
 | `/help` | lista curta no próprio bot |
