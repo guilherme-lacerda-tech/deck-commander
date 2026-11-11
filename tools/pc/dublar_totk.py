@@ -51,8 +51,13 @@ ESPANHOL = re.compile(r"\b(recuerdos?|también|usted(es)?|ahora|entonces|mientra
 def traduzir(textos: list[str], modelo: str = "qwen2.5:7b") -> list[str]:
     """Tradução da cena; refaz (até 3x) se escapar espanhol — falha real: 'recuerdo' numa fala da Zelda."""
     aviso = ""
-    for _ in range(3):
-        saida = _traduzir1(textos, modelo, aviso)
+    saida = list(textos)
+    for _ in range(4):
+        try:
+            saida = _traduzir1(textos, modelo, aviso)
+        except RuntimeError as e:  # quantidade de falas não bateu (falha real: 5 para 4): pede de novo
+            aviso = f" ATENÇÃO: devolva EXATAMENTE {len(textos)} falas, uma para cada linha. ({e})"
+            continue
         ruins = [i for i, t in enumerate(saida) if ESPANHOL.search(t)]
         if not ruins:
             return saida
@@ -180,10 +185,20 @@ def main() -> int:
     ssh("mkdir -p /tmp/dc-dub")
     cenas = json.loads(ssh("cd ~/deck-commander && python3 -m dc.dublagem_totk cenas")) if a.todas else a.cenas
     total = 0
+    feitas = Path("D:/DeckCommander/logs/dublagem-totk-cenas-feitas.txt")
+    prontas = set(feitas.read_text("utf-8").split()) if feitas.exists() else set()
     for c in cenas:
-        n = dublar_cena(ff, c, a.voz_f, a.voz_m)
+        if c in prontas and a.todas:  # continua de onde parou
+            continue
+        try:
+            n = dublar_cena(ff, c, a.voz_f, a.voz_m)
+        except Exception as e:  # noqa: BLE001 — uma cena com problema não para as outras
+            print(f"{c}: pulei ({str(e)[:120]})")
+            continue
         print(f"{c}: {n} fala(s) dublada(s)")
         total += n
+        with open(feitas, "a", encoding="utf-8") as f:
+            f.write(c + "\n")
     print(f"Pronto: {total} fala(s) em {len(cenas)} cena(s).")
     return 0
 
