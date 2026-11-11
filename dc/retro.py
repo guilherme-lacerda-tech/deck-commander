@@ -156,7 +156,7 @@ def preparar(home: Path | None = None, mapa: dict | None = None, turbo: float = 
     modelo = gravar_modelo(home) if (home / ".local/share/Steam/controller_base/templates").exists() else None
     texto = (f"🕹️ Botões de trás em {len(jogos)} jogo(s)"
              + (f"; emuladores ajustados: {', '.join(emus)}" if emus else "; emuladores já estavam prontos")
-             + ". L4 salva · R4 carrega · L5 (segurar) volta no tempo · R5 (segurar) turbo.")
+             + ". L4 salva · R4 carrega · L5 (segurar) volta no tempo · R5 liga/desliga o turbo.")
     return {"texto": texto, "appids": [a for _, a in jogos if a], "modelo": modelo}
 
 

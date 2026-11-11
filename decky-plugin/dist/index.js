@@ -878,7 +878,7 @@ function TelaRetro() {
     return h("div", null,
         Sec("Botões de trás",
             Txt(d.aplicado
-                ? "✅ Ligados: L4 salva o estado · R4 carrega · L5 (segurar) volta no tempo · R5 (segurar) turbo " + (d.turbo || 2) + "x."
+                ? "✅ Ligados: L4 salva o estado · R4 carrega · L5 (segurar) volta no tempo · R5 liga/desliga o turbo (um toque) " + (d.turbo || 2) + "x."
                 : "Desligados. Ligue para usar os botões de trás do Deck como no R4/Retroid: salvar e carregar estado, voltar no tempo e acelerar."),
             Txt("Vale para: " + (d.emuladores.join(", ") || "nenhum emulador encontrado") + ". Jogo aberto: feche e abra de novo para valer.", { opacity: 0.8 }),
             Bt(d.aplicado ? "🔄 Aplicar de novo (jogos novos)" : "🕹️ Ligar botões de trás", () => fazer("retro_definir", { turbo: d.turbo || 2 }), { disabled: ocupado }, "on"),
