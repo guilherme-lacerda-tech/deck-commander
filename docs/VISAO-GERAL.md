@@ -132,13 +132,15 @@ Telas do painel:
 ## 7. Música (Spotify) 🆕
 - ✅ **Volume separado** do jogo e da música, e controle (tocar/pausar/próxima) pelo painel e pelo `/musica`.
 - ✅ **Playlists rápidas:** cole o link de uma playlist no bot ou no painel e ela vira um botão.
-- 🧪 **Spotify sem abrir o app:** o player oficial de código aberto go-librespot roda escondido no Deck e aparece
-  como "Steam Deck" no Spotify do seu celular. Para entrar na conta:
-  1. Música → "Conectar Spotify";
-  2. leia o QR com o celular e confirme (ou mande `/musica conectar` no bot e toque no link).
-
-  Depois disso, aparecem as **suas playlists** e ele toca com o jogo aberto. Precisa de Premium e de internet na hora
-  de tocar.
+- ✅ **Suas playlists no painel e no bot:** a aba Música mostra as playlists da sua conta. Elas tocam com o jogo aberto,
+  e você não precisa abrir o Spotify: o app oficial abre escondido, sem janela. Testado no Deck em 11/11, com 50
+  playlists. Também dá para pedir pelo nome no Telegram: `/musica funk`.
+- ✅ **Entrar na conta uma vez:** Música → "Conectar Spotify". Leia o QR com o celular e confirme (ou mande
+  `/musica conectar` no bot). Ninguém vê sua senha. A lista se atualiza sozinha a cada 6 h, ou pelo botão
+  "Atualizar lista".
+- ⚠️ **O Spotify só toca pelo app oficial.** Ele recusa o som para players não oficiais, e contornar isso seria quebrar
+  a proteção dele. Por isso o player de código aberto (go-librespot) serve só para a conta e a lista, e fica ligado
+  apenas alguns segundos. Precisa de Premium e de internet na hora de tocar.
 
 ## 8. Organizar, espaço e desinstalar
 - ✅ **Duplicados:** `/duplicados` lista e remove os repetidos.

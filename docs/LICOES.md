@@ -27,6 +27,9 @@ teste automático (`tests/test_travas.py` e outros), que roda antes de toda impl
 | 20 | Sincronizar saves levava ~2 min | listava os 166 mil arquivos do jogo para achar 4 saves | modo "só dados" nos dois lados (2,8 s) |
 | 21 | Código da IA local com erros (sintaxe, chaves erradas, detecção da dock sempre "ligada", estado não relido, valor igual para todas as opções) | modelo local erra 1–3 coisas por módulo | regra: todo módulo gerado passa por testes escritos a partir da especificação ANTES de entrar; revisão por focos (`tools/ia-local-revisao.py`) |
 | 22 | Chave AES do executável / tarefa agendada criada por mim | ações bloqueadas pela segurança (quebrar proteção; persistência no sistema) | não fazer; tarefas do sistema são instaladas pelo usuário (`-Instalar`) |
+| 23 | Save com espaço no nome quebraria a cópia para o Deck | o PowerShell 5.1 perde as aspas duplas (`") ao chamar ssh.exe/scp.exe | `test_powershell_nao_passa_aspas_escapadas_ao_ssh`; aspas simples no comando remoto |
+| 24 | Spotify do Deck não ligava | a documentação dizia `-config_dir`, mas o programa lia como `-c onfig_dir` (precisa de `--`) | teste confere `--config_dir`; regra: conferir o `--help` do próprio programa, não só a documentação |
+| 25 | Spotify "tocava" sem som | o Spotify recusa a chave de áudio para players não oficiais (go-librespot #279/#317) | conta e playlists pelo go-librespot; tocar sempre pelo app oficial escondido (testado no Deck) |
 
 ## Regras de trabalho que saíram daqui
 1. **Nada vai para o Deck sem `tools/implantar.py`.**
@@ -35,3 +38,4 @@ teste automático (`tests/test_travas.py` e outros), que roda antes de toda impl
 4. **Arquivos .ps1 com acento: UTF-8 com BOM.** Scripts que falam com o ssh: `$OutputEncoding` UTF-8.
 5. **Nada da rede de ninguém no código.** Cada aparelho guarda a própria configuração.
 6. **Medir antes de otimizar** (ex.: ações do painel 0,2 s; saves 2,8 s).
+7. **Testar no aparelho de verdade** o que depende de programa ou serviço de fora: a documentação e os testes simulados não pegaram as falhas 24 e 25.
