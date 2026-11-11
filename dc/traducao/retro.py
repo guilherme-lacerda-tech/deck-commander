@@ -151,7 +151,7 @@ def translate_rom(paths: Paths, rom: Path, game_name: str = "", chain=None,
         codes[str(n)] = cs
         if prot.strip():
             items.append(ia.Item(str(n), prot))
-    res = ia.translate(paths, cfg, items, f"retro-{rom.stem}", ia.load_glossary(paths, game_name), examples,
+    res = ia.translate(paths, cfg, items, f"retro-{rom.stem}", ia.load_glossary_jogo(paths, cfg, items, game_name), examples,
                        chain=chain, progress=progress, should_pause=should_pause)
     rep.provider, rep.tokens, rep.errors = res.provider_used, res.tokens, res.errors
     rep.flagged, rep.review = len(res.flagged), len(res.review)

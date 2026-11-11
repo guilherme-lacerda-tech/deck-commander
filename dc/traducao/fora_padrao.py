@@ -105,7 +105,7 @@ def translate_dir(paths, src: Path, stage: Path, title: str = "", expected_lang:
         for s in slots:
             budget = s.length // 2 if s.encoding.startswith("utf-16") else s.length
             items.append(ia.Item(f"{rel}@{s.offset}", s.text, max_len=budget))
-    res = ia.translate(paths, cfg, items, f"fora-{title or src.name}", ia.load_glossary(paths, title),
+    res = ia.translate(paths, cfg, items, f"fora-{title or src.name}", ia.load_glossary_jogo(paths, cfg, items, title),
                        chain=chain, progress=progress, should_pause=should_pause)
     rep.provider = res.provider_used
     rep.errors += res.errors[:3]

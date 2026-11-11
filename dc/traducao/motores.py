@@ -104,7 +104,7 @@ def translate(paths, cfg: dict, col: Coleta, job: str, title: str, chain=None,
         key = hashlib.sha1(s.encode("utf-8", "surrogatepass")).hexdigest()[:16]
         prot[key] = (s, codes)
         items.append(ia.Item(key, p))
-    res = ia.translate(paths, cfg, items, job, ia.load_glossary(paths, title), chain=chain,
+    res = ia.translate(paths, cfg, items, job, ia.load_glossary_jogo(paths, cfg, items, title), chain=chain,
                        progress=progress, should_pause=should_pause)
     by_id: dict[str, str] = {}
     for key, (s, codes) in prot.items():

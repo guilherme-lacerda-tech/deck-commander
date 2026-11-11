@@ -357,7 +357,7 @@ def translate_locres(paths, cfg: dict, data: bytes, job: str, title: str, chain=
         if s not in uniq and _LETTERS.search(CODES.sub(" ", s)):
             uniq[s] = ia.protect(s, CODES)
     items = [ia.Item(hashlib.sha1(s.encode()).hexdigest()[:16], p) for s, (p, _c) in uniq.items()]
-    res = ia.translate(paths, cfg, items, job, ia.load_glossary(paths, title), chain=chain,
+    res = ia.translate(paths, cfg, items, job, ia.load_glossary_jogo(paths, cfg, items, title), chain=chain,
                        progress=progress, should_pause=should_pause)
     new_text = {}
     for s, (_p, codes) in uniq.items():

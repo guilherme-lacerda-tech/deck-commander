@@ -371,7 +371,7 @@ def translate_game(paths: Paths, tid: str, rom: Path, roots: list[Path], game_na
             if marked.strip():
                 items.append(ia.Item(iid, marked))
     rep.strings = len(items)
-    glossary = ia.load_glossary(paths, game_name or "Pokemon")
+    glossary = ia.load_glossary_jogo(paths, cfg, items, game_name or "Pokemon")
     res = ia.translate(paths, cfg, items, f"switch-{tid}", glossary, [], chain=chain,
                        progress=progress, should_pause=should_pause)
     rep.provider, rep.tokens, rep.errors = res.provider_used, res.tokens, rep.errors + res.errors

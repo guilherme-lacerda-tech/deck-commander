@@ -252,7 +252,7 @@ def translate_game(paths, title_id: str, patch_file: Path, game_name: str = "", 
                 seen.add(pr.core)
                 items.append(ia.Item(key, pr.core, max_len=max(12, int(len(pr.core) * GROWTH) + 2)))
     rep.strings = len(tables[LOCALES[0]].order)
-    glossary = ia.load_glossary(paths, game_name or "Luigi's Mansion 3")
+    glossary = ia.load_glossary_jogo(paths, cfg, items, game_name or "Luigi's Mansion 3")
     res = ia.translate(paths, cfg, items, f"switch-{title_id}", glossary, chain=chain,
                        progress=progress, should_pause=should_pause)
     # 2ª chance para o que só passou do limite por frase: a tabela tem folga no total (frases que encolheram),

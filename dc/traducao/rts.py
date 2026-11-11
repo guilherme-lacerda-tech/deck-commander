@@ -208,7 +208,7 @@ def translate_rom(paths: Paths, rom: Path, console: str, title: str = "", chain=
         codes[e["id"]] = cs
         enc[e["id"]] = (e.get("encoding") or "").lower()
         items.append(ia.Item(e["id"], prot, max_len=int(e.get("maxBytes") or 0) or None))
-    res = ia.translate(paths, cfg, items, f"rts-{proj.stem}", ia.load_glossary(paths, title), chain=chain,
+    res = ia.translate(paths, cfg, items, f"rts-{proj.stem}", ia.load_glossary_jogo(paths, cfg, items, title), chain=chain,
                        progress=progress, should_pause=should_pause)
     rep.provider, rep.flagged = res.provider_used, len(res.flagged)
     rep.errors += res.errors[:3]

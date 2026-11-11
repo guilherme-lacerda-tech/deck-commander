@@ -632,6 +632,39 @@ def load_glossary(paths: Paths, name: str = "") -> dict:
     return out
 
 
+def glossary_path(paths: Paths) -> Path:
+    """Glossário por franquia (ex.: todos os Mario), montado sozinho e compartilhado com o Deck do par (família)."""
+    return paths.config / "glossary.json"
+
+
+def load_glossary_jogo(paths: Paths, cfg: dict, items: list, name: str = "") -> dict:
+    """Glossário do jogo ANTES de traduzir: glossario.toml (à mão) + o da franquia. Se o jogo é de uma franquia
+    conhecida, os nomes próprios que se repetem e ainda não estão no glossário são traduzidos UMA vez pela IA
+    (e guardados), para todos os jogos da série usarem os mesmos nomes. Nunca impede a tradução."""
+    out = load_glossary(paths, name)
+    try:
+        from . import glossario_franquia as gf
+        chave = gf.franquia(name or "")
+        if not chave:
+            return out
+        dados = gf.carregar(glossary_path(paths))
+        falta = gf.faltando(dados, chave, gf.candidatos([getattr(i, "text", str(i)) for i in items]))[:80]
+        chain = [p for p in build_chain(paths, cfg) if _instructable(p)] if falta else []
+        for i in range(0, len(falta), 40):
+            lote = falta[i:i + 40]
+            system, user = gf.pedido_ia(lote, chave)
+            raw = _ask(chain, system, user, lambda r: bool(gf.ler_resposta(r, lote)))
+            if raw:
+                dados = gf.juntar(dados, chave, gf.ler_resposta(raw, lote))
+        if falta:
+            gf.salvar(glossary_path(paths), dados)
+        for termo, trad in gf.do_jogo(dados, chave).items():
+            out.setdefault(termo, trad)  # o glossario.toml (feito à mão) vale mais
+    except Exception:  # noqa: BLE001 — glossário é ajuda; nunca derruba a tradução
+        pass
+    return out
+
+
 # ----------------------------------------------------------------------------- segunda chance
 def _instructable(p: Provider) -> bool:
     """IA que segue instrução (não só traduz): serve para remontar códigos e encurtar."""

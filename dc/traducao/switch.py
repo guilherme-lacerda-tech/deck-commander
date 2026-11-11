@@ -402,7 +402,7 @@ def translate_game(paths: Paths, title_id: str, romfs: Path, game_name: str = ""
             if text.strip() and text not in memory:
                 items.append(ia.Item(iid, text))
     rep.strings = len(all_texts)
-    glossary = ia.load_glossary(paths, game_name)
+    glossary = ia.load_glossary_jogo(paths, cfg, items, game_name)
     res = ia.translate(paths, cfg, items, f"{tag}-{title_id}", glossary, examples, chain=chain,
                        progress=progress, should_pause=should_pause)
     rep.provider, rep.tokens, rep.errors = res.provider_used, res.tokens, rep.errors + res.errors
