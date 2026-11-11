@@ -97,6 +97,7 @@ Aviso aqui quando o download terminar.
 /devolver <nome> — traz de volta um jogo que você tirou pelo Steam
 /bateria sim|nao — baixar também fora da tomada (padrão: só na tomada)
 /pc listar | sincronizar | acordar | status — jogos do PC no Deck (aba "Computador")
+/musica [playlist | pausar | proxima | anterior] — Spotify no Deck
 /transferir <jogo> — leva o jogo com tudo (emulador, config, saves) para o PC
 /trazer — jogos do PC · /trazer <jogo> — traz do PC para o Deck (instala o emulador se faltar)
 /traduzir <jogo> — tradução pt-BR com IA (Switch e Pokémon GBA) · /traduzir lista | status | config
@@ -297,6 +298,8 @@ class Bot:
         if cmd == "/trazer":  # traz um jogo do PC (jogo + dados do emulador) para o Deck
             from .receber import comando_trazer
             return comando_trazer(self, args)
+        if cmd == "/musica":  # Spotify no Deck: tocar playlist, pausar, próxima, o que está tocando
+            return self._musica(args)
         if cmd == "/pc":  # jogos do PC transmitidos para o Deck (aba "Computador")
             from . import pc_remoto
             return pc_remoto.comando_pc(self, args)
@@ -526,6 +529,31 @@ class Bot:
             return remove.effective_map(self.paths)
         except (OSError, ValueError):
             return {}
+
+    def _musica(self, args) -> str:
+        """/musica (o que toca) · /musica pausar|tocar|proxima|anterior · /musica <playlist guardada no painel>."""
+        from . import painel
+        from .painel import Erro
+        p = painel.Ponte(self.paths, self.qbt, self.store)
+        acoes = {"pausar": "pausar", "pause": "pausar", "tocar": "tocar", "play": "tocar", "proxima": "proxima",
+                 "próxima": "proxima", "anterior": "anterior", "voltar": "anterior"}
+        try:
+            if not args:
+                d = painel.musica(p, {})
+                t = d["tocando"]
+                lst = ", ".join(x["nome"] for x in d["playlists"]) or "nenhuma (guarde no painel do Deck → Música)"
+                return ((f"🎵 {t['titulo']} — {t['artista']} ({t['estado']})" if t and t.get("titulo")
+                         else "🎵 Nada tocando agora.") + f"\nPlaylists: {lst}\nUso: /musica <playlist> | pausar | proxima")
+            q = " ".join(args).strip().lower()
+            if q in acoes:
+                painel.musica_midia(p, {"acao": acoes[q]})
+                return "🎵 ok"
+            pl = next((x for x in painel.musica(p, {})["playlists"] if x["nome"].lower() == q), None)
+            if not pl:
+                return "Não achei essa playlist. Guarde-a no painel do Deck (Música) ou mande /musica para ver a lista."
+            return "🎵 " + painel.musica_playlist(p, pl)["texto"]
+        except Erro as e:
+            return f"🎵 {e}"
 
     def _bring_back(self, args) -> str:
         from . import remove

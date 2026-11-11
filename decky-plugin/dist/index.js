@@ -425,6 +425,7 @@ function TelaInicio({ ir }) {
         Bt("📦 Transferir jogos (Deck ⇄ PC)", () => ir("transferir")),
         Bt("🎚️ Qualidade e controles", () => ir("qualidade")),
         Bt("🗑️ Desinstalar jogos", () => ir("desinstalar")),
+        Bt("🎵 Música", () => ir("musica")),
         Bt("📚 Biblioteca e desempenho", () => ir("atalhos")));
     if (!d || !d.ok) return h("div", null, Sec("Status", Carregando(d)), menu);
     const ativos = d.downloads.filter((x) => !x.concluido);
@@ -717,7 +718,39 @@ function TelaDesinstalar() {
             : Txt("Nenhum: tudo que você tirou do Steam já foi apagado.")));
 }
 
-const TELAS = { telegram: TelaTelegram, downloads: TelaDownloads, traducao: TelaTraducao, pc: TelaPC,
+// ---- 9. Música (Spotify + volume do jogo × música) -----------------------------------------------
+function TelaMusica() {
+    const [d, recarregar] = useDados("musica", {}, 5000);
+    const [msg, ocupado, fazer] = useAcao(recarregar);
+    const [nome, setNome] = SP_REACT.useState("");
+    const [link, setLink] = SP_REACT.useState("");
+    if (!d || !d.ok) return Sec("Música", Carregando(d));
+    const t = d.tocando;
+    const vol = (tipo, rotulo) => d.volume[tipo] === null || d.volume[tipo] === undefined
+        ? Txt(rotulo + ": nada tocando agora.", { opacity: 0.8 }, "v" + tipo)
+        : Row(h(D.SliderField, { label: rotulo, value: d.volume[tipo], min: 0, max: 150, step: 5, showValue: true,
+            onChange: (v) => fazer("musica_volume", { tipo, pct: v }) }), "v" + tipo);
+    return h("div", null,
+        Sec("Tocando agora",
+            Txt(t && t.titulo ? (t.estado === "Playing" ? "▶ " : "⏸ ") + t.titulo + (t.artista ? " — " + t.artista : "")
+                : "Nada tocando. Toque em ⏯ para abrir o Spotify."),
+            Bt("⏯ Tocar / pausar", () => fazer("musica_midia", { acao: "tocar_pausar" }), { disabled: ocupado }, "pp"),
+            Bt("⏭ Próxima", () => fazer("musica_midia", { acao: "proxima" }), { disabled: ocupado }, "nx"),
+            Bt("⏮ Anterior", () => fazer("musica_midia", { acao: "anterior" }), { disabled: ocupado }, "pv"),
+            Msg(msg)),
+        Sec("Volume", D.SliderField ? [vol("jogo", "🎮 Jogo"), vol("musica", "🎵 Música")] : Txt("Volume: atualize o Decky.")),
+        Sec("Playlists rápidas",
+            d.playlists.length ? d.playlists.map((pl) => [
+                Bt("🎵 " + pl.nome, () => fazer("musica_playlist", pl), { disabled: ocupado }, "p" + pl.nome),
+                Bt("✖ tirar " + pl.nome, () => fazer("musica_salvar", { remover: pl.nome }), { disabled: ocupado }, "x" + pl.nome)])
+                : Txt("Nenhuma ainda. No Spotify: playlist → Compartilhar → Copiar link, e cole abaixo."),
+            Campo("Nome (ex.: Foco)", nome, setNome),
+            Campo("Link da playlist", link, setLink),
+            Bt("＋ Guardar playlist", async () => { await fazer("musica_salvar", { nome, uri: link }); setNome(""); setLink(""); },
+                { disabled: ocupado || !nome || !link }, "add")));
+}
+
+const TELAS = { telegram: TelaTelegram, downloads: TelaDownloads, traducao: TelaTraducao, pc: TelaPC, musica: TelaMusica,
     transferir: TelaTransferir, qualidade: TelaQualidade, desinstalar: TelaDesinstalar, atalhos: AtalhosPanel };
 
 function Panel() {

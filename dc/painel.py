@@ -352,6 +352,79 @@ def removido_perguntado(p: Ponte, a: dict) -> dict:
     return {"texto": "ok"}
 
 
+# ----------------------------------------------------------------------------------------------- música
+def _playlists_path(p: Ponte) -> Path:
+    return p.paths.config / "playlists.json"
+
+
+def musica(p: Ponte, a: dict) -> dict:
+    from . import audio
+    fl = audio.fluxos()
+    vol = {t: max([f["volume"] for f in fl if f["tipo"] == t] or [None], key=lambda v: v or 0) for t in ("jogo", "musica")}
+    return {"tocando": audio.tocando(), "volume": vol, "playlists": audio.playlists(_playlists_path(p))}
+
+
+def musica_volume(p: Ponte, a: dict) -> dict:
+    from . import audio
+    tipo = a.get("tipo")
+    if tipo not in ("jogo", "musica"):
+        raise Erro("Escolha jogo ou música.")
+    n = audio.definir_volume(tipo, int(a.get("pct", 100)))
+    return {"texto": f"Volume {'do jogo' if tipo == 'jogo' else 'da música'}: {int(a.get('pct', 100))}%"
+            if n else ("Nenhum jogo tocando som agora." if tipo == "jogo" else "O Spotify não está tocando agora.")}
+
+
+def _com_player(acao) -> bool:
+    import time
+    from . import audio
+    if acao():
+        return True
+    audio.abrir_spotify()  # Spotify fechado: abre e tenta de novo por alguns segundos
+    for _ in range(10):
+        time.sleep(1.5)
+        if acao():
+            return True
+    return False
+
+
+def musica_midia(p: Ponte, a: dict) -> dict:
+    from . import audio
+    acao = a.get("acao", "tocar_pausar")
+    if not _com_player(lambda: audio.midia(acao)):
+        raise Erro("O Spotify não respondeu. Abra o Spotify uma vez e entre na sua conta.")
+    return {"texto": "ok"}
+
+
+def musica_playlist(p: Ponte, a: dict) -> dict:
+    from . import audio
+    uri = a.get("uri", "")
+    if not uri.startswith("spotify:"):
+        raise Erro("Endereço de playlist inválido (copie o link da playlist no Spotify).")
+    if not _com_player(lambda: audio.abrir(uri)):
+        raise Erro("O Spotify não respondeu. Abra o Spotify uma vez e entre na sua conta.")
+    return {"texto": f"Tocando: {a.get('nome') or 'playlist'}"}
+
+
+def _uri_spotify(link: str) -> str:
+    """Aceita o link de compartilhar (https://open.spotify.com/playlist/ID?si=...) ou o spotify:playlist:ID."""
+    m = re.search(r"open\.spotify\.com/(playlist|album|artist|track)/([A-Za-z0-9]+)", link or "")
+    return f"spotify:{m.group(1)}:{m.group(2)}" if m else (link or "").strip()
+
+
+def musica_salvar(p: Ponte, a: dict) -> dict:
+    from . import audio
+    lista = audio.playlists(_playlists_path(p))
+    if a.get("remover"):
+        lista = [x for x in lista if x.get("nome") != a["remover"]]
+    else:
+        nome, uri = (a.get("nome") or "").strip(), _uri_spotify(a.get("uri", ""))
+        if not nome or not uri.startswith("spotify:"):
+            raise Erro("Dê um nome e cole o link da playlist do Spotify (Compartilhar → Copiar link).")
+        lista = [x for x in lista if x.get("nome") != nome] + [{"nome": nome, "uri": uri}]
+    audio.salvar_playlists(_playlists_path(p), lista)
+    return {"texto": "Playlists salvas."}
+
+
 # ----------------------------------------------------------------------------------------------- tradução
 PERGUNTA = {"aguardando sim": "fora", "aguardando ok": "motor"}
 
@@ -653,7 +726,8 @@ ACOES = {f.__name__: f for f in (
     bateria, duplicados, remover, traducao, traducao_automatica, traduzir, traducao_parar, traducao_retomar,
     traducao_responder, pc, pc_salvar, pc_testar, pc_acordar, pc_sincronizar, transferir, transferir_preparar,
     transferir_enviar, trazer_preparar, trazer_enviar, qualidade, qualidade_definir, controle_definir,
-    downloads_limpar, traducao_limpar, desinstalar_lista, devolver, removido_perguntado)}
+    downloads_limpar, traducao_limpar, desinstalar_lista, devolver, removido_perguntado, musica, musica_volume,
+    musica_midia, musica_playlist, musica_salvar)}
 ACOES["downloads_pausar"] = lambda p, a: _pausar(p, a, True)
 ACOES["downloads_retomar"] = lambda p, a: _pausar(p, a, False)
 
