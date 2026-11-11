@@ -976,6 +976,14 @@ class Bot:
                 familia_servico.avisar_presenca(self)
             except Exception as e:  # noqa: BLE001
                 self.log(f"família: {e}")
+            try:  # protetor de tela com a arte dos jogos: refeito 1x por dia (jogos novos, recentes primeiro)
+                marca = self.paths.state / "protetor-montado"
+                if not marca.exists() or time.time() - marca.stat().st_mtime > 86400:
+                    from . import protetor
+                    self.log(protetor.montar())
+                    marca.write_text("ok")
+            except Exception as e:  # noqa: BLE001
+                self.log(f"protetor de tela: {e}")
             try:
                 self.notify_removidos()
             except Exception as e:  # noqa: BLE001
