@@ -39,7 +39,7 @@ function Para-Deck($tab) {   # só sha256/mtime vão para o Deck
 $tab = Get-TabelaEmuladores
 $j = Get-JogosPC -Jogos $Jogos -Emuladores $Emuladores -Tab $tab | Where-Object { $_.Id -eq $Jogo } | Select-Object -First 1
 if (-not $j) { Write-Host "O jogo $Jogo não está no PC (copie com /transferir primeiro)."; exit 1 }
-$m = Get-ManifestoPC -J $j -Tab $tab -Emuladores $Emuladores -Jogos $Jogos
+$m = Get-ManifestoPC -J $j -Tab $tab -Emuladores $Emuladores -Jogos $Jogos -SoDados
 $pc = Saves-PC $m
 # pasta real do {EMU} no PC (para save novo que só existe no Deck)
 $basePC = $null

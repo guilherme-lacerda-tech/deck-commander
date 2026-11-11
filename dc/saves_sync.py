@@ -40,7 +40,7 @@ def saves_do_deck(game_id: str) -> dict[str, dict]:
     """destino -> {sha256, mtime, caminho} dos saves deste jogo no Deck (mesma lista da transferência)."""
     import hashlib
     from . import transferir
-    man = transferir.preparar(game_id, com_hash=False)  # hash só dos saves (o jogo pode ter 19 GB)
+    man = transferir.preparar(game_id, com_hash=False, so_dados=True)  # só saves: sem listar o jogo inteiro
     out = {}
     for a in man.get("arquivos", []):
         if a.get("categoria") == "save":

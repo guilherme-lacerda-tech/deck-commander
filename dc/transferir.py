@@ -599,8 +599,9 @@ def _emulador_deck(emu: str, home: Path) -> dict:
 
 # ------------------------------------------------------------------ preparar -----------
 def preparar(game_id: str, home=None, launch_map: dict | None = None, com_hash: bool = True,
-             cache: Path | str | None | bool = True) -> dict:
-    """Manifesto do jogo. Só lê o Deck. `cache`: True = cache padrão, None/False = sem cache, ou um caminho."""
+             cache: Path | str | None | bool = True, so_dados: bool = False) -> dict:
+    """Manifesto do jogo. Só lê o Deck. `cache`: True = cache padrão, None/False = sem cache, ou um caminho.
+    `so_dados`: para saves/config do emulador (Switch 2: não percorre a pasta enorme do jogo)."""
     home = _home(home)
     lm = launch_map if launch_map is not None else carregar_mapa(home)
     if game_id not in lm:
@@ -613,7 +614,11 @@ def preparar(game_id: str, home=None, launch_map: dict | None = None, com_hash: 
     m = Manifesto(game_id, e, emu)
     ryu = _primeiro(home / ".config/Ryujinx", home / ".var/app/io.github.ryubing.Ryujinx/config/Ryujinx")
 
-    if console == "switch2":
+    if console == "switch2" and so_dados:  # saves/config: não lista os ~166 mil arquivos do jogo (só o Title ID)
+        raiz = rom.parents[2] if rom.name == "main" and rom.parent.name == "exefs" else rom.parent
+        m.info["title_id"] = _tid_npdm(raiz / "base/exefs/main.npdm") or _tid_npdm(rom.with_name("main.npdm"))
+        _emu_lichii(m, home)
+    elif console == "switch2":
         _jogo_switch2(m, rom)
         _emu_lichii(m, home)
     elif console == "switch":

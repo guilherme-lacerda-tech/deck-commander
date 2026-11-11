@@ -535,9 +535,9 @@ function Add-DadosEmulador($Col, $J, $X, [hashtable]$Info) {
 
 function Get-ManifestoPC {
     # manifesto PC -> Deck de um jogo: arquivos com destino lógico ({JOGOS}/..., {EMU}/...), tamanho e (opcional) sha256
-    param($J, $Tab, [string]$Emuladores, [string]$Jogos, [switch]$ComHash, [string]$CacheHash)
+    param($J, $Tab, [string]$Emuladores, [string]$Jogos, [switch]$ComHash, [string]$CacheHash, [switch]$SoDados)
     $col = New-ColecaoArquivos
-    Add-ArquivosJogo $col $J
+    if (-not $SoDados) { Add-ArquivosJogo $col $J }   # -SoDados: saves/config, sem listar o jogo inteiro
     $emu = Get-EmuDoConsole $J.Console $Tab
     $X = if ($emu) { Find-EmuladorPC $emu $Emuladores $Tab } else { $null }
     $info = @{ saves = @() }
