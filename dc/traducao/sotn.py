@@ -104,6 +104,7 @@ def translate_rom(paths: Paths, rom: Path, title: str = "", chain=None, progress
     disco = Disco(bin_)
     trechos = coletar(disco)
     rep.found = rep.candidates = len(trechos)
+    rep.strings = rep.candidates  # o run.py lê .strings no relatório (falha real: AttributeError depois de gravar)
     dados = {nome: disco.ler(nome) for nome in {t.arquivo for t in trechos}}
     # cada fala (grupo de linhas) vira UMA frase para a IA; frases iguais em vários lugares traduzem uma vez só
     por_texto: dict[str, list[list[S.Trecho]]] = {}
