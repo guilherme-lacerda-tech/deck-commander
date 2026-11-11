@@ -75,6 +75,7 @@ def rodada(launch_map, estado: Estado, ultimas, abrir, agora: datetime, na_tomad
         estado.marcar(game_id, agora)
         estado.salvar()
         processados.append(game_id)
-        log(f"Pré-compilado: {launch_map[game_id].get('title', game_id)}")
+        titulo = launch_map[game_id].get('title', game_id)
+        log(f"Pré-compilado: {titulo}" if sucesso else f"Não abriu (fica marcado para não repetir): {titulo}")
 
     return processados
