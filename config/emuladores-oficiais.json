@@ -1,0 +1,143 @@
+{
+ "_leia": "Origem OFICIAL de cada emulador (lugar único: usado pelo PC e pelo Deck na transferência). fonte = de onde vem a lista de versões (GitHub ou Forgejo do projeto). windows.asset / linux.asset = expressão regular do nome do arquivo na release. windows.exe = caminho do .exe dentro da pasta; windows.dados = pasta de dados relativa à pasta do .exe (modo portátil). windows.portatil = o que criar para ligar o modo portátil. linux.flatpak = id no Flathub (preferido); linux.procurar = onde o Deck já pode ter o emulador; linux.instalar_em = onde o AppImage/tar oficial é posto quando não há Flatpak; linux.dados = pastas de dados no Deck (a primeira que existir); linux.sub = subpastas de {EMU} que no Linux ficam em outro lugar.",
+ "versao": 1,
+ "emuladores": {
+  "lichii": {
+   "nome": "Lichii", "consoles": ["switch2"],
+   "fonte": {"tipo": "github", "repo": "zortos293/Lichii"},
+   "pagina": "https://github.com/zortos293/Lichii/releases",
+   "windows": {"asset": "^lichii-windows-x86_64-pgo\\.zip$", "pasta": "Lichii", "exe": ["lichii.exe"], "dados": "user",
+               "portatil": {"pastas": ["user"], "arquivos": []}},
+   "linux": {"flatpak": null, "asset": "^lichii-linux-x86_64-pgo\\.AppImage$",
+             "procurar": ["Emulation/Lichii/lichii-linux-x86_64-pgo.AppImage", "Emulation/Lichii/*.AppImage", "Applications/*[Ll]ichii*.AppImage"],
+             "instalar_em": "Emulation/Lichii/lichii-linux-x86_64-pgo.AppImage",
+             "dados": [".local/share/eden"], "sub": {"config": ".config/eden"}}
+  },
+  "ryujinx": {
+   "nome": "Ryujinx (Ryubing)", "consoles": ["switch"],
+   "fonte": {"tipo": "forgejo", "api": "https://git.ryujinx.app/api/v1/repos/projects/Ryubing"},
+   "pagina": "https://git.ryujinx.app/projects/Ryubing/releases",
+   "windows": {"asset": "^ryujinx-[0-9.]+-win_x64\\.zip$", "pasta": "Ryujinx", "exe": ["publish\\Ryujinx.exe", "Ryujinx.exe"], "dados": "portable",
+               "portatil": {"pastas": ["portable"], "arquivos": []}},
+   "linux": {"flatpak": "io.github.ryubing.Ryujinx", "asset": "^ryujinx-[0-9.]+-x64\\.AppImage$",
+             "procurar": ["Applications/publish/Ryujinx", "Applications/Ryujinx*/Ryujinx", "Applications/Ryujinx*.AppImage",
+                          "Applications/ryujinx*.AppImage", "Downloads/publish/Ryujinx", "Downloads/*/publish/Ryujinx"],
+             "instalar_em": "Applications/Ryujinx.AppImage",
+             "dados": [".config/Ryujinx", ".var/app/io.github.ryubing.Ryujinx/config/Ryujinx"]}
+  },
+  "pcsx2": {
+   "nome": "PCSX2", "consoles": ["ps2"],
+   "fonte": {"tipo": "github", "repo": "PCSX2/pcsx2"},
+   "pagina": "https://github.com/PCSX2/pcsx2/releases",
+   "windows": {"asset": "^pcsx2-v[0-9.]+-windows-x64-Qt\\.7z$", "pasta": "PCSX2", "exe": ["pcsx2-qt.exe"], "dados": ".",
+               "portatil": {"pastas": [], "arquivos": ["portable.ini"]}},
+   "linux": {"flatpak": "net.pcsx2.PCSX2", "asset": "^pcsx2-v[0-9.]+-linux-appimage-x64-Qt\\.AppImage$",
+             "procurar": ["Applications/pcsx2*.AppImage"], "instalar_em": "Applications/pcsx2-Qt.AppImage",
+             "dados": [".var/app/net.pcsx2.PCSX2/config/PCSX2", ".config/PCSX2"]}
+  },
+  "duckstation": {
+   "nome": "DuckStation", "consoles": ["psx"],
+   "fonte": {"tipo": "github", "repo": "stenzek/duckstation"},
+   "pagina": "https://github.com/stenzek/duckstation/releases",
+   "windows": {"asset": "^duckstation-windows-x64-release\\.zip$", "pasta": "DuckStation", "exe": ["duckstation-qt-x64-ReleaseLTCG.exe"], "dados": ".",
+               "portatil": {"pastas": [], "arquivos": ["portable.txt"]}},
+   "linux": {"flatpak": null, "asset": "^DuckStation-x64\\.AppImage$",
+             "procurar": ["Applications/DuckStation*.AppImage", "Applications/duckstation*.AppImage", "Downloads/DuckStation*.AppImage"],
+             "instalar_em": "Applications/DuckStation-x64.AppImage",
+             "dados": [".local/share/duckstation", ".config/duckstation", ".var/app/org.duckstation.DuckStation/data/duckstation"]}
+  },
+  "ppsspp": {
+   "nome": "PPSSPP", "consoles": ["psp"],
+   "fonte": {"tipo": "github", "repo": "hrydgard/ppsspp"},
+   "pagina": "https://github.com/hrydgard/ppsspp/releases",
+   "windows": {"asset": "^PPSSPP-v[0-9.]+-Windows-x64\\.zip$", "pasta": "PPSSPP", "exe": ["PPSSPPWindows64.exe"], "dados": "memstick",
+               "portatil": {"pastas": ["memstick"], "arquivos": []}},
+   "linux": {"flatpak": "org.ppsspp.PPSSPP", "asset": "^PPSSPP-v[0-9.]+-anylinux-x86_64\\.AppImage$",
+             "procurar": ["Applications/PPSSPP*.AppImage"], "instalar_em": "Applications/PPSSPP-x86_64.AppImage",
+             "dados": [".var/app/org.ppsspp.PPSSPP/config/ppsspp", ".config/ppsspp"]}
+  },
+  "xenia": {
+   "nome": "Xenia Canary", "consoles": ["x360"],
+   "fonte": {"tipo": "github", "repo": "xenia-canary/xenia-canary-releases"},
+   "pagina": "https://github.com/xenia-canary/xenia-canary-releases/releases",
+   "windows": {"asset": "^xenia_canary_windows_?\\.zip$", "pasta": "Xenia", "exe": ["xenia_canary.exe"], "dados": ".",
+               "portatil": {"pastas": [], "arquivos": ["portable.txt"]}},
+   "linux": {"flatpak": null, "asset": "^xenia_canary_linux\\.tar_?\\.xz$",
+             "procurar": [".local/share/deck-commander/emus/xenia-canary/xenia_canary"],
+             "instalar_em": ".local/share/deck-commander/emus/xenia-canary/",
+             "dados": [".local/share/deck-commander/emus/xenia-canary"]}
+  },
+  "retroarch": {
+   "nome": "RetroArch", "consoles": ["snes", "n64", "gba", "nes", "gb", "gbc", "genesis", "sms", "gg", "segacd", "saturn", "pce", "arcade"],
+   "fonte": {"tipo": "github", "repo": "libretro/RetroArch"},
+   "pagina": "https://www.retroarch.com/?page=platforms",
+   "windows": {"url": "https://buildbot.libretro.com/stable/{versao_sem_v}/windows/x86_64/RetroArch.7z", "pasta": "RetroArch",
+               "exe": ["retroarch.exe", "RetroArch-Win64\\retroarch.exe"], "dados": ".", "portatil": {"pastas": [], "arquivos": []}},
+   "linux": {"flatpak": "org.libretro.RetroArch", "asset": null, "procurar": [],
+             "dados": [".var/app/org.libretro.RetroArch/config/retroarch", ".config/retroarch"]}
+  },
+  "dolphin": {
+   "nome": "Dolphin", "consoles": ["gc", "wii"],
+   "fonte": {"tipo": "pagina"},
+   "pagina": "https://dolphin-emu.org/download/",
+   "windows": {"manual": true, "pasta": "Dolphin", "exe": ["Dolphin.exe", "Dolphin-x64\\Dolphin.exe"], "dados": "User",
+               "portatil": {"pastas": [], "arquivos": ["portable.txt"]}},
+   "linux": {"flatpak": "org.DolphinEmu.dolphin-emu", "asset": null, "procurar": [],
+             "dados": [".var/app/org.DolphinEmu.dolphin-emu/data/dolphin-emu"]}
+  },
+  "cemu": {
+   "nome": "Cemu", "consoles": ["wiiu"],
+   "fonte": {"tipo": "github", "repo": "cemu-project/Cemu"},
+   "pagina": "https://github.com/cemu-project/Cemu/releases",
+   "windows": {"asset": "^cemu-[0-9.]+-windows-x64\\.zip$", "pasta": "Cemu", "exe": ["Cemu.exe", "Cemu_*\\Cemu.exe"], "dados": "portable",
+               "portatil": {"pastas": ["portable"], "arquivos": []}},
+   "linux": {"flatpak": "info.cemu.Cemu", "asset": "^Cemu-[0-9.]+-x86_64\\.AppImage$", "procurar": ["Applications/Cemu*.AppImage"],
+             "instalar_em": "Applications/Cemu-x86_64.AppImage", "dados": [".var/app/info.cemu.Cemu/data/Cemu"]}
+  },
+  "rpcs3": {
+   "nome": "RPCS3", "consoles": ["ps3"],
+   "fonte": {"tipo": "github", "repo": "RPCS3/rpcs3-binaries-win", "repo_linux": "RPCS3/rpcs3-binaries-linux"},
+   "pagina": "https://rpcs3.net/download",
+   "windows": {"asset": "^rpcs3-v[0-9.]+-[0-9]+-[0-9a-f]+_win64_msvc\\.7z$", "pasta": "RPCS3", "exe": ["rpcs3.exe"], "dados": ".",
+               "portatil": {"pastas": [], "arquivos": []}},
+   "linux": {"flatpak": "net.rpcs3.RPCS3", "asset": "^rpcs3-v[0-9.]+-[0-9]+-[0-9a-f]+_linux64\\.AppImage$", "procurar": ["Applications/rpcs3*.AppImage"],
+             "instalar_em": "Applications/rpcs3.AppImage", "dados": [".var/app/net.rpcs3.RPCS3/config/rpcs3"]}
+  },
+  "azahar": {
+   "nome": "Azahar", "consoles": ["n3ds"],
+   "fonte": {"tipo": "github", "repo": "azahar-emu/azahar"},
+   "pagina": "https://github.com/azahar-emu/azahar/releases",
+   "windows": {"asset": "^azahar-windows-msvc-[0-9.]+\\.zip$", "pasta": "Azahar", "exe": ["azahar.exe", "*\\azahar.exe"], "dados": "user",
+               "portatil": {"pastas": ["user"], "arquivos": []}},
+   "linux": {"flatpak": "org.azahar_emu.Azahar", "asset": "^azahar\\.AppImage$", "procurar": ["Applications/azahar*.AppImage"],
+             "instalar_em": "Applications/azahar.AppImage", "dados": [".var/app/org.azahar_emu.Azahar/data/azahar-emu"]}
+  },
+  "melonds": {
+   "nome": "melonDS", "consoles": ["nds"],
+   "fonte": {"tipo": "github", "repo": "melonDS-emu/melonDS"},
+   "pagina": "https://github.com/melonDS-emu/melonDS/releases",
+   "windows": {"asset": "^melonDS-[0-9.]+-windows-x86_64\\.zip$", "pasta": "melonDS", "exe": ["melonDS.exe"], "dados": ".",
+               "portatil": {"pastas": [], "arquivos": []}},
+   "linux": {"flatpak": "net.kuribo64.melonDS", "asset": null, "procurar": [],
+             "dados": [".var/app/net.kuribo64.melonDS/config/melonDS"]}
+  },
+  "xemu": {
+   "nome": "xemu", "consoles": ["xbox"],
+   "fonte": {"tipo": "github", "repo": "xemu-project/xemu"},
+   "pagina": "https://github.com/xemu-project/xemu/releases",
+   "windows": {"asset": "^xemu-[0-9.]+-windows-x86_64\\.zip$", "pasta": "xemu", "exe": ["xemu.exe"], "dados": ".",
+               "portatil": {"pastas": [], "arquivos": ["portable.txt"]}},
+   "linux": {"flatpak": "app.xemu.xemu", "asset": "^xemu-[0-9.]+-x86_64\\.AppImage$", "procurar": ["Applications/xemu*.AppImage"],
+             "instalar_em": "Applications/xemu-x86_64.AppImage", "dados": [".var/app/app.xemu.xemu/data/xemu/xemu"]}
+  },
+  "flycast": {
+   "nome": "Flycast", "consoles": ["dc"],
+   "fonte": {"tipo": "github", "repo": "flyinghead/flycast"},
+   "pagina": "https://github.com/flyinghead/flycast/releases",
+   "windows": {"asset": "^flycast-win64-[0-9.]+\\.zip$", "pasta": "Flycast", "exe": ["flycast.exe"], "dados": ".",
+               "portatil": {"pastas": [], "arquivos": []}},
+   "linux": {"flatpak": "org.flycast.Flycast", "asset": "^flycast-x86_64-[0-9.]+\\.AppImage$", "procurar": ["Applications/flycast*.AppImage"],
+             "instalar_em": "Applications/flycast-x86_64.AppImage", "dados": [".var/app/org.flycast.Flycast/config/flycast"]}
+  }
+ }
+}

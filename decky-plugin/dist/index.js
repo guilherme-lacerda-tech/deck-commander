@@ -386,7 +386,7 @@ function TelaInicio({ ir }) {
         Bt("⬇️ Downloads", () => ir("downloads")),
         Bt("🈯 Tradução" + (d && d.perguntas ? " (" + d.perguntas + " pergunta" + (d.perguntas > 1 ? "s" : "") + ")" : ""), () => ir("traducao")),
         Bt("🖥️ PC (jogar os jogos do PC)", () => ir("pc")),
-        Bt("📦 Levar jogo para o PC", () => ir("transferir")),
+        Bt("📦 Transferir jogos (Deck ⇄ PC)", () => ir("transferir")),
         Bt("🎚️ Qualidade e controles", () => ir("qualidade")),
         Bt("📚 Biblioteca e desempenho", () => ir("atalhos")));
     if (!d || !d.ok) return h("div", null, Sec("Status", Carregando(d)), menu);
@@ -570,29 +570,41 @@ function TelaPC() {
 }
 
 // ---- 6. Transferências --------------------------------------------------------------------------
-function TelaTransferir() {
-    const [d, recarregar] = useDados("transferir", {}, 20000);
+// Um sentido da transferência: busca, escolha, "o que vai junto" (tamanho, emulador do outro lado) e confirmar
+function BlocoTransferir({ titulo, jogos, preparar, enviar, botao, pergunta, explica, vazio, recarregar }) {
     const [busca, setBusca] = SP_REACT.useState("");
     const [gid, setGid] = SP_REACT.useState(null);
     const [prep, setPrep] = SP_REACT.useState(null);
     const [msg, ocupado, fazer] = useAcao(recarregar);
-    if (!d || !d.ok) return Sec("Levar jogo para o PC", Carregando(d));
-    const achados = filtrar(d.jogos, busca);
-    const escolher = async (g) => { setGid(g); setPrep({ carregando: true }); setPrep(await painel("transferir_preparar", { gid: g })); };
+    const achados = filtrar(jogos, busca);
+    const escolher = async (g) => { setGid(g); setPrep({ carregando: true }); setPrep(await painel(preparar, { gid: g })); };
+    if (!jogos.length) return Sec(titulo, Txt(vazio));
+    return Sec(titulo,
+        Campo("Buscar jogo", busca, setBusca, { description: achados.length + " jogo(s)" }),
+        Lista("Jogo", opcoesJogos(achados), gid, escolher),
+        prep && prep.carregando ? Txt("Vendo o que vai junto…") : null,
+        prep && prep.ok ? [Txt("Tamanho: " + prep.tamanho + " em " + prep.arquivos + " arquivos", { fontWeight: "bold" }, "pt"),
+            Txt(prep.resumo, { opacity: 0.9 }, "pr"),
+            Bt(botao, () => confirmar(pergunta.replace("{jogo}", prep.titulo), explica, "Confirmar",
+                () => fazer(enviar, { gid })), { disabled: ocupado }, "pe")] : null,
+        prep && prep.erro ? Txt("⚠️ " + prep.erro, { color: "#ff8a80" }) : null,
+        Msg(msg));
+}
+
+function TelaTransferir() {
+    const [d, recarregar] = useDados("transferir", {}, 20000);
+    if (!d || !d.ok) return Sec("Transferir jogos", Carregando(d));
     return h("div", null,
-        Sec("Levar jogo para o PC",
-            Campo("Buscar jogo", busca, setBusca, { description: achados.length + " jogo(s)" }),
-            Lista("Jogo", opcoesJogos(achados), gid, escolher),
-            prep && prep.carregando ? Txt("Vendo o que vai junto…") : null,
-            prep && prep.ok ? [Txt("Tamanho: " + prep.tamanho + " em " + prep.arquivos + " arquivos", { fontWeight: "bold" }, "pt"),
-                Txt(prep.resumo, { opacity: 0.9 }, "pr"),
-                Bt("📦 Enviar pro PC", () => confirmar("Enviar " + prep.titulo + " para o PC?",
-                    "O PC acorda, busca e copia sozinho (confere cada arquivo; nada é apagado no Deck).", "Enviar",
-                    () => fazer("transferir_enviar", { gid })), { disabled: ocupado }, "pe")] : null,
-            prep && prep.erro ? Txt("⚠️ " + prep.erro, { color: "#ff8a80" }) : null,
-            Msg(msg)),
-        Sec("Fila", d.fila.length ? d.fila.map((e, i) => Txt("• " + e.titulo + ": " + e.status, null, "f" + i))
-            : Txt("Nenhuma transferência pedida.")));
+        h(BlocoTransferir, { key: "dp", titulo: "Do Deck para o PC", jogos: d.jogos, preparar: "transferir_preparar",
+            enviar: "transferir_enviar", botao: "📦 Enviar pro PC", pergunta: "Enviar {jogo} para o PC?",
+            explica: "O PC acorda, busca e copia sozinho (confere cada arquivo; instala o emulador no PC se faltar; nada é apagado no Deck).",
+            vazio: "Nenhum jogo na biblioteca do Deck.", recarregar }),
+        h(BlocoTransferir, { key: "pd", titulo: "Do PC para o Deck", jogos: d.jogos_pc || [], preparar: "trazer_preparar",
+            enviar: "trazer_enviar", botao: "📥 Trazer pro Deck", pergunta: "Trazer {jogo} do PC?",
+            explica: "O PC acorda e envia sozinho (confere cada arquivo; instala o emulador no Deck se faltar; backup do que já existir; nada é apagado no PC).",
+            vazio: "A lista de jogos do PC ainda não chegou (ela vem quando o PC liga).", recarregar }),
+        Sec("Fila", d.fila.length ? d.fila.map((e, i) => Txt("• " + (e.direcao === "pc->deck" ? "📥 " : "📦 ") + e.titulo
+            + ": " + e.status, null, "f" + i)) : Txt("Nenhuma transferência pedida.")));
 }
 
 // ---- 7. Qualidade e controles -------------------------------------------------------------------

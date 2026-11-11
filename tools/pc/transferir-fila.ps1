@@ -1,4 +1,7 @@
-# Deck Commander — busca no Steam Deck os jogos pedidos com /transferir <jogo> (botão "Enviar pro PC") e copia.
+﻿# Deck Commander — atende a fila de transferências do Steam Deck nos DOIS sentidos:
+#   deck->pc: /transferir <jogo> (botão "Enviar pro PC")  -> transferir-do-deck.ps1 (baixa o emulador oficial se faltar no PC)
+#   pc->deck: /trazer <jogo do PC> (botão "Trazer pro Deck") -> enviar-para-deck.ps1 (o Deck instala o emulador se faltar)
+# Também publica no Deck a lista de jogos do PC que podem ir (pc-jogos-transferiveis.json), quando ela muda.
 #
 # Roda pela tarefa agendada "DeckCommander Transferencias" (a cada 5 min e no logon). Instalar a tarefa (sem admin):
 #     powershell -ExecutionPolicy Bypass -File tools\pc\transferir-fila.ps1 -Instalar
@@ -59,6 +62,13 @@ try {
     }
 } catch { L ("lista de jogos: " + $_.Exception.Message) }
 
+# Jogos do PC que podem ir para o Deck (/trazer e painel "Do PC para o Deck"): só manda quando muda
+try {
+    $pub = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $aqui 'enviar-para-deck.ps1') -Publicar -Deck $Deck -Chave $Chave 2>&1
+    if ($LASTEXITCODE -ne 0) { L ("lista de jogos transferíveis: " + (($pub | Out-String).Trim())) }
+    elseif (($pub | Out-String) -match 'enviada') { L 'lista de jogos transferíveis enviada ao Deck' }
+} catch { L ("lista de jogos transferíveis: " + $_.Exception.Message) }
+
 # fila no Deck (só pedidos "na fila"/"copiando"); Deck desligado/fora de alcance = tenta na próxima rodada
 try {
     $json = & ssh.exe @sshArgs 'cd ~/deck-commander && python3 -m dc.transferir fila-json' 2>$null
@@ -90,9 +100,14 @@ function Marcar([string]$id, [string]$status, [string]$nota) {
 try {
     foreach ($p in $fila) {
         L ("pedido " + $p.id + " (" + $p.titulo + ")")
-        Marcar $p.id 'copiando' 'o PC está copiando'
+        Marcar $p.id 'copiando' $(if ($p.direcao -eq 'pc->deck') { 'o PC está enviando para o Deck' } else { 'o PC está copiando' })
         $saida = Join-Path $logDir ('transferir-' + $p.game_id + '.log')
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $aqui 'transferir-do-deck.ps1') -Jogo $p.game_id -SemEmuladorLinux -Deck $Deck -Chave $Chave *> $saida
+        if ($p.direcao -eq 'pc->deck') {
+            $saida = Join-Path $logDir ('enviar-' + $p.game_id + '.log')
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $aqui 'enviar-para-deck.ps1') -Jogo $p.game_id -Deck $Deck -Chave $Chave *> $saida
+        } else {
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $aqui 'transferir-do-deck.ps1') -Jogo $p.game_id -SemEmuladorLinux -Deck $Deck -Chave $Chave *> $saida
+        }
         $rc = $LASTEXITCODE
         $fim = (Get-Content $saida -Tail 12 -ErrorAction SilentlyContinue) -join "`n"
         if ($rc -eq 0) { Marcar $p.id 'pronto' $fim; L ("pronto: " + $p.game_id) }

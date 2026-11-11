@@ -58,16 +58,32 @@ Não precisa abrir o modo Desktop no dia a dia. Instalação: [TUTORIAL-INSTALAC
 - **Fora de casa:** a Tailscale precisa estar ligada no Deck.
 - Jogos com antitrapaça (Vanguard da Riot, EAC) podem não deixar o sistema fechá-los, mas o PC dorme mesmo assim.
 
-## 7. Levar um jogo do Deck para o PC
+## 7. Levar jogos entre o Deck e o PC (nos dois sentidos)
+**Do Deck para o PC**
 1. `/transferir <jogo>`: o bot mostra o que vai e o tamanho, com o botão **Enviar pro PC**.
 2. Toque no botão. O bot acorda o PC; em até 5 min o PC começa a copiar.
 3. O bot avisa quando terminar. `/transferir fila` mostra o andamento.
 
+**Do PC para o Deck**
+1. `/trazer` lista os jogos do PC (a lista chega sozinha quando o PC liga). `/trazer <jogo>` mostra o tamanho, o que
+   vem junto e se o emulador vai ser instalado no Deck, com o botão **Trazer pro Deck**.
+2. Toque no botão. O PC acorda, envia, confere cada arquivo no Deck e instala. O jogo entra na biblioteca do Steam.
+3. O bot avisa quando terminar. `/trazer fila` mostra o andamento.
+
+**O emulador vai junto.** Antes de enviar, o Deck Commander vê se o emulador existe do outro lado. Se não existir,
+ele instala a versão **oficial** (da página de releases do projeto, com o sha256 publicado conferido): no PC, a
+versão Windows portátil em `D:\Emuladores` (a mesma build do Deck quando dá para saber); no Deck, o Flatpak do
+Flathub ou, sem Flatpak, o AppImage oficial. O resumo antes de enviar já diz "o emulador X vai ser instalado do
+outro lado (versão Y, da página oficial)". Dolphin no Windows é a exceção: o resumo indica a página para baixar.
+
 - Vai **tudo**: jogo, update, DLC, saves, configuração do emulador (geral e do jogo), controles, mods, keys/firmware/BIOS.
-- Seguro: cada arquivo é conferido; se cair, continua de onde parou; a configuração do PC ganha backup antes;
-  nada é apagado no Deck. O PC não dorme enquanto copia.
-- No PC: jogos em `D:\DeckCommander\Jogos\<console>\<jogo>`, emuladores em `D:\Emuladores`.
-- Depois da cópia: na primeira vez, escolha o controle na tela de controles do emulador do PC. Os primeiros minutos
+  Do PC para o Deck, a configuração **geral** do emulador do Deck é mantida (ela está ajustada para o Deck); saves,
+  config do jogo, mods e keys/BIOS do PC entram.
+- Seguro: cada arquivo é conferido (sha256); se cair, continua de onde parou; antes de sobrescrever qualquer coisa
+  do outro lado, uma cópia vai para `_backup-deck-commander`; nada é apagado na origem. O PC não dorme enquanto copia.
+- No PC: jogos em `D:\DeckCommander\Jogos\<console>\<jogo>`, emuladores em `D:\Emuladores`. No Deck: jogos em
+  `~/Emulation/roms/<console>/<jogo>`.
+- Depois da cópia: na primeira vez, escolha o controle na tela de controles do emulador. Os primeiros minutos
   podem engasgar enquanto os shaders são refeitos (normal).
 - **Jogar esse jogo do PC também no Deck (streaming):** crie um atalho dele (.lnk, que abre o emulador com o jogo)
   na pasta `C:\Users\Public\Documents\Deck Commander\Jogos do PC`. Ele entra na aba **Computador** como os outros
@@ -94,8 +110,9 @@ bateria), o botão **Diagnóstico** (o que falta fazer) e a chave **Modo seguro*
   diferente e da tradução fora do padrão); **Tarefas** com Parar/Retomar; **Não traduzidos** com o botão Traduzir.
 - **PC:** campos do PC (IP de casa, rede de casa, MAC, IP da Tailscale, porteiro e código, opcionais), **Salvar**,
   **Testar conexão**, **Acordar PC**, **Sincronizar jogos do PC** e a lista dos jogos do PC.
-- **Levar jogo para o PC:** busque o jogo, escolha na lista, veja o tamanho e o que vai junto e toque em
-  **Enviar pro PC**. A fila mostra o andamento.
+- **Transferir jogos (Deck ⇄ PC):** dois blocos, **Do Deck para o PC** e **Do PC para o Deck**. Em cada um, busque o
+  jogo, escolha na lista, veja o tamanho, o que vai junto e se o emulador vai ser instalado do outro lado, e toque em
+  **Enviar pro PC** / **Trazer pro Deck** (pede confirmação). A fila mostra os dois sentidos.
 - **Qualidade e controles:** resolução por jogo (padrão, nativo, 2x, 3x…) e quais emuladores ainda precisam que
   você escolha o controle uma vez (no modo Desktop).
 - **Biblioteca e desempenho:** situação dos atalhos criados pelo plugin e o ajuste de desempenho do jogo aberto.
@@ -119,6 +136,7 @@ errado, aparece uma mensagem simples na própria tela; detalhes ficam em `~/.loc
 | `/converter <jogo> [organizar\|descompactar]` | Switch: update/DLC/NSZ |
 | `/pc status\|acordar\|sincronizar\|listar` | jogos do PC no Deck |
 | `/transferir <jogo>` · `/transferir fila` | levar jogo para o PC |
+| `/trazer` · `/trazer <jogo>` · `/trazer fila` | trazer jogo do PC para o Deck |
 | `/status` · `/diagnostico` · `/sos` · `/sos off` | saúde |
 | `/reiniciar` | reiniciar o Steam |
 | `/help` | lista curta no próprio bot |
