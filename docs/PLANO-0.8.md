@@ -49,6 +49,20 @@ Começamos pelo automático por tempo.
 | 9. texturas HD | Instalar pacotes de textura que você escolher (links de fontes conhecidas: N64, GameCube/Wii, PS2) na pasta certa do emulador, com tamanho e confirmação antes de baixar | Pacotes de 1–10 GB; nem todo emulador do Deck aguenta 4K, então usamos a melhor resolução que roda liso |
 | 2. dublagem | Protótipo: legendas PT-BR para cutscenes primeiro (Whisper no PC transcreve, o tradutor do projeto traduz). Voz com Edge-TTS (grátis) só onde o vídeo for de formato aberto | Cada jogo guarda vídeo em formato próprio (USM, BK2, THP…); trocar o áudio sem quebrar exige suporte por formato. Sincronia labial perfeita não é realista; sincronia por frase, sim |
 
+## Situação (11/11/2026)
+| Módulo | Situação |
+|---|---|
+| 1. botões de trás + turbo | ✅ instalado no Deck (17 jogos, DuckStation/PCSX2/RetroArch/Dolphin); falta o seu teste no jogo |
+| 7. rewind/runahead | ✅ RetroArch (por núcleo) e rewind no DuckStation; runahead só nos consoles leves |
+| 8. filtros de tela | ✅ CRT/LCD por núcleo no RetroArch, liga/desliga no painel (troca na hora com o jogo aberto) |
+| 6. cheats | 🧪 leitor/escritor da base oficial pronto e testado; tela de escolher cheat por jogo vem com o 1º jogo retrô |
+| 4. painel por contexto | ✅ com jogo aberto o início mostra só as telas daquele jogo ("ver todas" sempre) |
+| 5. guardião | ✅ cópia diária das configurações; atualizou e quebrou → devolve a config e volta a versão (Flatpak) |
+| 10. saves na nuvem | 🧪 pronto; falta você rodar tools/pc/nuvem-google.ps1 no PC (login do Google) |
+| 3. netplay | próximo |
+| 9. texturas HD | próximo |
+| 2. dublagem (legendas primeiro) | próximo |
+
 ## Já feito nesta rodada
 - **Protetor de tela "Deck Commander":** o protetor novo do Steam (versão de 13/10/2026) mostrava preto com os
   atalhos de emulador. Agora há um protetor próprio com a arte e o logo dos seus jogos (recentes primeiro),
