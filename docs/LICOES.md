@@ -30,6 +30,9 @@ teste automático (`tests/test_travas.py` e outros), que roda antes de toda impl
 | 23 | Save com espaço no nome quebraria a cópia para o Deck | o PowerShell 5.1 perde as aspas duplas (`") ao chamar ssh.exe/scp.exe | `test_powershell_nao_passa_aspas_escapadas_ao_ssh`; aspas simples no comando remoto |
 | 24 | Spotify do Deck não ligava | a documentação dizia `-config_dir`, mas o programa lia como `-c onfig_dir` (precisa de `--`) | teste confere `--config_dir`; regra: conferir o `--help` do próprio programa, não só a documentação |
 | 25 | Spotify "tocava" sem som | o Spotify recusa a chave de áudio para players não oficiais (go-librespot #279/#317) | conta e playlists pelo go-librespot; tocar sempre pelo app oficial escondido (testado no Deck) |
+| 26 | Turbo e salvar "pararam" no Castlevania PT-BR | a cópia traduzida virou atalho NOVO no Steam e o layout dos botões de trás só era aplicado ao apertar "Ligar" | o painel aplica sozinho em todo jogo retrô novo (`retroBotoes`) + `test_jogo_novo_depois_de_ligado_ganha_os_botoes`, `test_painel_aplica_botoes_em_jogo_novo_sozinho` |
+| 27 | Zelda TotK nunca entrou na tradução | texto em zstd COM dicionário do jogo (`Pack/ZsDic.pack.zs`); o leitor desistia calado | dicionário registrado e reusado na regravação + `test_nx_zstd_dic.py` (roda no PC pelo backports.zstd) |
+| 28 | Dublagem leu "chave f: Você vê..." | a IA devolveu objetos no lugar das falas | `_fala` tira o texto de dentro; fala que ainda vier como objeto é refeita |
 
 ## Regras de trabalho que saíram daqui
 1. **Nada vai para o Deck sem `tools/implantar.py`.**
@@ -41,3 +44,4 @@ teste automático (`tests/test_travas.py` e outros), que roda antes de toda impl
 7. **Testar no aparelho de verdade** o que depende de programa ou serviço de fora: a documentação e os testes simulados não pegaram as falhas 24 e 25.
 8. **Heredoc (`<<'EOF'`) só para texto sem barra invertida.** Em 11/11 a regra 3 foi quebrada 3 vezes (f-string, `"\n".join`, `'\t'`) e o `test_todo_python_compila` pegou todas antes de ir para o Deck. Código com `\` vai pelo editor.
 9. **Nome de pasta que vira endereço** (protetor de tela do Steam: `uioverride-<pasta>.steamscreensavers.host`) não pode ter espaço nem maiúscula — deu erro -105.
+10. **Toda falha que o usuário achar vira teste de regressão no mesmo commit da correção** (pedido dele em 11/11/2026: "pra nunca acontecer de um bug rolar de novo"). Vale também para o que depende de estado criado depois (jogo novo, cópia traduzida): testar o caso "entrou depois".
