@@ -86,7 +86,7 @@ def distribuir(texto: str, grupo: list[S.Trecho]) -> list[str]:
         linha = ""
         while palavras:
             cand = (linha + " " + palavras[0]).strip()
-            if len(S.codificar(cand, 10 ** 4, t.tipo).rstrip()) > t.tam and linha:
+            if len(S.codificar(cand, 10 ** 4, t.tipo, t.sjis).rstrip()) > t.tam and linha:
                 break
             linha = cand
             palavras.pop(0)
@@ -112,7 +112,7 @@ def cabe(texto: str, grupo: list[S.Trecho]) -> bool:
     """A frase inteira cabe nas linhas do grupo, sem cortar palavra?"""
     linhas = distribuir(texto, grupo)
     return len(linhas) == len(grupo) and all(
-        len(S.codificar(l, 10 ** 4, t.tipo).rstrip(b" \x00")) <= t.tam for l, t in zip(linhas, grupo))
+        len(S.codificar(l, 10 ** 4, t.tipo, t.sjis).rstrip(b" \x00")) <= t.tam for l, t in zip(linhas, grupo))
 
 
 def _completar(paths, cfg, chain, faltam: dict[str, str], por_texto, ids, res, progress) -> dict[str, str]:
@@ -120,23 +120,44 @@ def _completar(paths, cfg, chain, faltam: dict[str, str], por_texto, ids, res, p
     verdade. Devolve {id: tradução que cabe}."""
     if not faltam:
         return {}
-    itens = [ia.Item(iid, ids[iid]) for iid in faltam]
-    longa = ia.translate(paths, cfg, itens, "sotn-2a-chance", chain=chain, progress=progress).translated
-    ok: dict[str, str] = {}
     grupo_de = {iid: min(por_texto[ids[iid]], key=lambda g: sum(t.tam for t in g)) for iid in faltam}
+    # já veio uma tradução (que não coube)? começa por ela; senão traduz de novo sem limite
+    longa = {iid: txt for iid, txt in faltam.items() if txt.strip() and txt != ids[iid]}
+    sem = [ia.Item(iid, ids[iid]) for iid in faltam if iid not in longa]
+    if sem:
+        longa.update(ia.translate(paths, cfg, sem, "sotn-2a-chance", chain=chain, progress=progress).translated)
+    ok: dict[str, str] = {}
     for iid, txt in longa.items():
-        if txt.strip() and cabe(txt, grupo_de[iid]):
-            ok[iid] = txt
+        a = ajustar(txt, grupo_de[iid]) if txt.strip() else None
+        if a:
+            ok[iid] = a
     pendentes = {iid: longa[iid] for iid in longa if iid not in ok and longa[iid].strip()}
-    for _ in range(3):  # encurtar com o limite real (letras de cada linha), conferindo com cabe()
+    for _ in range(5):  # encurtar com o limite real (bytes de todas as linhas), conferindo com ajustar()
         if not pendentes:
             break
-        pedidos = [(iid, txt, len(grupo_de[iid]), max(t.tam for t in grupo_de[iid])) for iid, txt in pendentes.items()]
-        curtos = ia.shorten(paths, cfg, pedidos, lambda i, s: cabe(s, grupo_de[i]), chain=chain)
+        pedidos = [(iid, txt, 1, max(4, int(sum(t.tam for t in grupo_de[iid]) * 0.85)))
+                   for iid, txt in pendentes.items()]
+        curtos = ia.shorten(paths, cfg, pedidos, lambda i, s: ajustar(s, grupo_de[i]) is not None, chain=chain)
         for iid, txt in curtos.items():
-            ok[iid] = txt
+            ok[iid] = ajustar(txt, grupo_de[iid]) or txt
             pendentes.pop(iid, None)
+    # último recurso (nunca deixa em inglês): sem acento e cortada em palavra inteira — contada no relatório
+    for iid, txt in pendentes.items():
+        ok[iid] = S.sem_acento(txt)
+        CORTADAS.append(ids[iid])
     return ok
+
+
+CORTADAS: list[str] = []  # frases que nem encurtando couberam (relatório: devem ser zero ou quase)
+
+
+def ajustar(texto: str, grupo: list[S.Trecho]) -> str | None:
+    """Pedido do usuário 11/11/2026: frase cortada no meio não serve. Cabe como está? Senão, sem acento (nas falas
+    cada acento ocupa 2 bytes)? Devolve o texto que cabe inteiro, ou None (aí precisa encurtar)."""
+    if cabe(texto, grupo):
+        return texto
+    s = S.sem_acento(texto)
+    return s if cabe(s, grupo) else None
 
 
 NOMES = {"alucard", "dracula", "maria", "richter", "trevor", "grant", "sypha", "shaft", "death", "lisa", "slogra",
@@ -206,7 +227,7 @@ def retoque(paths: Paths, rom_original: Path, rom_pt: Path, chain=None, progress
     sobra = []
     for t in resto:
         pt = GLOSSARIO.get(t.texto)
-        if pt and len(S.codificar(pt, 10 ** 4, t.tipo).rstrip(b" \x00")) <= t.tam:
+        if pt and len(S.codificar(pt, 10 ** 4, t.tipo, t.sjis).rstrip(b" \x00")) <= t.tam:
             trocas.setdefault(t.arquivo, []).append((t, pt))
             feitos[t.texto] = pt
         else:
@@ -272,7 +293,21 @@ def translate_rom(paths: Paths, rom: Path, title: str = "", chain=None, progress
     rep.provider = res.provider_used
     traduzidos = dict(res.translated)
     faltam = {iid: txt for iid, txt in ids.items() if iid not in traduzidos or not traduzidos[iid].strip()}
+    # falha real 11/11/2026 ("no diálogo tava tudo cortado"): tradução que não cabia era gravada cortada na última
+    # palavra. Agora: cabe? sem acento cabe? senão vai para o encurtar (com a tradução que veio).
+    for iid, novo in list(traduzidos.items()):
+        if iid in faltam or not novo.strip():
+            continue
+        a = ajustar(novo, min(por_texto[ids[iid]], key=lambda g: sum(t.tam for t in g)))
+        if a:
+            traduzidos[iid] = a
+        else:
+            faltam[iid] = novo
+            del traduzidos[iid]
+    CORTADAS.clear()
     traduzidos.update(_completar(paths, cfg, chain, faltam, por_texto, ids, res, progress))
+    rep.errors += [f"{len(CORTADAS)} frase(s) não couberam nem encurtando (cortadas): " + "; ".join(CORTADAS[:5])] \
+        if CORTADAS else []
     trocas: dict[str, list[tuple[S.Trecho, str]]] = {}
     for iid, novo in traduzidos.items():
         orig = ids.get(iid)

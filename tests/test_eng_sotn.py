@@ -163,3 +163,39 @@ def test_glossario_cabe_no_espaco():
     for en, pt in sotn.GLOSSARIO.items():
         tipo_menor = min(len(S.codificar(pt, 999, "menos20").rstrip(b"\x00")), len(S.codificar(pt, 999, "ascii").rstrip()))
         assert tipo_menor <= len(en), (en, pt)
+
+
+def test_menu_com_pontuacao_japonesa():
+    """Falha real 11/11/2026: menus do cartão de memória terminam com "." japonês (0x81 0x44) e o leitor descartava
+    ou cortava ("No data found" -> "Sem dados n"); o jogo abria todo em inglês."""
+    d = (b"\x00\x00No data found\x00\x00\x00on this Memory Card\x81D\x00\x00  Select the slot\x81D\x00 Slot \x82P\x00"
+         b"your game\x81D Is that OK\x81H\x00")
+    a = S.achar_ascii("SEL", d)
+    textos = {t.texto: t for t in a}
+    assert "No data found" in textos and "on this Memory Card." in textos and "Select the slot." in textos
+    t = textos["on this Memory Card."]
+    assert t.sjis and t.tam == len("on this Memory Card") + 2 and d[t.pos + t.tam] == 0
+    novo = S.aplicar(d, [(t, "neste cartão.")])
+    assert len(novo) == len(d) and novo[t.pos:t.pos + t.tam].rstrip(b" ").endswith(b"\x81D")  # "." volta japonês
+
+
+def test_frase_nao_sai_cortada(monkeypatch):
+    """Falha real 11/11/2026 ("no diálogo tava tudo cortado"): tradução que não cabe vai para o encurtar; antes de
+    encurtar, tenta sem acento (cada acento ocupa 2 bytes nas falas)."""
+    from dc.traducao import sotn
+    g = [S.Trecho("X", 0, 12, "a", "ascii"), S.Trecho("X", 20, 12, "b", "ascii")]
+    assert sotn.ajustar("Ele está aqui agora.", g) == "Ele está aqui agora."
+    g9 = [S.Trecho("X", 0, 9, "a", "ascii"), S.Trecho("X", 20, 9, "b", "ascii")]
+    assert not sotn.cabe("É hora da ação já", g9) and sotn.ajustar("É hora da ação já", g9) == "E hora da acao ja"
+    assert sotn.ajustar("Uma frase comprida demais para duas linhas curtas", g) is None
+    pedidos = []
+
+    def encurtar(paths, cfg, itens, fits, chain=None):
+        pedidos.extend(itens)
+        return {iid: "Frase curta." for iid, *_ in itens if fits(iid, "Frase curta.")}
+    monkeypatch.setattr(sotn.ia, "shorten", encurtar)
+    monkeypatch.setattr(sotn.ia, "translate", lambda *a, **k: (_ for _ in ()).throw(AssertionError("não devia")))
+    ids = {"t0": "A very long english sentence here"}
+    longa = "Uma frase comprida demais para duas linhas curtas"
+    ok = sotn._completar(None, {}, [], {"t0": longa}, {ids["t0"]: [g]}, ids, None, lambda *a: None)
+    assert ok == {"t0": "Frase curta."} and pedidos and pedidos[0][1] == longa  # encurtou a tradução que veio

@@ -15,6 +15,19 @@ import unicodedata
 from dataclasses import dataclass
 
 APOSTROFO = b"\x81\x66"
+# Pontuação japonesa (2 bytes) no meio do ASCII. Falha real 11/11/2026: os menus do cartão de memória terminam com
+# "." = 0x81 0x44, "?" = 0x81 0x48 ("Select the slot．") e o leitor descartava ou cortava esses textos
+# ("No data found" virou "Sem dados n"; "Memory card" virou "nMemória") — o jogo abria todo em inglês.
+SJIS = {0x8166: "'", 0x8144: ".", 0x8148: "?", 0x8149: "!", 0x8143: ",", 0x8146: ":", 0x8168: '"', 0x8169: "(",
+        0x816A: ")", 0x816D: "[", 0x816E: "]", 0x815B: "-", **{0x824F + k: str(k - 1) for k in range(1, 11)}}
+SJIS_DE = {v: struct.pack(">H", k) for k, v in SJIS.items()}
+
+
+def _sjis(d: bytes, i: int) -> str | None:
+    """Caractere da pontuação japonesa em d[i:i+2], ou None."""
+    return SJIS.get(d[i] << 8 | d[i + 1]) if i + 1 < len(d) and d[i] in (0x81, 0x82) else None
+
+
 _PROIBIDOS = set("_\\/{}|<>=#$@~^%")  # "%" = texto de depuração ("col step %x")
 _EXT = (".BIN", ".VH", ".VB", ".TIM", ".STR", ".DAT", ".XA")
 
@@ -26,6 +39,7 @@ class Trecho:
     tam: int      # bytes que o texto ocupa (sem o terminador)
     texto: str
     tipo: str     # "ascii" | "menos20"
+    sjis: bool = False  # o original usa pontuação japonesa de 2 bytes (. ? ! , números): a tradução também usa
 
 
 _COMUNS = set("""the of and to in is you that it he was for on are with as his they be at one have this from or had by not
@@ -90,13 +104,15 @@ def _apara(t: Trecho, espaco: int, d: bytes) -> Trecho | None:
 def achar_ascii(arquivo: str, d: bytes, minimo: int = 4) -> list[Trecho]:
     out, i, n = [], 0, len(d)
     while i < n:
-        if not (0x20 <= d[i] <= 0x7E or d[i:i + 2] == APOSTROFO):
+        if not (0x20 <= d[i] <= 0x7E or _sjis(d, i)):
             i += 1
             continue
-        ini, chars = i, []
-        while i < n and (0x20 <= d[i] <= 0x7E or d[i:i + 2] == APOSTROFO):
-            if d[i:i + 2] == APOSTROFO:
-                chars.append("'")
+        ini, chars, japones = i, [], False
+        while i < n and (0x20 <= d[i] <= 0x7E or _sjis(d, i)):
+            c = _sjis(d, i)
+            if c:
+                chars.append(c)
+                japones |= c != "'"
                 i += 2
             else:
                 chars.append(chr(d[i]))
@@ -106,7 +122,7 @@ def achar_ascii(arquivo: str, d: bytes, minimo: int = 4) -> list[Trecho]:
         # texto de verdade começa e termina junto de código de controle/0x00 (lixo binário começa em qualquer byte)
         if (ini > 0 and d[ini - 1] not in _ANTES_DEPOIS_OK) or (i < n and d[i] not in _ANTES_DEPOIS_OK):
             continue
-        t = _apara(Trecho(arquivo, ini, i - ini, "".join(chars), "ascii"), 0x20, d)
+        t = _apara(Trecho(arquivo, ini, i - ini, "".join(chars), "ascii", japones), 0x20, d)
         if t and len(t.texto) >= minimo and parece_texto(t.texto):
             out.append(t)
     return out
@@ -142,26 +158,26 @@ def sem_acento(s: str) -> str:
     return "".join(c for c in s if 0x20 <= ord(c) <= 0x7E)
 
 
-def _bytes(texto: str, tipo: str) -> list[bytes]:
-    """Cada caractere vira os bytes dele no formato (o "'" em ASCII ocupa 2)."""
+def _bytes(texto: str, tipo: str, sjis: bool = False) -> list[bytes]:
+    """Cada caractere vira os bytes dele no formato (o "'" em ASCII ocupa 2; com `sjis`, . ? ! , números também)."""
     if tipo == "ascii":  # falas/descrições: acentos pelos códigos 0x8540.. (dc.traducao.sotn_falas_fonte)
         from .sotn_falas_fonte import CODIGO
-        return [APOSTROFO if c == "'" else struct.pack(">H", CODIGO[c]) if c in CODIGO else c.encode("ascii")
-                for c in texto]
+        return [APOSTROFO if c == "'" else SJIS_DE[c] if sjis and c in SJIS_DE
+                else struct.pack(">H", CODIGO[c]) if c in CODIGO else c.encode("ascii") for c in texto]
     if tipo == "menos20":  # acentos: células da fonte 8x8 redesenhadas (dc.traducao.sotn_fonte)
         from .sotn_fonte import INDICE
         return [bytes([INDICE[c]]) if c in INDICE else bytes([ord(c) - 0x20]) for c in texto]
     raise ValueError(f"tipo inválido: {tipo}")
 
 
-def codificar(texto: str, tam: int, tipo: str) -> bytes:
+def codificar(texto: str, tam: int, tipo: str, sjis: bool = False) -> bytes:
     """Exatamente `tam` bytes: corta em palavra inteira se precisar e completa com espaço."""
     if tipo == "menos20":  # a fonte 8x8 tem as letras acentuadas do português: só tira o que ela não tem
         from .sotn_fonte import INDICE as tem
     else:  # falas: letras novas na tabela do jogo (patch da rotina de letras)
         from .sotn_falas_fonte import CODIGO as tem
     texto = "".join(c if c in tem else sem_acento(c) for c in texto)
-    pedacos = _bytes(texto, tipo)
+    pedacos = _bytes(texto, tipo, sjis)
     espaco = b" " if tipo == "ascii" else b"\x00"
     total, corte, ultimo_espaco = 0, len(pedacos), None
     for k, p in enumerate(pedacos):
@@ -181,6 +197,6 @@ def aplicar(d: bytes, trocas: list[tuple[Trecho, str]]) -> bytes:
     for t, texto in sorted(trocas, key=lambda x: x[0].pos):
         if ocupado and t.pos < ocupado[-1][1]:
             raise ValueError(f"trechos sobrepostos em {t.arquivo} @{t.pos}")
-        novo[t.pos:t.pos + t.tam] = codificar(texto, t.tam, t.tipo)
+        novo[t.pos:t.pos + t.tam] = codificar(texto, t.tam, t.tipo, t.sjis)
         ocupado.append((t.pos, t.pos + t.tam))
     return bytes(novo)
