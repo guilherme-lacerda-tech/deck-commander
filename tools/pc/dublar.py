@@ -87,6 +87,7 @@ def main() -> int:
     ap.add_argument("--max", type=int, default=3)
     ap.add_argument("--voz", default="pt-BR-AntonioNeural")
     ap.add_argument("--so-listar", action="store_true")
+    ap.add_argument("--dublar", action="store_true", help="voz em português (lento); o padrão é só legenda")
     a = ap.parse_args()
     import imageio_ffmpeg
     dublagem.FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
@@ -97,7 +98,8 @@ def main() -> int:
         for v in videos:
             print(f"  {v['mb']:>7} MB  {v['caminho']}")
         return 0
-    transcrever, falar = transcritor(), falador(a.voz)
+    transcrever = transcritor()
+    falar = falador(a.voz) if a.dublar else None
     feitos = 0
     for v in sorted(videos, key=lambda x: x["mb"]):
         if feitos >= a.max:
@@ -109,7 +111,10 @@ def main() -> int:
             scp(f"{alvo}:/tmp/dc-dub/{nome}", str(t / nome))
             ssh(alvo, f"rm -f /tmp/dc-dub/{nome}")
             saida = t / ("pt-" + nome)
-            r = dublagem.dublar(t / nome, saida, t / "trab", transcrever, traduzir, falar)
+            if a.dublar:
+                r = dublagem.dublar(t / nome, saida, t / "trab", transcrever, traduzir, falar)
+            else:  # padrão: legenda em português (sem gerar voz: bem mais rápido)
+                r = dublagem.legendar(t / nome, saida, t / "trab", transcrever, traduzir)
             if not r["falas"]:
                 print(f"  {nome}: " + ("sem som no vídeo (a voz do jogo fica em outro arquivo)" if r.get("sem_audio")
                                         else "nenhuma fala") + " — pulei")
@@ -117,9 +122,9 @@ def main() -> int:
             scp(str(saida), f"{alvo}:/tmp/dc-dub/{saida.name}")
             print(ssh(alvo, f"cd ~/deck-commander && python3 -m dc.dublagem_deck instalar '{a.jogo}' '{v['caminho']}' "
                             f"/tmp/dc-dub/{saida.name} && rm -f /tmp/dc-dub/{saida.name}").strip())
-            print(f"  {nome}: {r['falas']} fala(s) dublada(s)")
+            print(f"  {nome}: {r['falas']} fala(s) " + ("dublada(s)" if a.dublar else "legendada(s)"))
             feitos += 1
-    print(f"Pronto: {feitos} vídeo(s) dublado(s).")
+    print(f"Pronto: {feitos} vídeo(s) " + ("dublado(s)." if a.dublar else "legendado(s)."))
     return 0
 
 

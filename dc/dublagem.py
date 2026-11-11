@@ -111,5 +111,43 @@ def dublar(video: Path, saida: Path, trab: Path, transcrever, traduzir, falar, r
     return {"falas": len(pt), "saida": str(saida), "legenda": str(leg)}
 
 
+def _caminho_filtro(p: Path) -> str:
+    return str(p).replace("\\", "/").replace(":", r"\:").replace("'", r"\'")
+
+
+def comando_legendar(video: Path, legenda: Path, saida: Path) -> list[str]:
+    """Legenda PT-BR "queimada" na imagem (o jogo não sabe mostrar uma legenda que não previu). Rascunho da IA local
+    (qwen2.5-coder:7b) corrigido: codec/qualidade trocados, sem -map, ignorava FFMPEG."""
+    webm = saida.suffix.lower() == ".webm"
+    video_cod = (["-c:v", "libvpx-vp9", "-b:v", "0", "-crf", "32", "-row-mt", "1"] if webm else
+                 ["-c:v", "libx264", "-crf", "18", "-preset", "medium", "-pix_fmt", "yuv420p"])
+    filtro = f"subtitles='{_caminho_filtro(legenda)}':force_style='FontSize=22,Outline=2'"
+    return [FFMPEG, "-y", "-v", "error", "-i", str(video), "-map", "0:v:0", "-map", "0:a?", "-vf", filtro,
+            *video_cod, "-c:a", "copy", str(saida)]
+
+
+def legendar(video: Path, saida: Path, trab: Path, transcrever, traduzir, run=subprocess.run) -> dict:
+    """PADRÃO (pedido do usuário 11/11/2026): legenda em português em vez de dublar — sem gerar voz, bem mais rápido.
+    A dublagem (dublar) fica como opção para o jogo que ele quiser."""
+    trab.mkdir(parents=True, exist_ok=True)
+    _dur, tem_audio = info(video, run)
+    if not tem_audio:
+        return {"falas": 0, "saida": "", "legenda": "", "sem_audio": True}
+    wav = trab / "orig.wav"
+    r = run(comando_extrair_audio(video, wav), capture_output=True, timeout=600)
+    if r.returncode != 0:
+        raise RuntimeError("ffmpeg (extrair áudio): " + str(r.stderr)[-300:])
+    falas = transcrever(wav)
+    if not falas:
+        return {"falas": 0, "saida": "", "legenda": ""}
+    textos = traduzir([f.texto for f in falas])
+    leg = trab / "legenda.srt"
+    leg.write_text(srt([Fala(f.ini, f.fim, x) for f, x in zip(falas, textos)]), encoding="utf-8")
+    r = run(comando_legendar(video, leg, saida), capture_output=True, timeout=3600)
+    if r.returncode != 0:
+        raise RuntimeError("ffmpeg (legendar): " + str(r.stderr)[-300:])
+    return {"falas": len(falas), "saida": str(saida), "legenda": str(leg)}
+
+
 def videos_do_jogo(arquivos: list[str]) -> list[str]:
     return [f for f in arquivos if Path(f).suffix.lower() in (".mp4", ".webm", ".mkv", ".mov")]

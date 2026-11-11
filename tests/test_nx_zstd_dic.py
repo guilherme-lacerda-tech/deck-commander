@@ -2,7 +2,10 @@
 (Pack/ZsDic.pack.zs) e o leitor desistia. Agora abre com o dicionário e regrava com o MESMO dicionário."""
 import pytest
 
-zstd = pytest.importorskip("compression.zstd")
+try:
+    from compression import zstd
+except ImportError:
+    zstd = pytest.importorskip("backports.zstd")
 
 from dc.traducao import extract, nx  # noqa: E402
 
