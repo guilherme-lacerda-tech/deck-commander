@@ -34,6 +34,7 @@ def test_instalar_confere_sha256(tmp_path, monkeypatch):
     conf = (spotify._conf_dir(paths) / "config.yml").read_text("utf-8")
     assert "type: device_auth" in conf and "address: 127.0.0.1" in conf  # API só no próprio Deck
     assert ["systemctl", "--user", "enable", "--now", spotify.UNIDADE] in chamadas
+    assert f"--config_dir {spotify._conf_dir(paths)}" in spotify._unit_path().read_text()  # "-config_dir" virava "-c onfig_dir"
 
 
 def test_estado_login_e_conectado(tmp_path, monkeypatch):

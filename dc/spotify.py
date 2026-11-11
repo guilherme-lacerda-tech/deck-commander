@@ -84,7 +84,7 @@ def instalar(paths: Paths, baixar=_baixar, run=subprocess.run) -> str:
     u = _unit_path()
     u.parent.mkdir(parents=True, exist_ok=True)
     u.write_text("[Unit]\nDescription=Deck Commander - Spotify (go-librespot)\nAfter=pipewire-pulse.service\n\n"
-                 f"[Service]\nExecStart={b} -config_dir {c}\nRestart=on-failure\nRestartSec=5\n\n"
+                 f"[Service]\nExecStart={b} --config_dir {c}\nRestart=on-failure\nRestartSec=5\n\n"
                  "[Install]\nWantedBy=default.target\n", "utf-8")
     run(["systemctl", "--user", "daemon-reload"], capture_output=True)
     r = run(["systemctl", "--user", "enable", "--now", UNIDADE], capture_output=True, text=True)
