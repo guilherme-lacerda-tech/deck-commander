@@ -325,6 +325,8 @@ def translate_rom(paths: Paths, rom: Path, title: str = "", chain=None, progress
     novos = {nome: S.aplicar(dados[nome], ts) for nome, ts in trocas.items()}
     from . import sotn_fonte  # nomes e menus com acento: letras novas na fonte 8x8
     novos["BIN/F_GAME.BIN"] = sotn_fonte.com_acentos(disco.ler("BIN/F_GAME.BIN"))
+    from . import sotn_imagens  # botões desenhados da tela de arquivos (File select…) remontados em português
+    novos["ST/SEL/F_SEL.BIN"] = sotn_imagens.botoes_em_portugues(disco.ler("ST/SEL/F_SEL.BIN"))
     from . import sotn_falas_fonte  # falas com acento: tabela de letras novas + rotina de letras com 25 voltas
     bios = _bios()
     if bios:
