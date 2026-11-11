@@ -55,3 +55,27 @@ def test_aplicar_e_desfazer(tmp_path):
 def test_vdf_texto_ida_e_volta():
     d = {"controller_config": {"a b": {"autosave": "1"}, "x": {"template": 'c"d'}}}
     assert vdf.load_text(vdf.dump_text(d)) == d
+
+
+def test_jogo_novo_depois_de_ligado_ganha_os_botoes(tmp_path):
+    """Falha real 11/11/2026: a cópia PT-BR do Castlevania entrou como atalho NOVO depois dos botões ligados e ficou
+    sem L4/R4/L5/R5 (turbo e salvar "pararam"). Todo jogo retrô que entrar depois precisa ganhar os botões."""
+    h, base = _deck(tmp_path)
+    assert retro.jogos_para_o_painel(h, MAPA) == {"appids": [], "modelo": None}  # ainda não ligado: não mexe
+    retro.aplicar(h, MAPA)
+    cfg = h / ".local/share/Steam/userdata/42/config/shortcuts.vdf"
+    novos = {"0": {"appid": 1, "AppName": "Castlevania SOTN", "LaunchOptions": "psx-cv"},
+             "1": {"appid": 3, "AppName": "Castlevania SOTN (PT-BR)", "LaunchOptions": "psx-cv-pt"}}
+    cfg.write_bytes(vdf.dump_binary({"shortcuts": novos}))
+    r = retro.jogos_para_o_painel(h, dict(MAPA, **{"psx-cv-pt": {"console": "psx"}}))
+    assert r["appids"] == [1, 3] and r["modelo"] == "template://controller_neptune_dc_retro.vdf"
+    assert "key_press F9" in (base / "castlevania sotn (pt-br)/controller_neptune.vdf").read_text()
+
+
+def test_painel_aplica_botoes_em_jogo_novo_sozinho():
+    """Mesma falha: o ciclo do painel (a cada 10 s) precisa chamar retro_jogos e escolher o modelo nos appids novos."""
+    from pathlib import Path
+    js = (Path(__file__).resolve().parents[1] / "decky-plugin/dist/index.js").read_text("utf-8")
+    assert '["botões de trás", retroBotoes]' in js and 'call("painel", "retro_jogos"' in js
+    from dc import painel
+    assert "retro_jogos" in painel.ACOES

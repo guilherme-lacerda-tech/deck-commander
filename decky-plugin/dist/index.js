@@ -217,10 +217,25 @@ async function syncCollections() {
     await call("set_collection_ids", ids);
 }
 
+// Falha real 11/11/2026: a cópia PT-BR do Castlevania virou atalho novo e ficou sem L4/R4/L5/R5 (turbo e salvar
+// "pararam"). Depois de ligado uma vez, todo jogo retrô novo ganha o modelo sozinho (a cada ~1 min).
+const retroFeitos = new Set();
+let retroConta = 0;
+async function retroBotoes() {
+    if (retroConta++ % 6 !== 0) return;
+    const r = await call("painel", "retro_jogos", {});
+    if (!r || !r.ok || !r.modelo) return;
+    const novos = (r.appids || []).filter((a) => !retroFeitos.has(a));
+    if (!novos.length) return;
+    escolherModelo(novos, r.modelo);
+    novos.forEach((a) => retroFeitos.add(a));
+    note("botões de trás aplicados em " + novos.length + " jogo(s)");
+}
+
 async function cycle(force) {
     if (busy || (!force && !steamReady())) return;
     busy = true;
-    for (const [label, fn] of [["avisos", showLaunchError], ["remoções", processRemovals], ["fila", processQueue], ["autocorreção", reconcile], ["coleções", syncCollections]]) {
+    for (const [label, fn] of [["avisos", showLaunchError], ["remoções", processRemovals], ["fila", processQueue], ["autocorreção", reconcile], ["coleções", syncCollections], ["botões de trás", retroBotoes]]) {
         try {
             await fn();
         } catch (e) {

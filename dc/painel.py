@@ -847,6 +847,11 @@ def retro(p: Ponte, a: dict) -> dict:
     return RT.estado()
 
 
+def retro_jogos(p: Ponte, a: dict) -> dict:
+    from . import retro as RT
+    return RT.jogos_para_o_painel()
+
+
 def retro_definir(p: Ponte, a: dict) -> dict:
     """Ligar os botões de trás (e turbo 2x/4x), filtros de tela, ou desfazer tudo."""
     from . import retro as RT
@@ -904,7 +909,7 @@ ACOES = {f.__name__: f for f in (
     transferir_enviar, trazer_preparar, trazer_enviar, qualidade, qualidade_definir, controle_definir,
     downloads_limpar, traducao_limpar, desinstalar_lista, devolver, removido_perguntado, musica, musica_volume,
     musica_midia, musica_playlist, musica_salvar, musica_conectar, pc_tv, espaco_sugestoes, familia, familia_salvar,
-    familia_atualizar, familia_puxar, melhorias, melhorias_definir, contexto, retro, retro_definir)}
+    familia_atualizar, familia_puxar, melhorias, melhorias_definir, contexto, retro, retro_definir, retro_jogos)}
 ACOES["downloads_pausar"] = lambda p, a: _pausar(p, a, True)
 ACOES["downloads_retomar"] = lambda p, a: _pausar(p, a, False)
 

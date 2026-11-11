@@ -189,6 +189,21 @@ def comando_retroarch(cmd: str, porta: int = 55355) -> bool:
         return False
 
 
+def jogos_para_o_painel(home: Path | None = None, mapa: dict | None = None) -> dict:
+    """Depois de ligado uma vez, todo jogo retro que entrar depois (ex.: a copia PT-BR de uma traducao) tambem
+    ganha os botoes de tras. Falha real 11/11/2026: a copia PT-BR do Castlevania virou atalho novo e ficou sem
+    L4/R4/L5/R5. O painel chama isto de tempos em tempos e escolhe o modelo nos appids que ainda nao tinham."""
+    home = home or Path.home()
+    if not estado(home)["aplicado"] or not (home / ".local/share/Steam/controller_base/templates" / MODELO).exists():
+        return {"appids": [], "modelo": None}
+    if mapa is None:
+        from . import transferir
+        mapa = transferir.carregar_mapa()
+    jogos = jogos_dos_emuladores(home, mapa)
+    steam_input(home, [n for n, _ in jogos])  # layout salvo (vale quando o Steam reiniciar); so grava o que mudou
+    return {"appids": [a for _, a in jogos if a], "modelo": "template://" + MODELO}
+
+
 def estado(home: Path | None = None) -> dict:
     home = home or Path.home()
     ra = home / ARQUIVOS["RetroArch"]
