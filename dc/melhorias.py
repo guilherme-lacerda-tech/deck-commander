@@ -27,8 +27,7 @@ OPCOES: Dict[str, Dict] = {
             "widescreen": [
                 ("GPU", "WidescreenHack", "true", "false"),
                 ("Display", "AspectRatio", "16:9", "Auto (Game Native)")
-            ],
-            "sem_entrelacamento": []
+            ]
         }
     },
     "dolphin": {
@@ -38,8 +37,7 @@ OPCOES: Dict[str, Dict] = {
             "widescreen": [
                 ("Settings", "wideScreenHack", "True", "False"),
                 ("Settings", "AspectRatio", "1", "0")
-            ],
-            "sem_entrelacamento": []
+            ]
         }
     }
 }
