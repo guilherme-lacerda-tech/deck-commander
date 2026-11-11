@@ -132,3 +132,12 @@ def test_sem_caractere_de_controle_invisivel():
         if any(ord(c) < 32 and c not in "\t\n\r\f" for c in txt):
             ruins.append(str(p.relative_to(RAIZ)))
     assert not ruins, ruins
+
+
+def test_powershell_nao_passa_aspas_escapadas_ao_ssh():
+    """Falha encontrada na revisão: o PowerShell 5.1 perde as aspas duplas (`") ao chamar ssh.exe/scp.exe, então um
+    caminho com espaço ("Pokemon Emerald.srm") quebrava. Use aspas simples no comando remoto."""
+    ruins = [f"{p.name}:{i}" for p in _arquivos("tools/pc/*.ps1") for i, l in
+             enumerate(p.read_text("utf-8-sig", "replace").splitlines(), 1)
+             if re.search(r"&\s*(ssh|scp)\.exe", l) and '`"' in l]
+    assert not ruins, ruins

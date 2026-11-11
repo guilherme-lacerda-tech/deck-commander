@@ -1,9 +1,8 @@
 import json
 import re
-import tempfile
 import shutil
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional, Union
+from typing import Dict, List, Tuple, Optional
 
 FRANQUIAS: Dict[str, Tuple[str, ...]] = {
     "pokemon": ("pokemon",),

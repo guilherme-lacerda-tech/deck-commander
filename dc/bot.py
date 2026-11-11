@@ -97,16 +97,17 @@ Aviso aqui quando o download terminar.
 /devolver <nome> — traz de volta um jogo que você tirou pelo Steam
 /bateria sim|nao — baixar também fora da tomada (padrão: só na tomada)
 /pc listar | sincronizar | acordar | status — jogos do PC no Deck (aba "Computador")
-/musica [playlist | pausar | proxima | anterior] — Spotify no Deck · cole o link de uma playlist para guardar
+/musica [playlist | pausar | proxima | anterior | conectar] — Spotify no Deck (conectar: toca sem abrir o app) · cole o link de uma playlist para guardar
 /familia — Deck do irmão: status, jogos, puxar <jogo> (magnet + tradução pronta), par, chave, autorizar
 /corrigir — mande a foto de uma frase traduzida estranha com /corrigir <jogo> na legenda
-/saves <jogo> [deck|pc] — deixa os saves iguais no Deck e no PC (o mais novo vale; conflito você escolhe)
+/saves <jogo> [deck|pc] — deixa os saves iguais no Deck e no PC (o mais novo vale; conflito você escolhe) · /saves auto sim|nao
 /transferir <jogo> — leva o jogo com tudo (emulador, config, saves) para o PC
 /trazer — jogos do PC · /trazer <jogo> — traz do PC para o Deck (instala o emulador se faltar)
 /traduzir <jogo> — tradução pt-BR com IA (Switch e Pokémon GBA) · /traduzir lista | status | config
 /traduzir biblioteca — traduz todos os jogos que ainda não estão em português (pergunta antes)
 /converter <jogo> [organizar|descompactar] — Switch: update/DLC e NSZ
 /status · /queue · /disk · /diagnostico
+/voltar — desfaz a última atualização do Deck Commander (se algo parou de funcionar)
 /pause · /resume — downloads
 /quarantine list | review <id> | clear <id>
 /aprovar <id> — aprova operação pendente (vale 1h)
@@ -309,6 +310,10 @@ class Bot:
         if cmd == "/corrigir":
             return ("Mande uma FOTO (ou print) da frase estranha com a legenda /corrigir <nome do jogo>. "
                     "Pode dizer o que está errado depois de uma barra: /corrigir Zelda | o certo é Reino Cogumelo")
+        if cmd == "/voltar":  # desfaz a última atualização (troca pela versão anterior guardada)
+            from . import versao
+            txt, self.next_buttons = versao.comando(args)
+            return txt
         if cmd == "/saves":  # sincronizar saves Deck <-> PC de um jogo (o PC busca o pedido em até 5 min)
             return self._saves(args)
         if cmd == "/familia":  # dois Decks pareados: catálogo (magnet + tradução pronta) do par
@@ -576,6 +581,15 @@ class Bot:
             return ("Uso: /saves <jogo> — deixa os saves iguais no Deck e no PC (o mais novo vale).\n"
                     + ("Conflitos esperando você: " + ", ".join(pend) + " → /saves <jogo> deck  ou  /saves <jogo> pc"
                        if pend else "Nenhum conflito pendente."))
+        if args[0].lower() == "auto":  # /saves auto [sim|nao]: sincronizar sozinho ao fechar o jogo
+            flag = self.paths.config / "saves-auto-desligado"
+            if args[1:2] and args[1].lower() in ("nao", "não"):
+                flag.write_text("1")
+            elif args[1:2] and args[1].lower() == "sim":
+                flag.unlink(missing_ok=True)
+            return ("💾 Saves automáticos: " + ("DESLIGADOS" if flag.exists() else "LIGADOS") + ". Ligados, ao fechar um jogo "
+                    "que já foi sincronizado uma vez, os saves vão para a fila e o PC iguala quando estiver ligado "
+                    "(só aviso se der conflito). /saves auto sim|nao")
         lado = args[-1].lower() if args[-1].lower() in ("deck", "pc") else None
         q = " ".join(args[:-1] if lado else args)
         lm = self._map()
@@ -616,6 +630,8 @@ class Bot:
                 return ((f"🎵 {t['titulo']} — {t['artista']} ({t['estado']})" if t and t.get("titulo")
                          else "🎵 Nada tocando agora.") + f"\nPlaylists: {lst}\nUso: /musica <playlist> | pausar | proxima")
             q = " ".join(args).strip().lower()
+            if q == "conectar":  # Spotify do Deck sem o app: instala o player e manda o link de login
+                return "🎵 " + painel.musica_conectar(p, {})["texto"]
             if q in acoes:
                 painel.musica_midia(p, {"acao": acoes[q]})
                 return "🎵 ok"

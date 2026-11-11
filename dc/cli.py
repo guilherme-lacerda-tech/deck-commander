@@ -68,7 +68,6 @@ def _library(paths, apply: bool) -> int:
 def _extra(paths, args) -> int:
     """Subcomandos do projeto completo (M0, M3, M5, M6, M7, M10, M11, M17, M19, M20, M21)."""
     from . import emulators, export, health, ops, patches, services, syncer, library, vdf
-    from .store import Store
     if not args:
         print(open(Path(__file__).resolve().parents[1] / "docs/COMANDOS.md", encoding="utf-8").read()); return 0
     c, r = args[0], args[1:]

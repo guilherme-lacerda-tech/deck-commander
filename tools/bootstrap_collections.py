@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Cria/atualiza as coleções do Steam agora (mesma lógica do plugin) e aponta as abas do TabMaster
 para elas. Só acrescenta jogos às coleções; nunca remove."""
-import glob
 import json
 import sys
 from pathlib import Path

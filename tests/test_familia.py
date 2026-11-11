@@ -1,5 +1,4 @@
 """Família: catálogo (magnet + pacote de tradução), sem nunca enviar arquivo de jogo."""
-import json
 from types import SimpleNamespace
 
 from dc import familia

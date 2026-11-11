@@ -1,5 +1,4 @@
 """Simulação 10/11: usuário confuso no bot (as mensagens chegam por handle_message, como no Telegram)."""
-import json
 
 import pytest
 

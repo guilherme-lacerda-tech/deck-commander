@@ -2,10 +2,9 @@
 
 Escrito pela IA local (qwen3-coder) e revisado.
 """
-import os
 import shutil
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 OPCOES: Dict[str, Dict] = {
     "pcsx2": {

@@ -180,10 +180,15 @@ for ($t = 0; $t -le $Tentativas; $t++) {
         if ($t -eq $Tentativas) { $falhas = @('ainda faltam arquivos'); break }
         Msg ("  enviando {0} arquivo(s) (rodada {1})..." -f $lote.Quantos, ($t + 1))
         $batch = Join-Path $Local '.sftp-lote.txt'
-        [IO.File]::WriteAllText($batch, $lote.Texto, $Utf8)
-        $sftpArgs = @('-q', '-b', "`"$batch`"", '-i', "`"$Chave`"", '-o', 'BatchMode=yes', '-o', 'ServerAliveInterval=15', $Deck)
-        $p = Start-Process sftp.exe -ArgumentList $sftpArgs -NoNewWindow -Wait -PassThru -RedirectStandardOutput "$Local\sftp.out" -RedirectStandardError "$Local\sftp.err"
-        if ($p.ExitCode -ne 0) { Msg "  (sftp saiu com código $($p.ExitCode); confiro e mando de novo o que faltar)" 'Yellow' }
+        $linhas = @($lote.Texto -split "`n" | Where-Object { $_ })
+        for ($ini = 0; $ini -lt $linhas.Count; $ini += 200) {   # em partes: dá para mostrar o progresso
+            $parte = $linhas[$ini..([Math]::Min($ini + 200, $linhas.Count) - 1)]
+            [IO.File]::WriteAllText($batch, (($parte -join "`n") + "`n"), $Utf8)
+            $sftpArgs = @('-q', '-b', "`"$batch`"", '-i', "`"$Chave`"", '-o', 'BatchMode=yes', '-o', 'ServerAliveInterval=15', $Deck)
+            $p = Start-Process sftp.exe -ArgumentList $sftpArgs -NoNewWindow -Wait -PassThru -RedirectStandardOutput "$Local\sftp.out" -RedirectStandardError "$Local\sftp.err"
+            if ($p.ExitCode -ne 0) { Msg "  (sftp saiu com código $($p.ExitCode); confiro e mando de novo o que faltar)" 'Yellow' }
+            Msg ("  enviando {0}/{1} arquivos..." -f ([Math]::Min($ini + 200, $linhas.Count)), $linhas.Count)
+        }
         Remove-Item $batch -ErrorAction SilentlyContinue
     }
     Msg '  conferindo no Deck (sha256sum -c)...'

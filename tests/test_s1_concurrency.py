@@ -3,12 +3,11 @@ import os
 import subprocess
 import sys
 import textwrap
-import time
 from pathlib import Path
 
 import pytest
 
-from dc.lock import ENV_OP_ID, LockTimeout, OperationLock, lock_is_held
+from dc.lock import ENV_OP_ID, OperationLock, lock_is_held
 from dc.paths import get_paths
 from dc.store import Store
 from dc import worker

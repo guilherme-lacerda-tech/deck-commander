@@ -194,7 +194,6 @@ def test_motor_question_no(P):
 
 
 def test_translation_tasks_progress_and_stop(P, monkeypatch):
-    from dc.traducao import run as trun
     _job(P, status="interrompida", progress=[50, 200])
     r = run(P, "traducao")
     t = r["tarefas"][0]

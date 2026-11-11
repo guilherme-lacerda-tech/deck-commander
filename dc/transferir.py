@@ -760,7 +760,7 @@ def _gravar_fila(fila: list[dict], home=None) -> None:
 DIRECOES = ("deck->pc", "pc->deck", "saves")  # "saves": só sincronizar os saves (dc.saves_sync)
 
 
-def enfileirar(game_id: str, titulo: str, home=None, direcao: str = "deck->pc") -> dict:
+def enfileirar(game_id: str, titulo: str, home=None, direcao: str = "deck->pc", auto: bool = False) -> dict:
     """Pedido na fila. direcao "deck->pc" (/transferir) ou "pc->deck" (/trazer: game_id é o id do jogo NO PC)."""
     if direcao not in DIRECOES:
         raise ValueError(f"direção inválida: {direcao}")
@@ -771,6 +771,8 @@ def enfileirar(game_id: str, titulo: str, home=None, direcao: str = "deck->pc") 
     from datetime import datetime, timezone
     e = {"id": f"{game_id}-{int(time.time())}", "game_id": game_id, "titulo": titulo, "status": "na fila",
          "direcao": direcao, "pedido": datetime.now(timezone.utc).isoformat(), "avisado": False}
+    if auto:  # saves ao fechar o jogo: espera o PC em silêncio e só avisa se der conflito ou falha
+        e["auto"] = True
     _gravar_fila(fila + [e], home)
     return e
 
@@ -781,6 +783,8 @@ def marcar(pedido_id: str, status: str, nota: str = "", home=None) -> bool:
         if e["id"] == pedido_id:
             e["status"] = status
             e["nota"] = nota[-1500:]
+            e["atualizado"] = time.time()
+            e.pop("aviso_parado", None)  # o PC manda progresso a cada minuto: serve para notar cópia parada
             if status in ("pronto", "falhou"):
                 e["avisado"] = False
             _gravar_fila(fila, home)
@@ -793,16 +797,41 @@ def notificar(bot, home=None) -> None:
     chat = bot.cfg.get("notify_chat")
     fila = ler_fila(home)
     mudou = False
+    agora = time.time()
     for e in fila:
         if e["status"] in ("pronto", "falhou") and not e.get("avisado"):
-            if chat:
+            silencioso = e.get("auto") and e["status"] == "pronto" and "CONFLITO" not in (e.get("nota") or "")
+            if chat and not silencioso:
                 ic = "✅" if e["status"] == "pronto" else "❌"
-                onde = "Do PC para o Deck" if e.get("direcao") == "pc->deck" else "Transferência para o PC"
+                onde = {"pc->deck": "Do PC para o Deck", "saves": "Saves"}.get(e.get("direcao"), "Transferência para o PC")
                 bot.send(chat, f"{ic} {onde} — {e['titulo']}: {e['status']}.\n{e.get('nota', '')}".strip())
             e["avisado"] = True
             mudou = True
+        elif e["status"] in ("na fila", "copiando") and not e.get("aviso_parado") and not (
+                e.get("auto") and e["status"] == "na fila") and _parado_ha(e, agora) > PARADO_MIN * 60:
+            if chat:
+                bot.send(chat, f"⏳ {e['titulo']}: " + ("está na fila há mais de 30 min e o PC ainda não pegou. Ele está ligado "
+                         "e com a tarefa \"DeckCommander Transferencias\" instalada?" if e["status"] == "na fila" else
+                         "a cópia não dá sinal há mais de 30 min (PC desligou ou perdeu a rede?). Ela continua de onde "
+                         "parou quando o PC voltar."), buttons=[("Acordar PC", "/pc acordar")])
+            e["aviso_parado"] = True
+            mudou = True
     if mudou:
         _gravar_fila(fila, home)
+
+
+PARADO_MIN = 30
+
+
+def _parado_ha(e: dict, agora: float) -> float:
+    """Segundos desde o último sinal do pedido (progresso do PC ou hora do pedido)."""
+    if e.get("atualizado"):
+        return agora - float(e["atualizado"])
+    try:
+        from datetime import datetime
+        return agora - datetime.fromisoformat(e["pedido"]).timestamp()
+    except (KeyError, ValueError, TypeError):
+        return 0.0
 
 
 def _acordar_pc(bot) -> str:

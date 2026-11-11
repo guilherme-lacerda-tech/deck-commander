@@ -328,7 +328,7 @@ def game_locres(pak: Pak, lang: str = "en") -> list[str]:
     """Textos do jogo (não os da Unreal nem menus de depuração) no idioma de origem."""
     out = []
     for p in pak.entries:
-        if p.endswith(".locres") and f"/Localization/" in p and f"/{lang}/" in p and not p.startswith("Engine/") \
+        if p.endswith(".locres") and "/Localization/" in p and f"/{lang}/" in p and not p.startswith("Engine/") \
                 and "/DebugMenu/" not in p:
             out.append(p)
     return sorted(out)

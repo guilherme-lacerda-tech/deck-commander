@@ -102,6 +102,21 @@ def escolher(paths: Paths, game_id: str, lado: str) -> str:
     return f"Combinado: na próxima sincronização vale o save do {lado.upper()}."
 
 
+def auto_ligado(paths: Paths, game_id: str) -> bool:
+    """Sincronizar sozinho ao fechar o jogo: só jogos já sincronizados uma vez (existem nos dois lados) e se o usuário
+    não desligou (/saves auto nao)."""
+    return (_dir(paths) / f"{game_id}.json").exists() and not (paths.config / "saves-auto-desligado").exists()
+
+
+def pedir_ao_fechar(paths: Paths, game_id: str, titulo: str, segundos: float) -> bool:
+    """Chamado pelo launch quando o jogo fecha: põe a sincronização na fila (o PC faz quando estiver ligado)."""
+    if segundos < 60 or not auto_ligado(paths, game_id):
+        return False
+    from . import transferir
+    transferir.enfileirar(game_id, titulo, direcao="saves", auto=True)
+    return True
+
+
 def conflitos(paths: Paths) -> dict:
     return _load(_dir(paths) / "conflitos.json", {})
 

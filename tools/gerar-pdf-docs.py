@@ -126,7 +126,7 @@ def build(md_path: Path, pdf_path: Path, titulo: str, sub: str) -> None:
     body = f"<div class='capa'><h1>{html.escape(titulo)}</h1><p>{html.escape(sub)}</p></div>" + convert(md)
     doc = f"<!doctype html><html lang='pt-br'><head><meta charset='utf-8'><title>{html.escape(titulo)}</title>" \
           f"<style>{CSS}</style></head><body>{body}</body></html>"
-    import os, shutil, tempfile
+    import shutil, tempfile
     tmpd = Path(tempfile.gettempdir())
     h = tmpd / "dc-doc.html"
     tmp_pdf = tmpd / "dc-doc.pdf"

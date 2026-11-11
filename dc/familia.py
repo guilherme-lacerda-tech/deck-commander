@@ -3,7 +3,7 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
-from typing import List, Tuple, Dict, Any, Optional
+from typing import List, Tuple, Dict, Any
 from datetime import datetime
 
 EXT_JOGO = (
@@ -192,10 +192,10 @@ def aplicar_pacote(pasta_pacote: Path, home: Path) -> List[str]:
             if destino.is_file():
                 # Compara conteúdo (simplesmente verifica se é diferente)
                 try:
-                    with open(arquivo_origem, "rb") as f1, open(destino, "rb") as f2:
-                        if f1.read() != f2.read():
-                            backup = destino.with_suffix(destino.suffix + ".antes-familia")
-                            shutil.copy2(destino, backup)
+                    import filecmp  # compara por pedaços (não carrega os dois arquivos inteiros na memória)
+                    if not filecmp.cmp(arquivo_origem, destino, shallow=False):
+                        backup = destino.with_suffix(destino.suffix + ".antes-familia")
+                        shutil.copy2(destino, backup)
                 except (OSError, IOError):
                     pass  # Ignora erro de comparação
             else:

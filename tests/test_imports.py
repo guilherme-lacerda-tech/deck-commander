@@ -3,7 +3,6 @@ comandos de terminal mais usados precisam rodar sem quebrar."""
 import importlib
 import json
 import pkgutil
-import sys
 
 import pytest
 

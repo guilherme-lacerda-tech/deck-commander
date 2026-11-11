@@ -1,6 +1,5 @@
 """/traduzir e /converter pelo bot + executor em segundo plano (sem processo de verdade)."""
 import json
-from pathlib import Path
 
 import pytest
 

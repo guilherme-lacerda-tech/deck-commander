@@ -97,6 +97,24 @@ function Marcar([string]$id, [string]$status, [string]$nota) {
     $nota | & ssh.exe @sshArgs "cd ~/deck-commander && python3 -m dc.transferir marcar '$id' '$status' -" 2>$null | Out-Null
 }
 
+function Rodar([string]$script, [string[]]$extra, [string]$saida, [string]$id) {
+    # roda o script de cópia em segundo plano e, a cada minuto, manda ao Deck a linha de progresso
+    # ("copiando 1200/5000 arquivos (3,10 de 9,80 GB)") — o painel e o bot mostram isso
+    $a = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $aqui $script)) + $extra
+    $a = $a | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } }
+    $pr = Start-Process powershell.exe -ArgumentList $a -NoNewWindow -PassThru -RedirectStandardOutput $saida -RedirectStandardError "$saida.err"
+    $null = $pr.Handle   # sem isto o ExitCode volta vazio
+    $ultima = ''
+    while (-not $pr.WaitForExit(60000)) {
+        $l = Get-Content $saida -Tail 40 -Encoding Oem -ErrorAction SilentlyContinue |
+             Where-Object { $_ -match '(copiando|enviando) \d+/\d+|onferindo|Faltam' } | Select-Object -Last 1
+        if ($l -and $l -ne $ultima) { Marcar $id 'copiando' $l.Trim(); $ultima = $l }
+    }
+    Get-Content "$saida.err" -Encoding Oem -ErrorAction SilentlyContinue | Add-Content $saida -Encoding Oem
+    Remove-Item "$saida.err" -ErrorAction SilentlyContinue
+    return $pr.ExitCode
+}
+
 try {
     foreach ($p in $fila) {
         L ("pedido " + $p.id + " (" + $p.titulo + ")")
@@ -104,15 +122,14 @@ try {
         $saida = Join-Path $logDir ('transferir-' + $p.game_id + '.log')
         if ($p.direcao -eq 'saves') {
             $saida = Join-Path $logDir ('saves-' + $p.game_id + '.log')
-            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $aqui 'sincronizar-saves.ps1') -Jogo $p.game_id -Deck $Deck -Chave $Chave *> $saida
+            $rc = Rodar 'sincronizar-saves.ps1' @('-Jogo', $p.game_id, '-Deck', $Deck, '-Chave', $Chave) $saida $p.id
         } elseif ($p.direcao -eq 'pc->deck') {
             $saida = Join-Path $logDir ('enviar-' + $p.game_id + '.log')
-            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $aqui 'enviar-para-deck.ps1') -Jogo $p.game_id -Deck $Deck -Chave $Chave *> $saida
+            $rc = Rodar 'enviar-para-deck.ps1' @('-Jogo', $p.game_id, '-Deck', $Deck, '-Chave', $Chave) $saida $p.id
         } else {
-            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $aqui 'transferir-do-deck.ps1') -Jogo $p.game_id -SemEmuladorLinux -Deck $Deck -Chave $Chave *> $saida
+            $rc = Rodar 'transferir-do-deck.ps1' @('-Jogo', $p.game_id, '-SemEmuladorLinux', '-Deck', $Deck, '-Chave', $Chave) $saida $p.id
         }
-        $rc = $LASTEXITCODE
-        $fim = (Get-Content $saida -Tail 12 -ErrorAction SilentlyContinue) -join "`n"
+        $fim = (Get-Content $saida -Tail 12 -Encoding Oem -ErrorAction SilentlyContinue) -join "`n"
         if ($rc -eq 0) { Marcar $p.id 'pronto' $fim; L ("pronto: " + $p.game_id) }
         else { Marcar $p.id 'falhou' ("código $rc`n" + $fim); L ("falhou ($rc): " + $p.game_id) }
     }

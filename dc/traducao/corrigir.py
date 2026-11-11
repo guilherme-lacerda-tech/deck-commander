@@ -5,7 +5,7 @@ import base64
 import urllib.request
 import urllib.error
 from pathlib import Path
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple, Dict
 
 MARCADOR = re.compile(r"⟦\d+⟧")
 

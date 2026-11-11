@@ -4,7 +4,7 @@
 #
 # Quem decide é o Deck (python3 -m dc.saves_sync plano): copia só o lado que mudou; se os DOIS mudaram, é conflito e
 # nada é sobrescrito (você escolhe no bot: /saves <jogo> deck|pc). Antes de trocar um save, o antigo vira
-# "<arquivo>.antes-sync-<data>" (no PC e no Deck). Nada é apagado.
+# "<arquivo>.antes-sync-<data>" (no PC e no Deck; ficam os 5 mais novos de cada save). Nenhum save é apagado.
 param(
     [Parameter(Mandatory = $true)][string]$Jogo,
     [string]$Jogos = 'D:\DeckCommander\Jogos',
@@ -58,17 +58,23 @@ foreach ($a in @($plano.acoes)) {
         $alvo = if ($pc.ContainsKey($a.destino)) { $pc[$a.destino].origem } elseif ($basePC) { $basePC + $a.destino.Substring(5).Replace('/', '\') } else { $null }
         if (-not $alvo) { Write-Host "  (sem pasta do emulador no PC para $($a.destino))"; continue }
         $baixado = Join-Path $tmp ([IO.Path]::GetFileName($alvo))
-        & scp.exe -q -i $Chave -o BatchMode=yes "${Deck}:`"$($a.caminho_deck)`"" $baixado
+        & scp.exe -q -i $Chave -o BatchMode=yes "${Deck}:$($a.caminho_deck)" $baixado
         if ($LASTEXITCODE -ne 0) { Write-Host "  falhou ao baixar $($a.destino)"; continue }
         New-Item -ItemType Directory -Force (Split-Path $alvo) | Out-Null
         if (Test-Path -LiteralPath $alvo) { Copy-Item -LiteralPath $alvo -Destination "$alvo.antes-sync-$data" -Force }
+        # guarda só os 5 backups mais novos deste save (o nome tem a data: ordem alfabética = ordem de tempo)
+        Get-ChildItem -LiteralPath (Split-Path $alvo) -Filter "$(Split-Path $alvo -Leaf).antes-sync-*" -File -ErrorAction SilentlyContinue |
+            Sort-Object Name -Descending | Select-Object -Skip 5 | Remove-Item -Force -ErrorAction SilentlyContinue
         Move-Item -LiteralPath $baixado -Destination $alvo -Force
         Write-Host "  Deck -> PC: $($a.destino) ($($a.motivo))"
     } elseif ($a.acao -eq 'pc->deck') {
         $dest = if ($a.caminho_deck) { $a.caminho_deck } elseif ($plano.base_deck) { $plano.base_deck + $a.destino.Substring(5) } else { $null }
         if (-not $dest) { Write-Host "  (sem pasta do emulador no Deck para $($a.destino))"; continue }
-        & ssh.exe @ssh "mkdir -p `"`$(dirname '$dest')`" && if [ -f '$dest' ]; then cp -p '$dest' '$dest.antes-sync-$data'; fi" | Out-Null
-        & scp.exe -q -i $Chave -o BatchMode=yes $pc[$a.destino].origem "${Deck}:`"$dest`""
+        # sem aspas duplas no comando: o PowerShell 5.1 as perde ao chamar o ssh (nome com espaço quebrava); o scp
+        # moderno (modo SFTP) aceita o caminho remoto sem aspas. Guarda os 5 backups mais novos de cada save.
+        $pastaDeck = $dest.Substring(0, $dest.LastIndexOf('/'))
+        & ssh.exe @ssh "mkdir -p -- '$pastaDeck' && if [ -f '$dest' ]; then cp -p -- '$dest' '$dest.antes-sync-$data'; fi; ls -1d -- '$dest'.antes-sync-* 2>/dev/null | sort -r | tail -n +6 | xargs -r -d '\n' rm -f --" | Out-Null
+        & scp.exe -q -i $Chave -o BatchMode=yes $pc[$a.destino].origem "${Deck}:$dest"
         if ($LASTEXITCODE -ne 0) { Write-Host "  falhou ao enviar $($a.destino)"; continue }
         Write-Host "  PC -> Deck: $($a.destino) ($($a.motivo))"
     } else {

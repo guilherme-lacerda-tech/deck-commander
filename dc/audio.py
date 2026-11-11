@@ -6,7 +6,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional
 
 def run(args: List[str], **kwargs) -> subprocess.CompletedProcess:
     """Executa comando com timeout e captura de saída."""
@@ -36,7 +36,7 @@ def fluxos(run=run) -> List[Dict]:
         nome = app_name or binary
         chave = f"{app_name} {binary}".lower()
 
-        if "spotify" in chave:
+        if "spotify" in chave or "librespot" in chave:
             tipo = "musica"
         elif app_name == "Steam" or any(x in chave for x in ("steamwebhelper", "speech-dispatcher")):
             tipo = "sistema"

@@ -3,6 +3,8 @@ import hashlib
 import json
 import os
 import struct
+import time
+from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
@@ -334,3 +336,24 @@ def test_fila_enviar_marcar_e_avisar(tmp_path, monkeypatch):
     transferir.notificar(x); transferir.notificar(x)
     assert len(sent) == 1 and "Hercules" in sent[0] and "pronto" in sent[0]
     assert "Hercules: pronto" in transferir.comando_transferir(x, ["fila"])
+
+
+def test_avisa_uma_vez_quando_a_copia_para(tmp_path, monkeypatch):
+    """Melhoria: pedido parado (PC desligado / sem tarefa) gera UM aviso; progresso novo rearma o aviso."""
+    from dc import transferir
+    monkeypatch.setattr(transferir, "_home", lambda home=None: tmp_path)
+    sent = []
+    x = SimpleNamespace(cfg={"notify_chat": 9}, send=lambda chat, text, buttons=None: sent.append(text))
+    e = transferir.enfileirar("psx-h", "Hercules")
+    transferir.notificar(x)
+    assert sent == []  # recém-pedido
+    agora = [time.time() + 31 * 60]
+    monkeypatch.setattr(transferir.time, "time", lambda: agora[0])
+    transferir.notificar(x); transferir.notificar(x)
+    assert len(sent) == 1 and "PC ainda não pegou" in sent[0]
+    transferir.marcar(e["id"], "copiando", "copiando 10/100 arquivos")
+    transferir.notificar(x)
+    assert len(sent) == 1  # deu sinal agora
+    agora[0] += 31 * 60
+    transferir.notificar(x)
+    assert len(sent) == 2 and "não dá sinal" in sent[1]

@@ -805,15 +805,32 @@ function TelaMusica() {
         ? Txt(rotulo + ": nada tocando agora.", { opacity: 0.8 }, "v" + tipo)
         : Row(h(D.SliderField, { label: rotulo, value: d.volume[tipo], min: 0, max: 150, step: 5, showValue: true,
             onChange: (v) => fazer("musica_volume", { tipo, pct: v }) }), "v" + tipo);
+    const sp = d.spotify || {};
+    const conta = sp.conectado
+        ? Sec("Spotify do Deck", Txt("✅ Conectado como " + sp.usuario + ". Toca sem abrir o app, inclusive com o jogo aberto. "
+            + "No celular, o Deck aparece como \"Steam Deck\" na lista de aparelhos."))
+        : sp.login
+        ? Sec("Entrar no Spotify (uma vez)",
+            Txt("Leia o QR com a câmera do celular (ou mande /musica conectar no Telegram e toque no link) e toque em Confirmar. "
+                + "Código: " + (sp.login.code || "")),
+            Qr(sp.login.qr),
+            Txt(sp.login.url, { opacity: 0.8 }), Msg(msg))
+        : Sec("Spotify sem abrir o app",
+            Txt(sp.instalado ? "O Spotify do Deck está iniciando…" : "Toque em Conectar: instalo o player do Spotify no Deck "
+                + "(código aberto, 7 MB) e mostro um QR para você entrar pela conta no celular. Precisa de Premium."),
+            Bt("🔗 Conectar Spotify", () => fazer("musica_conectar", {}), { disabled: ocupado }, "con"), Msg(msg));
     return h("div", null,
+        conta,
         Sec("Tocando agora",
             Txt(t && t.titulo ? (t.estado === "Playing" ? "▶ " : "⏸ ") + t.titulo + (t.artista ? " — " + t.artista : "")
-                : "Nada tocando. Toque em ⏯ para abrir o Spotify."),
+                : sp.conectado ? "Nada tocando. Escolha uma playlist abaixo." : "Nada tocando. Toque em ⏯ para abrir o Spotify."),
             Bt("⏯ Tocar / pausar", () => fazer("musica_midia", { acao: "tocar_pausar" }), { disabled: ocupado }, "pp"),
             Bt("⏭ Próxima", () => fazer("musica_midia", { acao: "proxima" }), { disabled: ocupado }, "nx"),
             Bt("⏮ Anterior", () => fazer("musica_midia", { acao: "anterior" }), { disabled: ocupado }, "pv"),
             Msg(msg)),
         Sec("Volume", D.SliderField ? [vol("jogo", "🎮 Jogo"), vol("musica", "🎵 Música")] : Txt("Volume: atualize o Decky.")),
+        (d.minhas || []).length ? Sec("Suas playlists",
+            d.minhas.map((pl) => Bt("🎵 " + pl.nome, () => fazer("musica_playlist", pl), { disabled: ocupado }, "m" + pl.uri))) : null,
         Sec("Playlists rápidas",
             d.playlists.length ? d.playlists.map((pl) => [
                 Bt("🎵 " + pl.nome, () => fazer("musica_playlist", pl), { disabled: ocupado }, "p" + pl.nome),

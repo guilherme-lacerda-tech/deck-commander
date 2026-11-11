@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 
 def decidir(deck: Dict[str, Dict], pc: Dict[str, Dict], ultimo: Dict[str, str]) -> List[Dict]:

@@ -425,7 +425,36 @@ def musica(p: Ponte, a: dict) -> dict:
     from . import audio
     fl = audio.fluxos()
     vol = {t: max([f["volume"] for f in fl if f["tipo"] == t] or [None], key=lambda v: v or 0) for t in ("jogo", "musica")}
-    return {"tocando": audio.tocando(), "volume": vol, "playlists": audio.playlists(_playlists_path(p))}
+    from . import spotify
+    sp = spotify.estado(p.paths)
+    if sp["login"]:
+        sp["login"]["qr"] = spotify.qr_svg(p.paths, sp["login"]["url"])
+    return {"tocando": sp["tocando"] if sp["conectado"] else audio.tocando(), "volume": vol,
+            "playlists": audio.playlists(_playlists_path(p)), "spotify": sp,
+            "minhas": spotify.minhas_playlists() if sp["conectado"] else []}
+
+
+def musica_conectar(p: Ponte, a: dict) -> dict:
+    """Instala/liga o Spotify do Deck (go-librespot) e devolve o código de login (QR no painel, link no Telegram)."""
+    import time
+    from . import spotify
+    try:
+        spotify.instalar(p.paths)
+    except (OSError, RuntimeError) as e:
+        raise Erro(f"Não consegui instalar o Spotify do Deck: {e}")
+    for _ in range(10):  # o serviço leva alguns segundos para pedir o código ao Spotify
+        sp = spotify.estado(p.paths)
+        if sp["conectado"]:
+            return {"texto": f"Spotify conectado ({sp['usuario']})."}
+        if sp["login"]:
+            return {"texto": "Abra o link no celular (ou leia o QR) e confirme: " + sp["login"]["url"]}
+        time.sleep(1.5)
+    raise Erro("O Spotify do Deck ainda está iniciando. Tente de novo em alguns segundos.")
+
+
+def _spotify_conectado(p: Ponte) -> bool:
+    from . import spotify
+    return spotify.instalado(p.paths) and spotify.estado(p.paths)["conectado"]
 
 
 def musica_volume(p: Ponte, a: dict) -> dict:
@@ -454,6 +483,11 @@ def _com_player(acao) -> bool:
 def musica_midia(p: Ponte, a: dict) -> dict:
     from . import audio
     acao = a.get("acao", "tocar_pausar")
+    if _spotify_conectado(p):  # Spotify do Deck (sem app)
+        from . import spotify
+        if not spotify.midia(acao):
+            raise Erro("O Spotify do Deck não respondeu. Tente de novo.")
+        return {"texto": "ok"}
     if not _com_player(lambda: audio.midia(acao)):
         raise Erro("O Spotify não respondeu. Abra o Spotify uma vez e entre na sua conta.")
     return {"texto": "ok"}
@@ -464,6 +498,11 @@ def musica_playlist(p: Ponte, a: dict) -> dict:
     uri = a.get("uri", "")
     if not uri.startswith("spotify:"):
         raise Erro("Endereço de playlist inválido (copie o link da playlist no Spotify).")
+    if _spotify_conectado(p):
+        from . import spotify
+        if not spotify.tocar(uri):
+            raise Erro("O Spotify do Deck não conseguiu tocar essa playlist.")
+        return {"texto": f"Tocando: {a.get('nome') or 'playlist'}"}
     if not _com_player(lambda: audio.abrir(uri)):
         raise Erro("O Spotify não respondeu. Abra o Spotify uma vez e entre na sua conta.")
     return {"texto": f"Tocando: {a.get('nome') or 'playlist'}"}
@@ -821,7 +860,7 @@ ACOES = {f.__name__: f for f in (
     traducao_responder, pc, pc_salvar, pc_testar, pc_acordar, pc_sincronizar, transferir, transferir_preparar,
     transferir_enviar, trazer_preparar, trazer_enviar, qualidade, qualidade_definir, controle_definir,
     downloads_limpar, traducao_limpar, desinstalar_lista, devolver, removido_perguntado, musica, musica_volume,
-    musica_midia, musica_playlist, musica_salvar, pc_tv, espaco_sugestoes, familia, familia_salvar,
+    musica_midia, musica_playlist, musica_salvar, musica_conectar, pc_tv, espaco_sugestoes, familia, familia_salvar,
     familia_atualizar, familia_puxar, melhorias, melhorias_definir)}
 ACOES["downloads_pausar"] = lambda p, a: _pausar(p, a, True)
 ACOES["downloads_retomar"] = lambda p, a: _pausar(p, a, False)

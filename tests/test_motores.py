@@ -1,9 +1,7 @@
 """Tradução por motor (Unity, GameMaker, ...): pergunta no Telegram com nº de frases e tempo; com o Sim, traduz."""
-import re
 import sys
 import types
 
-import pytest
 
 from dc.traducao import comandos, ia, motores, run
 from tests.test_traducao_bot import b  # noqa: F401 - fixture

@@ -114,8 +114,13 @@ def main(argv: list[str]) -> None:
             tdp_ctl = None
     except Exception as e:  # noqa: BLE001 — energia nunca impede o jogo de abrir
         say(f"energia: ignorado ({e})"); tdp_ctl = None
+    try:  # saves iguais no Deck e no PC: ao fechar, a sincronização entra na fila sozinha
+        from . import saves_sync
+        saves_auto = saves_sync.auto_ligado(paths, game_id)
+    except Exception:  # noqa: BLE001
+        saves_auto = False
     say(f"lançando {game_id}: {cmd}")
-    if not rec and not measure and not tdp_ctl:
+    if not rec and not measure and not tdp_ctl and not saves_auto:
         os.execvp(cmd[0], cmd)
     if rec:
         say(f"qualidade deste jogo: {rec['key']} {rec['old']} -> {rec['new']} (volta ao fechar)")
@@ -144,6 +149,12 @@ def main(argv: list[str]) -> None:
     try:
         code = child.wait()
     finally:
+        if saves_auto:
+            try:
+                if saves_sync.pedir_ao_fechar(paths, game_id, title, time.time() - t0):
+                    say("saves: sincronização com o PC na fila")
+            except Exception as e:  # noqa: BLE001
+                say(f"saves: não pus na fila ({e})")
         if sampler:
             try:
                 res = perf.finish_session(paths, game_id, console, title, log_dir, t0, sampler, rec)

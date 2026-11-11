@@ -2,6 +2,7 @@
 
     python tools/implantar.py [deck@IP]          (padrão: o endereço em %USERPROFILE%/.deck-commander/deck.txt)
 
+Antes de copiar, guarda a versão que estava rodando em ~/deck-commander.anterior (/voltar no bot desfaz).
 Recusa se: há merge em conflito/sem terminar, há mudança não salva (commit) em dc/ ou decky-plugin/, ou algum teste
 falha no PC. Depois testa A MESMA versão no Deck (numa pasta temporária) e só então copia, reinicia o bot e o serviço
 de energia e atualiza o plugin do Decky. Nenhuma tradução em andamento é parada (elas rodam em serviços próprios).
@@ -40,13 +41,16 @@ def main():
     if r.returncode != 0:
         parar("testes falharam no PC:\n" + "\n".join(r.stdout.splitlines()[-15:]))
     print(r.stdout.strip().splitlines()[-1])
+    import shlex
+    commit = sh(["git", "log", "-1", "--format=%h %cd", "--date=format:%d/%m %H:%M"]).stdout.strip()
+    versao = commit or "desconhecida"  # guardada no Deck: /voltar mostra qual é qual
     ssh = ["ssh", "-i", CHAVE, "-o", "BatchMode=yes", alvo]
     remoto = ("rm -rf /tmp/dc-new && mkdir /tmp/dc-new && tar -x -C /tmp/dc-new && cd /tmp/dc-new && "
               "nice ~/.local/share/deck-commander/venv/bin/python -m pytest -q -p no:cacheprovider tests 2>&1 | tail -1 && "
-              "test ${PIPESTATUS[0]} -eq 0 && cp -a /tmp/dc-new/. ~/deck-commander/ && "
+              "test ${PIPESTATUS[0]} -eq 0 && rm -rf ~/deck-commander.anterior && cp -a ~/deck-commander ~/deck-commander.anterior && "
+              "cp -a /tmp/dc-new/. ~/deck-commander/ && echo " + shlex.quote(versao) + " > ~/deck-commander/VERSAO.txt && "
               "systemctl --user restart deck-commander-bot deck-commander-power && cd ~/deck-commander && "
               "python3 -c 'from dc import setup; l=[]; setup.setup_plugin(l); print(*l)' && echo IMPLANTADO")
-    import shlex
     p = subprocess.run(ssh + ["bash -c " + shlex.quote(remoto)], input=subprocess.run(
         ["git", "archive", "--format=tar", "HEAD"], cwd=RAIZ, capture_output=True).stdout, capture_output=True, timeout=1800)
     saida = p.stdout.decode("utf-8", "replace") + p.stderr.decode("utf-8", "replace")

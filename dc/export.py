@@ -5,8 +5,6 @@ inventory.json com a procedência. Caminhos absolutos do home viram "~". Saves N
 """
 from __future__ import annotations
 
-import io
-import json
 import zipfile
 from datetime import datetime
 from pathlib import Path
