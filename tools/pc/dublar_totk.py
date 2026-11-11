@@ -68,7 +68,9 @@ def _traduzir1(textos: list[str], modelo: str, aviso: str = "") -> list[str]:
               "Mestra, Pedra Secreta, blood moon = Lua de Sangue, Demon King = Rei Demônio, Sage = Sábio). "
               "Português correto e falado no Brasil (nada de 'ameaça-se': use 'está ameaçado'; 'Witness' = 'Vejam'). "
               "Nunca escreva em espanhol. Tamanho parecido com o original (é dublagem)." + aviso +
-              ' Responda SOMENTE um JSON {"falas": [...]} com a mesma quantidade e ordem.\n'
+              ' Diga também quem fala cada linha: "f" (Zelda, Sonia, Mineru, Riju, Purah, Paya, Impa e outras '
+              'personagens femininas) ou "m" (Link, Rauru, Ganondorf, Tulin, Yunobo, Sidon e outros masculinos), pelo '
+              'contexto. Responda SOMENTE um JSON {"falas": [...], "vozes": [...]} com a mesma quantidade e ordem.\n'
               + json.dumps(textos, ensure_ascii=False))
     corpo = json.dumps({"model": modelo, "prompt": prompt, "stream": False, "format": "json",
                         "options": {"temperature": 0.2}}).encode()
@@ -78,7 +80,13 @@ def _traduzir1(textos: list[str], modelo: str, aviso: str = "") -> list[str]:
     lista = out.get("falas") if isinstance(out, dict) else out
     if not isinstance(lista, list) or len(lista) != len(textos):
         raise RuntimeError(f"tradução veio com {len(lista) if isinstance(lista, list) else '?'} falas para {len(textos)}")
+    vozes = out.get("vozes") if isinstance(out, dict) else None
+    global ULTIMAS_VOZES
+    ULTIMAS_VOZES = [str(v).lower()[:1] for v in vozes] if isinstance(vozes, list) and len(vozes) == len(textos) else []
     return [str(x).strip() for x in lista]
+
+
+ULTIMAS_VOZES: list[str] = []  # "f"/"m" por fala, da última tradução (quem fala cada linha)
 
 
 def duracao(ff: str, arq: Path) -> float:
@@ -141,8 +149,10 @@ def dublar_cena(ff: str, cena: str, voz_f: str, voz_m: str) -> int:
                 if not any(c.isalpha() for c in texto) or f["rotulo"] not in originais:
                     continue  # "..." / só pontuação: fica a voz original
                 canais = 1 + len(bwav.ler(originais[f["rotulo"]]).outros)
+                k = falas.index(f)  # quem fala esta linha (a IA indica); sem isso, a regra da cena
+                voz_da_fala = (voz_f if ULTIMAS_VOZES[k] == "f" else voz_m) if k < len(ULTIMAS_VOZES) else voz
                 try:
-                    dados = voz_bwav(ff, texto, voz, f["amostras"], canais, t)
+                    dados = voz_bwav(ff, texto, voz_da_fala, f["amostras"], canais, t)
                 except Exception as e:  # noqa: BLE001 — uma fala ruim não para a cena: fica a voz original
                     print(f"  {f['rotulo']}: pulei ({str(e)[:80]})")
                     continue
