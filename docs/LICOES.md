@@ -39,3 +39,5 @@ teste automático (`tests/test_travas.py` e outros), que roda antes de toda impl
 5. **Nada da rede de ninguém no código.** Cada aparelho guarda a própria configuração.
 6. **Medir antes de otimizar** (ex.: ações do painel 0,2 s; saves 2,8 s).
 7. **Testar no aparelho de verdade** o que depende de programa ou serviço de fora: a documentação e os testes simulados não pegaram as falhas 24 e 25.
+8. **Heredoc (`<<'EOF'`) só para texto sem barra invertida.** Em 11/11 a regra 3 foi quebrada 3 vezes (f-string, `"\n".join`, `'\t'`) e o `test_todo_python_compila` pegou todas antes de ir para o Deck. Código com `\` vai pelo editor.
+9. **Nome de pasta que vira endereço** (protetor de tela do Steam: `uioverride-<pasta>.steamscreensavers.host`) não pode ter espaço nem maiúscula — deu erro -105.
