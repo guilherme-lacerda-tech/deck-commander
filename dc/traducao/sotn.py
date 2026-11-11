@@ -44,8 +44,21 @@ def coletar(disco: Disco) -> list[S.Trecho]:
                 nome.upper() == "DRA.BIN" or nome.upper().startswith(("ST/", "BOSS/"))):
             continue
         d = disco.ler(nome)
-        trechos += S.achar_ascii(nome, d) + S.achar_menos20(nome, d)
+        trechos += sem_sobreposicao(S.achar_menos20(nome, d) + S.achar_ascii(nome, d))
     return trechos
+
+
+def sem_sobreposicao(trechos: list[S.Trecho]) -> list[S.Trecho]:
+    """Os dois leitores podem pegar o mesmo pedaço (falha real: DRA.BIN @260864): fica o primeiro da lista
+    (nomes em -0x20 têm prioridade, porque terminam no 0xFF exato) e cai quem encostar nele."""
+    ocupado: list[tuple[int, int]] = []
+    out = []
+    for t in trechos:
+        if any(t.pos < fim and ini < t.pos + t.tam for ini, fim in ocupado):
+            continue
+        ocupado.append((t.pos, t.pos + t.tam))
+        out.append(t)
+    return sorted(out, key=lambda t: t.pos)
 
 
 def agrupar(trechos: list[S.Trecho], dados: dict[str, bytes]) -> list[list[S.Trecho]]:

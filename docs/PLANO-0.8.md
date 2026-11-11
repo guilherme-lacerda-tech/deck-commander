@@ -59,9 +59,9 @@ Começamos pelo automático por tempo.
 | 4. painel por contexto | ✅ com jogo aberto o início mostra só as telas daquele jogo ("ver todas" sempre) |
 | 5. guardião | ✅ cópia diária das configurações; atualizou e quebrou → devolve a config e volta a versão (Flatpak) |
 | 10. saves na nuvem | 🧪 pronto; falta você rodar tools/pc/nuvem-google.ps1 no PC (login do Google) |
-| 3. netplay | próximo |
-| 9. texturas HD | próximo |
-| 2. dublagem (legendas primeiro) | próximo |
+| 3. netplay | 🧪 /netplay <jogo> convida o Deck do par pela Tailscale e abre como anfitrião; o par toca "Aceitar" no Telegram (RetroArch) |
+| 9. texturas HD | 🧪 /texturas <jogo> <link>: instala na pasta do PCSX2/Dolphin e liga a opção; código dos 14 jogos de PS2 lido certo |
+| 2. dublagem | 🧪 tools/pc/dublar.py: Whisper (GPU do PC) + tradução + voz edge-tts → mod do Ryujinx. Zelda TotK: vídeos sem som, voz em 34 mil .bwav (próxima etapa: ler/gravar BWAV) |
 
 ## Já feito nesta rodada
 - **Protetor de tela "Deck Commander":** o protetor novo do Steam (versão de 13/10/2026) mostrava preto com os

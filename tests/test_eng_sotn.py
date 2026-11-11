@@ -96,3 +96,12 @@ def test_fala_inteira_vai_junta_e_volta_nas_linhas():
     linhas = sotn.distribuir("Precisamos de alguém como você!", grupos[0])
     assert len(linhas) == 2 and all(len(S.codificar(l, 999, "ascii").rstrip()) <= t.tam for l, t in zip(linhas, grupos[0]))
     assert linhas == ["Precisamos de", "alguem como voce!"]
+
+
+def test_sem_sobreposicao():
+    """Falha real: o mesmo nome achado pelos dois leitores em DRA.BIN @260864 parou a gravação."""
+    from dc.traducao import sotn
+    a = S.Trecho("X", 10, 6, "Potion", "menos20")
+    b = S.Trecho("X", 8, 10, "xxPotion", "ascii")
+    c = S.Trecho("X", 30, 5, "Sword", "ascii")
+    assert sotn.sem_sobreposicao([a, b, c]) == [a, c]
