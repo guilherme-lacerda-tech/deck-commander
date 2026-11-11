@@ -119,6 +119,19 @@ def load_text(text: str) -> dict:
     return parse()
 
 
+def dump_text(obj: dict, nivel: int = 0) -> str:
+    """VDF texto no formato que o próprio Steam grava (tabs, chaves entre aspas)."""
+    def esc(s: str) -> str:
+        return str(s).replace("\\", "\\\\").replace('"', '\\"')
+    ind, out = "\t" * nivel, []
+    for k, v in obj.items():
+        if isinstance(v, dict):
+            out.append(f'{ind}"{esc(k)}"\n{ind}{{\n{dump_text(v, nivel + 1)}{ind}}}\n')
+        else:
+            out.append(f'{ind}"{esc(k)}"\t\t"{esc(v)}"\n')
+    return "".join(out)
+
+
 def shortcut_appid(exe: str, name: str) -> int:
     return (zlib.crc32((exe + name).encode("utf-8")) & 0xFFFFFFFF) | 0x80000000
 

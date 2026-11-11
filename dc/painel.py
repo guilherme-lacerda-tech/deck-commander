@@ -803,6 +803,69 @@ def melhorias(p: Ponte, a: dict) -> dict:
     return {"emuladores": M.estado(Path.home()), "shaders_noite": noite}
 
 
+RETRO = {"nes", "snes", "n64", "gb", "gbc", "gba", "genesis", "sms", "gg", "segacd", "saturn", "pce", "arcade", "psx", "ps2", "gc", "wii"}
+
+
+def _gid_do_atalho(appid: int, home: Path | None = None) -> str | None:
+    """Atalho do Steam (appid) → id do jogo no Deck Commander (fica nas opções de abertura do atalho)."""
+    import glob
+    from . import vdf
+    h = home or Path.home()
+    for sc in glob.glob(str(h / ".local/share/Steam/userdata/*/config/shortcuts.vdf")):
+        try:
+            for s in vdf.read_shortcuts(Path(sc)):
+                if int(s.get("appid", 0)) & 0xFFFFFFFF == appid & 0xFFFFFFFF:
+                    return s.get("LaunchOptions") or None
+        except (OSError, ValueError, KeyError):
+            continue
+    return None
+
+
+def contexto(p: Ponte, a: dict) -> dict:
+    """O que está aberto agora, para o painel mostrar só as telas úteis (pedido 4 da 0.8)."""
+    try:
+        appid = int(a.get("appid") or 0)
+    except (TypeError, ValueError):
+        appid = 0
+    if not appid:
+        return {"modo": "nenhum"}
+    gid = _gid_do_atalho(appid)
+    if not gid:
+        return {"modo": "steam"}  # jogo da própria Steam
+    if gid.startswith("app-"):
+        return {"modo": "app", "gid": gid}
+    from . import transferir as tr
+    e = tr.carregar_mapa().get(gid) or {}
+    con = e.get("console", "")
+    modo = ("pc" if con == "pc" or gid.startswith("pc-") else "switch" if con in ("switch", "switch2")
+            else "retro" if con in RETRO else "emulador")
+    return {"modo": modo, "gid": gid, "titulo": e.get("title", gid), "console": con}
+
+
+def retro(p: Ponte, a: dict) -> dict:
+    from . import retro as RT
+    return RT.estado()
+
+
+def retro_definir(p: Ponte, a: dict) -> dict:
+    """Ligar os botões de trás (e turbo 2x/4x), filtros de tela, ou desfazer tudo."""
+    from . import retro as RT
+    if a.get("desfazer"):
+        return {"texto": RT.desfazer()}
+    if a.get("filtros") is not None:
+        from . import retro_hacks as RH
+        cfg = Path.home() / RT.ARQUIVOS["RetroArch"]
+        if cfg.exists():
+            cfg.write_text(RH.definir(cfg.read_text("utf-8", "replace"),
+                                      {"video_shader_enable": "true" if a["filtros"] else "false"}), "utf-8")
+        RT.comando_retroarch("SHADER_TOGGLE") if a.get("agora") else None  # jogo aberto: troca na hora
+        return {"texto": "Filtros de tela " + ("ligados" if a["filtros"] else "desligados") + "."}
+    turbo = float(a.get("turbo") or 2.0)
+    if turbo not in (2.0, 3.0, 4.0):
+        raise Erro("Turbo: 2x, 3x ou 4x.")
+    return {"texto": RT.aplicar(turbo=turbo)}
+
+
 def melhorias_definir(p: Ponte, a: dict) -> dict:
     from . import melhorias as M
     if a.get("shaders_noite") is not None:
@@ -841,7 +904,7 @@ ACOES = {f.__name__: f for f in (
     transferir_enviar, trazer_preparar, trazer_enviar, qualidade, qualidade_definir, controle_definir,
     downloads_limpar, traducao_limpar, desinstalar_lista, devolver, removido_perguntado, musica, musica_volume,
     musica_midia, musica_playlist, musica_salvar, musica_conectar, pc_tv, espaco_sugestoes, familia, familia_salvar,
-    familia_atualizar, familia_puxar, melhorias, melhorias_definir)}
+    familia_atualizar, familia_puxar, melhorias, melhorias_definir, contexto, retro, retro_definir)}
 ACOES["downloads_pausar"] = lambda p, a: _pausar(p, a, True)
 ACOES["downloads_retomar"] = lambda p, a: _pausar(p, a, False)
 

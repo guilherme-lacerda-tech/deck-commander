@@ -107,6 +107,8 @@ Aviso aqui quando o download terminar.
 /traduzir biblioteca — traduz todos os jogos que ainda não estão em português (pergunta antes)
 /converter <jogo> [organizar|descompactar] — Switch: update/DLC e NSZ
 /status · /queue · /disk · /diagnostico
+/retro [2x|3x|4x] — botões de trás: L4 salva, R4 carrega, L5 volta no tempo, R5 turbo · /retro desfazer
+/nuvem [agora] — saves no Google Drive (ligar pelo PC: tools/pc/nuvem-google.ps1)
 /voltar — desfaz a última atualização do Deck Commander (se algo parou de funcionar)
 /pause · /resume — downloads
 /quarantine list | review <id> | clear <id>
@@ -310,6 +312,21 @@ class Bot:
         if cmd == "/corrigir":
             return ("Mande uma FOTO (ou print) da frase estranha com a legenda /corrigir <nome do jogo>. "
                     "Pode dizer o que está errado depois de uma barra: /corrigir Zelda | o certo é Reino Cogumelo")
+        if cmd == "/retro":  # botões de trás (salvar/carregar estado, voltar no tempo, turbo) nos emuladores
+            from . import retro as RT
+            if args[:1] == ["desfazer"]:
+                return RT.desfazer()
+            turbo = float(args[0].rstrip("x")) if args and args[0].rstrip("x") in ("2", "3", "4") else 2.0
+            return RT.aplicar(turbo=turbo)
+        if cmd == "/nuvem":  # saves no Google Drive (ligar: tools/pc/nuvem-google.ps1 no PC)
+            from . import nuvem
+            n, _ = nuvem.do_deck()
+            if not n.configurada():
+                return ("☁️ Nuvem ainda não ligada. No PC, rode tools/pc/nuvem-google.ps1: abre o navegador, você entra "
+                        "no Google uma vez e o Deck passa a guardar os saves na pasta DeckCommander do seu Drive.")
+            if args[:1] == ["agora"]:
+                return "\n".join(n.sincronizar()) or "Nenhuma pasta de save ainda."
+            return "☁️ Saves na nuvem (de hora em hora):\n" + (n.resumo() or "nada sincronizado ainda") + "\n/nuvem agora"
         if cmd == "/voltar":  # desfaz a última atualização (troca pela versão anterior guardada)
             from . import versao
             txt, self.next_buttons = versao.comando(args)
@@ -984,6 +1001,28 @@ class Bot:
                     marca.write_text("ok")
             except Exception as e:  # noqa: BLE001
                 self.log(f"protetor de tela: {e}")
+            try:  # guardião: cópia diária das configurações dos emuladores; atualizou e quebrou → volta sozinho
+                marca = self.paths.state / "guardiao-rodou"
+                if not marca.exists() or time.time() - marca.stat().st_mtime > 3600:
+                    marca.write_text("ok")
+                    from . import guardiao
+                    for aviso in guardiao.Guardiao(Path.home(), self.paths.data / "guardiao").rodada():
+                        if self.cfg.get("notify_chat"):
+                            self.send(self.cfg["notify_chat"], aviso)
+            except Exception as e:  # noqa: BLE001
+                self.log(f"guardião: {e}")
+            try:  # saves na nuvem (Google Drive): de hora em hora, se o PC já ligou a conta
+                marca = self.paths.state / "nuvem-rodou"
+                if (self.paths.config / "rclone.conf").exists() and (
+                        not marca.exists() or time.time() - marca.stat().st_mtime > 3600):
+                    marca.write_text("ok")
+                    from . import nuvem
+                    n, _ = nuvem.do_deck()
+                    for linha in n.sincronizar():
+                        if linha.startswith("⚠️"):
+                            self.log("nuvem: " + linha)
+            except Exception as e:  # noqa: BLE001
+                self.log(f"nuvem: {e}")
             try:
                 self.notify_removidos()
             except Exception as e:  # noqa: BLE001

@@ -417,17 +417,24 @@ function TelaInicio({ ir }) {
     const [d, recarregar] = useDados("status", {}, 10000);
     const [diag, setDiag] = SP_REACT.useState(null);
     const [msg, ocupado, fazer] = useAcao(recarregar);
-    const menu = Sec("Configurar e usar",
-        Bt("💬 Telegram", () => ir("telegram")),
-        Bt("⬇️ Downloads", () => ir("downloads")),
-        Bt("🈯 Tradução" + (d && d.perguntas ? " (" + d.perguntas + " pergunta" + (d.perguntas > 1 ? "s" : "") + ")" : ""), () => ir("traducao")),
-        Bt("🖥️ PC (jogar os jogos do PC)", () => ir("pc")),
-        Bt("📦 Transferir jogos (Deck ⇄ PC)", () => ir("transferir")),
-        Bt("🎚️ Qualidade e controles", () => ir("qualidade")),
-        Bt("🗑️ Desinstalar jogos", () => ir("desinstalar")),
-        Bt("🎵 Música", () => ir("musica")),
-        Bt("👪 Família", () => ir("familia")),
-        Bt("📚 Biblioteca e desempenho", () => ir("atalhos")));
+    // painel por contexto: com jogo aberto, só as telas úteis para ele (botão "ver todas" mostra o resto)
+    const [ctx] = useDados("contexto", { appid: runningAppId() }, 15000);
+    const [tudo, setTudo] = SP_REACT.useState(false);
+    const modo = ctx && ctx.ok ? ctx.modo : "nenhum";
+    const UTEIS = { switch: ["traducao", "qualidade", "atalhos", "musica"], retro: ["retro", "traducao", "qualidade", "musica"],
+        emulador: ["retro", "traducao", "qualidade", "musica"], pc: ["pc", "qualidade", "musica"] };
+    const filtro = !tudo && UTEIS[modo];
+    const itens = [
+        ["telegram", "💬 Telegram"], ["downloads", "⬇️ Downloads"],
+        ["traducao", "🈯 Tradução" + (d && d.perguntas ? " (" + d.perguntas + " pergunta" + (d.perguntas > 1 ? "s" : "") + ")" : "")],
+        ["pc", "🖥️ PC (jogar os jogos do PC)"], ["transferir", "📦 Transferir jogos (Deck ⇄ PC)"],
+        ["retro", "🕹️ Retrô: botões de trás, cheats e filtros"],
+        ["qualidade", "🎚️ Qualidade e controles"], ["desinstalar", "🗑️ Desinstalar jogos"], ["musica", "🎵 Música"],
+        ["familia", "👪 Família"], ["atalhos", "📚 Biblioteca e desempenho"]];
+    const menu = Sec(filtro ? "Para " + (ctx.titulo || "este jogo") : "Configurar e usar",
+        itens.filter(([k]) => !filtro || filtro.includes(k)).map(([k, rotulo]) => Bt(rotulo, () => ir(k), null, "m" + k)),
+        filtro ? Bt("☰ Ver todas as telas", () => setTudo(true), null, "tudo")
+            : (tudo && UTEIS[modo] ? Bt("🎮 Só as telas deste jogo", () => setTudo(false), null, "menos") : null));
     if (!d || !d.ok) return h("div", null, Sec("Status", Carregando(d)), menu);
     const ativos = d.downloads.filter((x) => !x.concluido);
     let diagRows = null;
@@ -843,8 +850,29 @@ function TelaMusica() {
                 { disabled: ocupado || !nome || !link }, "add")));
 }
 
+// ---- 10. Retrô (0.8): botões de trás, turbo, voltar no tempo, filtros de tela -----------------------
+function TelaRetro() {
+    const [d, recarregar] = useDados("retro", {}, 0);
+    const [msg, ocupado, fazer] = useAcao(recarregar);
+    if (!d || !d.ok) return Sec("Retrô", Carregando(d));
+    const aberto = !!runningAppId();
+    return h("div", null,
+        Sec("Botões de trás",
+            Txt(d.aplicado
+                ? "✅ Ligados: L4 salva o estado · R4 carrega · L5 (segurar) volta no tempo · R5 (segurar) turbo " + (d.turbo || 2) + "x."
+                : "Desligados. Ligue para usar os botões de trás do Deck como no R4/Retroid: salvar e carregar estado, voltar no tempo e acelerar."),
+            Txt("Vale para: " + (d.emuladores.join(", ") || "nenhum emulador encontrado") + ". Jogo aberto: feche e abra de novo para valer.", { opacity: 0.8 }),
+            Bt(d.aplicado ? "🔄 Aplicar de novo (jogos novos)" : "🕹️ Ligar botões de trás", () => fazer("retro_definir", { turbo: d.turbo || 2 }), { disabled: ocupado }, "on"),
+            [2, 3, 4].map((x) => Bt("⏩ Turbo " + x + "x" + (d.turbo === x ? " ✓" : ""), () => fazer("retro_definir", { turbo: x }), { disabled: ocupado }, "t" + x)),
+            d.aplicado ? Bt("↩️ Desfazer (voltar as configurações de antes)", () => fazer("retro_definir", { desfazer: true }), { disabled: ocupado }, "undo") : null,
+            Msg(msg)),
+        Sec("Filtros de tela (RetroArch)",
+            Txt(d.filtros ? "✅ Ligados: TV de tubo (CRT) nos consoles de mesa, grade de LCD nos portáteis." : "Desligados: imagem pura."),
+            Bt(d.filtros ? "Desligar filtros" : "Ligar filtros", () => fazer("retro_definir", { filtros: !d.filtros, agora: aberto }), { disabled: ocupado }, "flt")));
+}
+
 const TELAS = { telegram: TelaTelegram, downloads: TelaDownloads, traducao: TelaTraducao, pc: TelaPC, musica: TelaMusica, familia: TelaFamilia,
-    transferir: TelaTransferir, qualidade: TelaQualidade, desinstalar: TelaDesinstalar, atalhos: AtalhosPanel };
+    transferir: TelaTransferir, qualidade: TelaQualidade, desinstalar: TelaDesinstalar, atalhos: AtalhosPanel, retro: TelaRetro };
 
 function Panel() {
     const [tela, setTela] = SP_REACT.useState(null);
