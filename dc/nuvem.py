@@ -111,6 +111,9 @@ class Nuvem:
             cmd = self.comando(local, nome_nuvem, primeira)
 
             try:
+                if primeira:  # o bisync exige a pasta dos dois lados: cria no Drive (não faz nada se já existe)
+                    self.run([str(self.rclone), "mkdir", f"gdrive:DeckCommander/{nome_nuvem}", "--config", str(self.conf)],
+                             capture_output=True, text=True, timeout=120)
                 res = self.run(cmd, capture_output=True, text=True, timeout=1800)
                 if res.returncode != 0 and "--resync" in res.stderr:
                     # Tenta novamente com --resync

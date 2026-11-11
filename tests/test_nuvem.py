@@ -24,8 +24,8 @@ def test_sincronizar(tmp_path):
     n = N.Nuvem(home, tmp_path / "rclone", conf, tmp_path / "estado/nuvem.json", run=run)
     assert n.configurada()
     assert n.sincronizar() == ["☁️ DuckStation/memcards: em dia"]
-    assert "--resync" in cmds[0] and "gdrive:DeckCommander/DuckStation/memcards" in cmds[0]
-    assert "--max-delete" in cmds[0]
+    assert cmds[0][1] == "mkdir" and "--resync" in cmds[1] and "gdrive:DeckCommander/DuckStation/memcards" in cmds[1]
+    assert "--max-delete" in cmds[1]
     n.sincronizar()
     assert "--resync" not in cmds[-1]
     assert "DuckStation/memcards" in n.resumo()
