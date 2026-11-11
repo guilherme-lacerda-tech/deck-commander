@@ -626,7 +626,7 @@ class Bot:
             if not args:
                 d = painel.musica(p, {})
                 t = d["tocando"]
-                lst = ", ".join(x["nome"] for x in d["playlists"]) or "nenhuma (guarde no painel do Deck → Música)"
+                lst = ", ".join(x["nome"] for x in (d["playlists"] + d.get("minhas", []))[:25]) or                     "nenhuma (painel do Deck → Música → Conectar Spotify)"
                 return ((f"🎵 {t['titulo']} — {t['artista']} ({t['estado']})" if t and t.get("titulo")
                          else "🎵 Nada tocando agora.") + f"\nPlaylists: {lst}\nUso: /musica <playlist> | pausar | proxima")
             q = " ".join(args).strip().lower()
@@ -635,7 +635,10 @@ class Bot:
             if q in acoes:
                 painel.musica_midia(p, {"acao": acoes[q]})
                 return "🎵 ok"
-            pl = next((x for x in painel.musica(p, {})["playlists"] if x["nome"].lower() == q), None)
+            d = painel.musica(p, {})
+            todas = d["playlists"] + d.get("minhas", [])  # guardadas + as da sua conta (Música → Conectar Spotify)
+            pl = next((x for x in todas if x["nome"].lower() == q), None) or next(
+                (x for x in todas if q in x["nome"].lower()), None)
             if not pl:
                 return "Não achei essa playlist. Guarde-a no painel do Deck (Música) ou mande /musica para ver a lista."
             return "🎵 " + painel.musica_playlist(p, pl)["texto"]

@@ -3,6 +3,7 @@
 Escrito pela IA local (qwen3-coder) e revisado.
 """
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -199,7 +200,8 @@ def abrir_spotify(run=run) -> bool:
     try:
         subprocess.Popen(
             ["flatpak", "run", "com.spotify.Client"],
-            start_new_session=True,
+            start_new_session=True,  # escondido: no modo de jogo a janela não aparece (testado 11/11/2026)
+            env={**os.environ, "DISPLAY": os.environ.get("DISPLAY") or ":0"},  # vindo do bot/painel não há DISPLAY
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
         )

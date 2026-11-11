@@ -807,8 +807,9 @@ function TelaMusica() {
             onChange: (v) => fazer("musica_volume", { tipo, pct: v }) }), "v" + tipo);
     const sp = d.spotify || {};
     const conta = sp.conectado
-        ? Sec("Spotify do Deck", Txt("✅ Conectado como " + sp.usuario + ". Toca sem abrir o app, inclusive com o jogo aberto. "
-            + "No celular, o Deck aparece como \"Steam Deck\" na lista de aparelhos."))
+        ? Sec("Spotify do Deck", Txt("✅ Conta conectada: " + (sp.playlists || []).length + " playlist(s) suas abaixo. "
+            + "Tocam pelo Spotify oficial aberto escondido, inclusive com o jogo aberto."),
+            Bt("🔄 Atualizar lista de playlists", () => fazer("musica_conectar", {}), { disabled: ocupado }, "atl"))
         : sp.login
         ? Sec("Entrar no Spotify (uma vez)",
             Txt("Leia o QR com a câmera do celular (ou mande /musica conectar no Telegram e toque no link) e toque em Confirmar. "
@@ -816,8 +817,8 @@ function TelaMusica() {
             Qr(sp.login.qr),
             Txt(sp.login.url, { opacity: 0.8 }), Msg(msg))
         : Sec("Spotify sem abrir o app",
-            Txt(sp.instalado ? "O Spotify do Deck está iniciando…" : "Toque em Conectar: instalo o player do Spotify no Deck "
-                + "(código aberto, 7 MB) e mostro um QR para você entrar pela conta no celular. Precisa de Premium."),
+            Txt("Toque em Conectar para ver as SUAS playlists aqui: mostro um QR para você entrar na conta pelo celular "
+                + "(uma vez só; ninguém vê sua senha). Precisa do Spotify instalado no Deck e de Premium."),
             Bt("🔗 Conectar Spotify", () => fazer("musica_conectar", {}), { disabled: ocupado }, "con"), Msg(msg));
     return h("div", null,
         conta,

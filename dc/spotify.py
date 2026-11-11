@@ -1,10 +1,14 @@
-"""Spotify sem abrir o app: o go-librespot (código aberto, github.com/devgianlu/go-librespot) roda como serviço do
-usuário no Deck e aparece como "Steam Deck" na lista de aparelhos do Spotify.
+"""Spotify no Deck: SUAS playlists no painel e no /musica, tocando com o jogo aberto, sem você abrir o app.
 
-Entrar na conta (uma vez): pareamento por código — o Deck pede um código ao Spotify, o painel mostra um QR (e o bot
-manda o link no Telegram); você abre no celular, confirma, e o Deck guarda o acesso (não vemos nem guardamos senha).
-Depois disso, o painel e o /musica tocam as SUAS playlists direto, com o jogo aberto, sem o app do Spotify.
-Precisa de Spotify Premium. API local só no 127.0.0.1:3678 (não aparece na rede).
+Como funciona (testado em 11/11/2026):
+- Conta e lista de playlists: o go-librespot (código aberto, github.com/devgianlu/go-librespot). Entrar na conta é uma
+  vez só, por código: o painel mostra um QR (o bot manda o link); você confirma no celular e o Deck guarda o acesso
+  (ninguém vê senha). Ele é ligado só por alguns segundos para atualizar a lista e desligado em seguida, para não
+  ficar como um aparelho "fantasma" no seu Spotify.
+- Tocar: pelo app OFICIAL do Spotify, aberto escondido (dc.audio, MPRIS). O Spotify recusa a chave de áudio da maioria
+  das faixas para players que não são o app oficial (go-librespot #279/#317, "lado do Spotify"); contornar isso seria
+  quebrar a proteção dele, então não fazemos.
+Precisa de Spotify Premium. A API local do go-librespot só escuta em 127.0.0.1:3678.
 """
 from __future__ import annotations
 
@@ -13,6 +17,7 @@ import io
 import json
 import subprocess
 import tarfile
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -24,15 +29,15 @@ URL = f"https://github.com/devgianlu/go-librespot/releases/download/{VERSAO}/go-
 SHA256 = "f08647217d1dced339375680d731bb5fc2410a9d693f2e1235303511c35a051c"  # publicado no release oficial
 PORTA = 3678
 UNIDADE = "dc-spotify.service"
+VALIDADE_LISTA = 6 * 3600  # a lista de playlists é atualizada sozinha a cada 6 h (ou no botão)
 
-CONFIG = f"""# gerado pelo Deck Commander (dc/spotify.py)
-device_name: Steam Deck
+CONFIG = f"""# gerado pelo Deck Commander (dc/spotify.py) — usado só para entrar na conta e listar playlists
+device_name: Deck Commander (lista)
 device_type: computer
-zeroconf_enabled: true    # o Deck também aparece no app do celular (Spotify Connect) na mesma rede
+zeroconf_enabled: false
 credentials:
   type: device_auth       # entrar pelo celular com um código (spotify.com/pair); o acesso fica guardado
 audio_backend: pulseaudio
-bitrate: 320
 server:
   enabled: true
   address: 127.0.0.1
@@ -46,6 +51,10 @@ def _bin(paths: Paths) -> Path:
 
 def _conf_dir(paths: Paths) -> Path:
     return paths.config / "go-librespot"
+
+
+def _cache(paths: Paths) -> Path:
+    return paths.state / "spotify-playlists.json"
 
 
 def _unit_path() -> Path:
@@ -62,7 +71,7 @@ def _baixar(url: str) -> bytes:
 
 
 def instalar(paths: Paths, baixar=_baixar, run=subprocess.run) -> str:
-    """Baixa o go-librespot oficial (confere o sha256 publicado), configura e liga o serviço. Pode repetir à vontade."""
+    """Baixa o go-librespot oficial (confere o sha256 publicado) e configura. Pode repetir à vontade."""
     b = _bin(paths)
     if not b.exists():
         dados = baixar(URL)
@@ -83,21 +92,19 @@ def instalar(paths: Paths, baixar=_baixar, run=subprocess.run) -> str:
     (c / "config.yml").write_text(CONFIG, "utf-8")
     u = _unit_path()
     u.parent.mkdir(parents=True, exist_ok=True)
-    u.write_text("[Unit]\nDescription=Deck Commander - Spotify (go-librespot)\nAfter=pipewire-pulse.service\n\n"
-                 f"[Service]\nExecStart={b} --config_dir {c}\nRestart=on-failure\nRestartSec=5\n\n"
-                 "[Install]\nWantedBy=default.target\n", "utf-8")
+    u.write_text("[Unit]\nDescription=Deck Commander - conta do Spotify (go-librespot, ligado sob demanda)\n\n"
+                 f"[Service]\nExecStart={b} --config_dir {c}\nRestart=on-failure\nRestartSec=5\n", "utf-8")
+    run(["systemctl", "--user", "disable", UNIDADE], capture_output=True)  # não liga no boot: só quando precisa
     run(["systemctl", "--user", "daemon-reload"], capture_output=True)
-    r = run(["systemctl", "--user", "enable", "--now", UNIDADE], capture_output=True, text=True)
-    if r.returncode != 0:
-        raise RuntimeError("não consegui ligar o serviço do Spotify: " + (r.stderr or "").strip()[-200:])
-    py = paths.data / "venv/bin/python"  # QR do login (biblioteca qrcode, só no ambiente do Deck Commander)
-    if py.exists():
-        run([str(py), "-m", "pip", "install", "-q", "qrcode"], capture_output=True, timeout=120)
     return "Spotify instalado."
 
 
+def _servico(acao: str, run=subprocess.run) -> bool:
+    return run(["systemctl", "--user", acao, UNIDADE], capture_output=True).returncode == 0
+
+
 def api(metodo: str, caminho: str, corpo: dict | None = None, timeout: float = 3) -> tuple[int, object]:
-    """Chama a API local do go-librespot. (código HTTP, JSON ou None); 0 = serviço fora do ar."""
+    """Chama a API local do go-librespot. (código HTTP, JSON ou None); 0 = serviço fora do ar / sem resposta."""
     req = urllib.request.Request(f"http://127.0.0.1:{PORTA}{caminho}", method=metodo,
                                  data=json.dumps(corpo).encode() if corpo is not None else None,
                                  headers={"Content-Type": "application/json"} if corpo is not None else {})
@@ -111,67 +118,72 @@ def api(metodo: str, caminho: str, corpo: dict | None = None, timeout: float = 3
         return 0, None
 
 
-def estado(paths: Paths, chamar=api) -> dict:
-    """{instalado, rodando, conectado, usuario, login: {url, code} | None, tocando: {...} | None}"""
-    out = {"instalado": instalado(paths), "rodando": False, "conectado": False, "usuario": None, "login": None,
-           "tocando": None}
-    if not out["instalado"]:
-        return out
-    # antes do login o /status não responde (fica esperando a sessão): o código de login vem primeiro
+def _ler_cache(paths: Paths) -> dict:
+    try:
+        return json.loads(_cache(paths).read_text("utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def _login_pendente(chamar) -> dict | None:
     cod, ac = chamar("GET", "/auth/code")
     if cod == 200 and isinstance(ac, dict) and ac.get("url"):
-        out.update(rodando=True, login={"url": ac["url"], "code": ac.get("code", ""), "expira": ac.get("expires_at")})
+        return {"url": ac["url"], "code": ac.get("code", ""), "expira": ac.get("expires_at")}
+    return None
+
+
+def atualizar(paths: Paths, chamar=api, run=subprocess.run, espera: float = 1.0, tentativas: int = 12) -> dict:
+    """Liga o go-librespot, e: se falta entrar na conta, devolve {"login": {...}} (o serviço fica ligado esperando);
+    se já entrou, guarda a lista de playlists e DESLIGA o serviço. {"erro": ...} se não respondeu."""
+    if not instalado(paths):
+        instalar(paths, run=run)
+    _servico("start", run)
+    for _ in range(tentativas):
+        login = _login_pendente(chamar)
+        if login:
+            return {"login": login}
+        cod, st = chamar("GET", "/status")
+        if cod == 200 and isinstance(st, dict) and st.get("username"):
+            cod, d = chamar("GET", "/library/playlists?limit=50", timeout=10)
+            lista = [{"nome": x.get("name", "").strip(), "uri": x["uri"], "imagem": x.get("image_url")}
+                     for x in ((d or {}).get("items") or []) if x.get("uri")] if cod == 200 else None
+            if lista is not None:
+                tmp = _cache(paths).with_suffix(".tmp")
+                tmp.write_text(json.dumps({"em": time.time(), "playlists": lista}, ensure_ascii=False), "utf-8")
+                tmp.replace(_cache(paths))
+            _servico("stop", run)
+            return {"conectado": True, "playlists": lista or []}
+        time.sleep(espera)
+    _servico("stop", run)
+    return {"erro": "a conta do Spotify não respondeu"}
+
+
+def estado(paths: Paths, chamar=api, run=subprocess.run) -> dict:
+    """{instalado, conectado, login: {url, code} | None, playlists: [...], em} — rápido: usa a lista guardada e só
+    consulta o go-librespot se ele estiver ligado (esperando o login) ou se a lista passou de 6 h."""
+    c = _ler_cache(paths)
+    out = {"instalado": instalado(paths), "conectado": bool(c), "login": None, "playlists": c.get("playlists", []),
+           "em": c.get("em")}
+    if not out["instalado"]:
         return out
-    if cod == 0:
-        return out
-    cod, st = chamar("GET", "/status")
-    if cod == 0:
-        return out
-    out["rodando"] = True
-    if cod == 200 and isinstance(st, dict) and st.get("username"):
-        out.update(conectado=True, usuario=st["username"])
-        t = st.get("track") or None
-        if t:
-            out["tocando"] = {"titulo": t.get("name", ""), "artista": ", ".join(t.get("artist_names") or []),
-                              "estado": "Paused" if st.get("paused") else "Playing", "capa": t.get("album_cover_url")}
-        return out
+    ativo = run(["systemctl", "--user", "is-active", "--quiet", UNIDADE], capture_output=True).returncode == 0
+    if ativo:  # entrando na conta agora
+        login = _login_pendente(chamar)
+        if login:
+            out.update(conectado=False, login=login)
+            return out
+    if ativo or (c and time.time() - c.get("em", 0) > VALIDADE_LISTA):
+        r = atualizar(paths, chamar, run, tentativas=4)
+        if r.get("login"):
+            out.update(conectado=False, login=r["login"])
+        elif r.get("conectado"):
+            c = _ler_cache(paths)
+            out.update(conectado=True, playlists=c.get("playlists", []), em=c.get("em"))
     return out
 
 
-def minhas_playlists(chamar=api) -> list[dict]:
-    """As playlists da conta (nome, uri, imagem). Lista vazia se a versão/conta não permitir."""
-    cod, d = chamar("GET", "/library/playlists?limit=50", timeout=8)
-    if cod != 200 or not isinstance(d, dict):
-        return []
-    return [{"nome": x.get("name", ""), "uri": x["uri"], "imagem": x.get("image_url")}
-            for x in d.get("items") or [] if x.get("uri")]
-
-
-def tocar(uri: str, chamar=api) -> bool:
-    return chamar("POST", "/player/play", {"uri": uri}, timeout=10)[0] in (200, 204)
-
-
-MIDIA = {"tocar_pausar": "/player/playpause", "tocar": "/player/resume", "pausar": "/player/pause",
-         "proxima": "/player/next", "anterior": "/player/prev"}
-
-
-def midia(acao: str, chamar=api) -> bool:
-    caminho = MIDIA.get(acao)
-    return bool(caminho) and chamar("POST", caminho, {} if acao == "proxima" else None)[0] in (200, 204)
-
-
-def qr_svg(paths: Paths, texto: str, run=subprocess.run) -> str | None:
-    """QR do link de login como SVG (data URI) para o painel; None se a biblioteca não estiver instalada."""
-    py = paths.data / "venv/bin/python"
-    if not py.exists():
-        return None
-    cod = ("import sys,io,qrcode,qrcode.image.svg as s;i=qrcode.make(sys.argv[1],image_factory=s.SvgPathFillImage,"
-           "box_size=10,border=2);b=io.BytesIO();i.save(b);sys.stdout.write(b.getvalue().decode())")
-    try:
-        r = run([str(py), "-c", cod, texto], capture_output=True, text=True, timeout=10)
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-    if r.returncode != 0 or "<svg" not in r.stdout:
-        return None
+def qr_svg(texto: str) -> str:
+    """QR do link de login como SVG (data URI) — o mesmo gerador do QR do Telegram, que o painel já mostra."""
     import base64
-    return "data:image/svg+xml;base64," + base64.b64encode(r.stdout.encode()).decode()
+    from . import qr
+    return "data:image/svg+xml;base64," + base64.b64encode(qr.svg(texto).encode()).decode()
