@@ -868,8 +868,10 @@ def _dispatch(paths, store, job, cfg, progress, should_pause) -> tuple[dict, str
     if job["type"] == "translate_generic":
         return _translate_generic(paths, job, g, rom, cfg, progress, should_pause)
     if job["type"] == "translate_retro":
-        from . import retro, rts
-        if g["console"] == "gba" and retro.is_pokemon_gba(rom) and retro.meowth_bin():
+        from . import retro, rts, sotn
+        if g["console"] == "psx" and sotn.reconhece(rom):  # engenharia reversa própria (formato do SOTN)
+            rep = sotn.translate_rom(paths, rom, g.get("title", ""), progress=progress, should_pause=should_pause)
+        elif g["console"] == "gba" and retro.is_pokemon_gba(rom) and retro.meowth_bin():
             rep = retro.translate_rom(paths, rom, g.get("title", ""), progress=progress, should_pause=should_pause)
         else:  # todo o resto do retrô: RomTranslate Studio
             okc, why = rts.supported(g["console"], rom)
