@@ -99,6 +99,7 @@ Aviso aqui quando o download terminar.
 /pc listar | sincronizar | acordar | status — jogos do PC no Deck (aba "Computador")
 /musica [playlist | pausar | proxima | anterior] — Spotify no Deck · cole o link de uma playlist para guardar
 /familia — Deck do irmão: status, jogos, puxar <jogo> (magnet + tradução pronta), par, chave, autorizar
+/corrigir — mande a foto de uma frase traduzida estranha com /corrigir <jogo> na legenda
 /transferir <jogo> — leva o jogo com tudo (emulador, config, saves) para o PC
 /trazer — jogos do PC · /trazer <jogo> — traz do PC para o Deck (instala o emulador se faltar)
 /traduzir <jogo> — tradução pt-BR com IA (Switch e Pokémon GBA) · /traduzir lista | status | config
@@ -304,6 +305,9 @@ class Bot:
             if not link:
                 return "Uso: /playlist <nome> <link da playlist> (ou só cole o link do Spotify aqui)"
             return self._guardar_playlist(" ".join(x for x in args if x != link), link)
+        if cmd == "/corrigir":
+            return ("Mande uma FOTO (ou print) da frase estranha com a legenda /corrigir <nome do jogo>. "
+                    "Pode dizer o que está errado depois de uma barra: /corrigir Zelda | o certo é Reino Cogumelo")
         if cmd == "/familia":  # dois Decks pareados: catálogo (magnet + tradução pronta) do par
             from . import familia_servico
             return familia_servico.comando(self, args)
@@ -412,6 +416,9 @@ class Bot:
         pend = self.cfg.setdefault("pending_console", {})
         doc = m.get("document")
         caption = m.get("caption") or ""
+        foto = (m.get("photo") or [None])[-1] or (doc if doc and str(doc.get("mime_type", "")).startswith("image/") else None)
+        if foto and caption.strip().lower().startswith("/corrigir"):
+            return self._corrigir_foto(foto, caption)
         sp = re.search(r"https?://open\.spotify\.com/(?:intl-[a-z]+/)?(playlist|album|artist|track)/[A-Za-z0-9]+\S*", text)
         if sp:  # link do Spotify colado: vira playlist rápida (nome = o resto da mensagem)
             return self._guardar_playlist(text[:sp.start()] + " " + text[sp.end():], sp.group(0))
@@ -541,6 +548,22 @@ class Bot:
             return remove.effective_map(self.paths)
         except (OSError, ValueError):
             return {}
+
+    def _corrigir_foto(self, foto: dict, legenda: str) -> str:
+        """Foto/print de uma frase traduzida estranha + /corrigir [jogo] [| orientação]: troca só aquela frase."""
+        from .traducao import comandos as trad, corrigir_servico, ia
+        try:
+            info = self.call("getFile", file_id=foto["file_id"])
+            with urllib.request.urlopen(f"https://api.telegram.org/file/bot{self.token}/{info['file_path']}",
+                                        timeout=60) as r:
+                img = r.read()
+        except Exception as e:  # noqa: BLE001
+            self.log(f"/corrigir: foto não baixou ({type(e).__name__})")
+            return "❌ Não consegui pegar a foto do Telegram. Mande de novo daqui a pouco."
+        res = corrigir_servico.corrigir(self.paths, ia.load_cfg(self.paths), img, legenda, self._map())
+        if res.get("feito"):
+            trad.traduzir(self, [res["gid"], "--forcar"])  # refaz o mod a partir do cache (rápido)
+        return res["texto"]
 
     def _guardar_playlist(self, nome: str, link: str) -> str:
         from . import painel
