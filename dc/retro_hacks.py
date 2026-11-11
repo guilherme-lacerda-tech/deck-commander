@@ -161,9 +161,9 @@ def ini_duckstation(texto: str, turbo: float = 2.0) -> str:
     }
     
     main = {
-        "RewindEnable": "false",  # ligado deixou o Castlevania MUITO travado no Deck (salvava 10x por segundo)
-        "RewindFrequency": "0.100000",
-        "RewindSaveSlots": "100",
+        "RewindEnable": "true",  # leve: 2 cópias por segundo, 10 s para trás (a lentidão de 11/11 era a camada WSI)
+        "RewindFrequency": "0.500000",
+        "RewindSaveSlots": "20",
         "FastForwardSpeed": f"{turbo:.6f}"
     }
     
@@ -172,6 +172,8 @@ def ini_duckstation(texto: str, turbo: float = 2.0) -> str:
     # avisos na tela ("estado salvo no espaço 1", ícone de turbo) — pedido do usuário: saber que funcionou
     # e a velocidade no canto ("100%"; com turbo "200%"): mostra na hora se o turbo e o jogo estão na velocidade certa
     texto = ini_definir(texto, "Display", {"ShowOSDMessages": "true", "ShowStatusIndicators": "true", "ShowSpeed": "true"})
+    # pula a abertura do PlayStation (logo do console): o turbo não acelera essa parte nem os vídeos lidos do disco
+    texto = ini_definir(texto, "BIOS", {"PatchFastBoot": "true"})
 
     manter = set(hotkeys.keys())
     texto = ini_remover_tecla(texto, "Hotkeys", "Keyboard/F9", manter)

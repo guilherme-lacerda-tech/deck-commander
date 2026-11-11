@@ -10,6 +10,20 @@ from pathlib import Path
 from .library import build_command
 from .paths import get_paths
 
+# Emuladores que a camada de vídeo do modo de jogo (gamescope WSI) segura em 30 quadros por segundo.
+# Medido no Deck em 11/11/2026: DuckStation ficava a 60% da velocidade (30 de 50 quadros) com o processador
+# parado; com ENABLE_GAMESCOPE_WSI=0 foi a 100%. O PCSX2 roda normal (60) e fica como está.
+SEM_WSI = ("duckstation",)
+
+
+def sem_wsi_do_gamescope(cmd: list[str]) -> list[str]:
+    """Abre o emulador sem a camada WSI do gamescope quando ele está na lista SEM_WSI."""
+    if any(any(n in str(p).lower() for n in SEM_WSI) for p in cmd[:4]) and "ENABLE_GAMESCOPE_WSI=0" not in cmd:
+        if cmd and cmd[0] == "/usr/bin/env":
+            return [cmd[0], "ENABLE_GAMESCOPE_WSI=0"] + cmd[1:]
+        return ["/usr/bin/env", "ENABLE_GAMESCOPE_WSI=0"] + cmd
+    return cmd
+
 
 def _jogar_pc(game_id: str, entry: dict, paths, say, fail) -> None:
     from . import pc_remoto
@@ -55,7 +69,7 @@ def main(argv: list[str]) -> None:
     try:
         emu_cfg = paths.config / "emulators.json"
         emulators = json.loads(emu_cfg.read_text("utf-8")) if emu_cfg.exists() else {}
-        cmd = build_command(game_id, launch_map, emulators)
+        cmd = sem_wsi_do_gamescope(build_command(game_id, launch_map, emulators))
     except Exception as e:  # noqa: BLE001
         fail(f"erro ao resolver {game_id}: {e}", "Esse jogo foi removido ou não está mais na biblioteca.")
     title = launch_map[game_id].get("title", game_id)

@@ -104,7 +104,7 @@ def test_override_e_shader():
 def test_duckstation_e_pcsx2():
     i = "[Hotkeys]\nFastForward = Keyboard/Tab\nScreenshot = Keyboard/F12\n\n[Main]\nX = 1\n"
     d = R.ini_duckstation(i)
-    assert "ToggleFastForward = Keyboard/F12" in d and "Screenshot" not in d and "X = 1" in d and "RewindEnable = false" in d
+    assert "ToggleFastForward = Keyboard/F12" in d and "Screenshot" not in d and "X = 1" in d and "RewindEnable = true" in d and "RewindSaveSlots = 20" in d
     assert d.index("SaveSelectedSaveState") < d.index("[Main]")  # entrou na seção certa
     assert R.ini_duckstation(d) == d
     p = R.ini_pcsx2("[Hotkeys]\nToggleTurbo = Keyboard/Tab\nHoldTurbo = Keyboard/Period\n\n[Pad]\nA = 1\n")
