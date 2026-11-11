@@ -29,3 +29,9 @@ def test_ogg():
     pacotes, preskip = B.pacotes_do_ogg(ogg)
     assert preskip == 312 and pacotes == [b"A" * 300, b"BB"]
     assert B.de_ogg(ogg, 960).pacotes == pacotes
+
+
+def test_ogg_ida_e_volta():
+    b = B.Bwav(48000, 2 * 960 - 120, 120, [b"\xfc" + bytes(40), b"\xfc" + bytes(300)])
+    ogg = B.para_ogg(b)
+    assert ogg.startswith(b"OggS") and B.pacotes_do_ogg(ogg) == (b.pacotes, 120)

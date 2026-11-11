@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import struct
 import zlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -17,17 +17,16 @@ class Bwav:
     taxa: int
     amostras: int
     preskip: int
-    pacotes: list[bytes]
+    pacotes: list[bytes]                                   # canal 0 (mono, ou esquerdo)
+    outros: list[list[bytes]] = field(default_factory=list)  # demais canais (estéreo: o direito)
 
 
-def ler(d: bytes) -> Bwav:
-    if d[:4] != b"BWAV":
-        raise ValueError("não é BWAV")
-    canais = struct.unpack_from("<H", d, 0x0E)[0]
-    codec, _pan, taxa, amostras = struct.unpack_from("<HHII", d, 0x10)
-    if canais != 1 or codec != 2:
-        raise ValueError(f"BWAV não suportado (canais {canais}, codec {codec}): só mono Opus")
-    base = struct.unpack_from("<I", d, 0x10 + 0x30)[0]
+def _alinha(n: int, a: int = 0x40) -> int:
+    return (n + a - 1) // a * a
+
+
+def _fluxo(d: bytes, base: int) -> tuple[int, list[bytes]]:
+    """(pré-salto, pacotes) do fluxo Opus da Nintendo que começa em `base`."""
     ident, _tam = struct.unpack_from("<II", d, base)
     if ident != 0x80000001:
         raise ValueError("bloco info do Opus ausente")
@@ -41,19 +40,45 @@ def ler(d: bytes) -> Bwav:
         n = struct.unpack_from(">I", d, i)[0]
         pacotes.append(d[i + 8:i + 8 + n])
         i += 8 + n
-    return Bwav(taxa, amostras, preskip, pacotes)
+    return preskip, pacotes
+
+
+def ler(d: bytes) -> Bwav:
+    if d[:4] != b"BWAV":
+        raise ValueError("não é BWAV")
+    canais = struct.unpack_from("<H", d, 0x0E)[0]
+    fluxos = []
+    for c in range(canais):
+        codec, _pan, taxa, amostras = struct.unpack_from("<HHII", d, 0x10 + c * 0x4C)
+        if codec != 2:
+            raise ValueError(f"BWAV não suportado (codec {codec}): só Opus")
+        fluxos.append(_fluxo(d, struct.unpack_from("<I", d, 0x10 + c * 0x4C + 0x30)[0]))
+    _c, _p, taxa, amostras = struct.unpack_from("<HHII", d, 0x10)
+    return Bwav(taxa, amostras, fluxos[0][0], fluxos[0][1], [f[1] for f in fluxos[1:]])
 
 
 def gravar(b: Bwav) -> bytes:
-    corpo = b"".join(struct.pack(">II", len(p), 0) + p for p in b.pacotes)
-    dados = struct.pack("<II", 0x80000004, len(corpo)) + corpo
-    info = struct.pack("<IIBBHIIIII", 0x80000001, 0x18, 0, 1, 0, b.taxa, 0x20, 0, 0, b.preskip)
-    canal = struct.pack("<HHIII", 2, 2, b.taxa, b.amostras, b.amostras) + bytes(32) + \
-        struct.pack("<IIIII", 0x80, 0x80, 1, 0xFFFFFFFF, 0) + bytes(8)
-    # CRC32 de 0x80 até o fim (conferido no arquivo real); o "final range" de cada pacote vai 0 (só depuração)
-    cab = b"BWAV" + struct.pack("<HHIHH", 0xFEFF, 1, zlib.crc32(info + dados), 0, 1)
-    topo = cab + canal
-    return topo + bytes(0x80 - len(topo)) + info + dados
+    canais = [b.pacotes] + list(b.outros)
+    pans = [2] if len(canais) == 1 else list(range(len(canais)))  # mono = centro; estéreo = 0 esq., 1 dir.
+    fluxos = []
+    for pac in canais:
+        corpo = b"".join(struct.pack(">II", len(p), 0) + p for p in pac)
+        info = struct.pack("<IIBBHIIIII", 0x80000001, 0x18, 0, 1, 0, b.taxa, 0x20, 0, 0, b.preskip)
+        fluxos.append(info + struct.pack("<II", 0x80000004, len(corpo)) + corpo)
+    inicio = _alinha(0x10 + 0x4C * len(canais))
+    offs, pos = [], inicio
+    for k, f in enumerate(fluxos):  # cada fluxo começa alinhado a 0x40 (conferido no arquivo estéreo real)
+        offs.append(pos)
+        pos = _alinha(pos + len(f)) if k < len(fluxos) - 1 else pos + len(f)
+    infos = b"".join(struct.pack("<HHIII", 2, pans[k], b.taxa, b.amostras, b.amostras) + bytes(32)
+                     + struct.pack("<IIIII", offs[k], offs[k], 1, 0xFFFFFFFF, 0) + bytes(8) for k in range(len(canais)))
+    corpo = bytearray(pos - inicio)
+    for k, f in enumerate(fluxos):
+        corpo[offs[k] - inicio:offs[k] - inicio + len(f)] = f
+    # CRC32 do início dos dados até o fim (conferido nos arquivos reais); "final range" dos pacotes vai 0
+    cab = b"BWAV" + struct.pack("<HHIHH", 0xFEFF, 1, zlib.crc32(bytes(corpo)), 0, len(canais))
+    topo = cab + infos
+    return topo + bytes(inicio - len(topo)) + bytes(corpo)
 
 
 def pacotes_do_ogg(ogg: bytes) -> tuple[list[bytes], int]:
@@ -76,6 +101,43 @@ def pacotes_do_ogg(ogg: bytes) -> tuple[list[bytes], int]:
         raise ValueError("Ogg sem OpusHead")
     preskip = struct.unpack_from("<H", pacotes[0], 10)[0]
     return [p for p in pacotes[1:] if not p.startswith(b"OpusTags")], preskip
+
+
+def _crc_ogg(dados: bytes) -> int:
+    """CRC do Ogg: polinômio 0x04C11DB7, sem reflexão, começa em 0."""
+    crc = 0
+    for b in dados:
+        crc ^= b << 24
+        for _ in range(8):
+            crc = ((crc << 1) ^ 0x04C11DB7) if crc & 0x80000000 else (crc << 1)
+            crc &= 0xFFFFFFFF
+    return crc
+
+
+def para_ogg(b: Bwav) -> bytes:
+    """Ogg Opus com os pacotes do BWAV (para o ffmpeg tocar/conferir: o original e a voz gerada)."""
+    def pagina(pacotes: list[bytes], granulo: int, seq: int, tipo: int) -> bytes:
+        lacing, corpo = b"", b""
+        for p in pacotes:
+            lacing += b"\xff" * (len(p) // 255) + bytes([len(p) % 255])
+            corpo += p
+        cab = b"OggS" + bytes([0, tipo]) + struct.pack("<qII", granulo, 0x44434F50, seq) + b"\x00\x00\x00\x00" \
+            + bytes([len(lacing)]) + lacing
+        pag = cab + corpo
+        return pag[:22] + struct.pack("<I", _crc_ogg(pag)) + pag[26:]
+    head = b"OpusHead" + struct.pack("<BBHIhB", 1, 1, b.preskip, b.taxa, 0, 0)
+    tags = b"OpusTags" + struct.pack("<I", 12) + b"deck-command" + struct.pack("<I", 0)
+    out = pagina([head], 0, 0, 2) + pagina([tags], 0, 1, 0)
+    pos, seq, lote = 0, 2, []
+    for k, p in enumerate(b.pacotes):
+        lote.append(p)
+        pos += 960  # quadros de 20 ms (o que o jogo e o ffmpeg usam)
+        if len(lote) == 50 or k == len(b.pacotes) - 1:
+            fim = k == len(b.pacotes) - 1
+            out += pagina(lote, b.amostras + b.preskip if fim else pos, seq, 4 if fim else 0)
+            seq += 1
+            lote = []
+    return out
 
 
 def de_ogg(ogg: bytes, amostras: int) -> Bwav:
