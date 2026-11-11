@@ -88,7 +88,21 @@ def _traduzir1(textos: list[str], modelo: str, aviso: str = "") -> list[str]:
     vozes = out.get("vozes") if isinstance(out, dict) else None
     global ULTIMAS_VOZES
     ULTIMAS_VOZES = [str(v).lower()[:1] for v in vozes] if isinstance(vozes, list) and len(vozes) == len(textos) else []
-    return [str(x).strip() for x in lista]
+    return [_fala(x, i) for i, x in enumerate(lista)]
+
+
+def _fala(x, i: int) -> str:
+    """Falha real: a IA devolveu {'f': 'Você vê...'} / {'texto': ..., 'voz': 'm'} no lugar da fala, e a voz leu as
+    chaves. Tira o texto de dentro (e a voz, se veio junto)."""
+    if isinstance(x, dict):
+        voz = x.get("voz") or next((k for k in x if k in ("f", "m")), None)
+        if voz and i < len(ULTIMAS_VOZES):
+            ULTIMAS_VOZES[i] = str(voz).lower()[:1]
+        x = x.get("texto") or x.get("fala") or next((v for v in x.values() if isinstance(v, str) and len(v) > 1), "")
+    s = str(x).strip()
+    if s.startswith("{"):
+        raise RuntimeError("fala veio como objeto: " + s[:60])
+    return s
 
 
 ULTIMAS_VOZES: list[str] = []  # "f"/"m" por fala, da última tradução (quem fala cada linha)
