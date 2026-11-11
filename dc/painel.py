@@ -622,7 +622,8 @@ def pc(p: Ponte, a: dict) -> dict:
     cfg = pc_remoto.carregar_config(p.paths)
     return {"host_casa": cfg.get("host_casa", ""), "rede_casa": cfg.get("rede_casa", ""), "mac": cfg.get("mac", ""),
             "host_tailscale": cfg.get("host_tailscale", ""), "porteiro": (cfg.get("porteiro") or [""])[0],
-            "codigo_definido": bool(cfg.get("codigo")), "jogos": _jogos_pc(p)}
+            "codigo_definido": bool(cfg.get("codigo")), "jogos": _jogos_pc(p),
+            "guia_qr": _qr("https://github.com/guilherme-lacerda-tech/deck-commander/blob/main/docs/FIRE-STICK.md")}
 
 
 def pc_salvar(p: Ponte, a: dict) -> dict:
@@ -774,6 +775,27 @@ def qualidade(p: Ponte, a: dict) -> dict:
     return {"jogos": jogos, "controles": ctl, "layouts": lay}
 
 
+def melhorias(p: Ponte, a: dict) -> dict:
+    from . import melhorias as M
+    try:
+        noite = bool(json.loads((p.paths.config / "shaders-noite.json").read_text("utf-8")).get("ligado"))
+    except (OSError, ValueError):
+        noite = False
+    return {"emuladores": M.estado(Path.home()), "shaders_noite": noite}
+
+
+def melhorias_definir(p: Ponte, a: dict) -> dict:
+    from . import melhorias as M
+    if a.get("shaders_noite") is not None:
+        (p.paths.config / "shaders-noite.json").write_text(json.dumps({"ligado": bool(a["shaders_noite"])}), "utf-8")
+        return {"texto": "Shaders à noite " + ("ligado: de madrugada, na tomada e sem jogo aberto, o Deck abre cada "
+                         "jogo novo por ~1 min para gerar o cache." if a["shaders_noite"] else "desligado.")}
+    try:
+        return {"texto": M.definir(Path.home(), a.get("emulador", ""), a.get("opcao", ""), bool(a.get("ligar")))}
+    except ValueError as e:
+        raise Erro(str(e))
+
+
 def qualidade_definir(p: Ponte, a: dict) -> dict:
     if not a.get("gid") or not a.get("nivel"):
         raise Erro("Escolha o jogo e o nível.")
@@ -800,7 +822,7 @@ ACOES = {f.__name__: f for f in (
     transferir_enviar, trazer_preparar, trazer_enviar, qualidade, qualidade_definir, controle_definir,
     downloads_limpar, traducao_limpar, desinstalar_lista, devolver, removido_perguntado, musica, musica_volume,
     musica_midia, musica_playlist, musica_salvar, pc_tv, espaco_sugestoes, familia, familia_salvar,
-    familia_atualizar, familia_puxar)}
+    familia_atualizar, familia_puxar, melhorias, melhorias_definir)}
 ACOES["downloads_pausar"] = lambda p, a: _pausar(p, a, True)
 ACOES["downloads_retomar"] = lambda p, a: _pausar(p, a, False)
 

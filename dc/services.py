@@ -102,6 +102,25 @@ def power_loop(paths: Paths, interval: float = 30) -> None:
             _log(paths, "worker", f"plugin: {e}")
         # fila: roda operações pendentes (ex.: /sync enfileirado durante jogo) quando o jogo fecha
         running = ops.game_running()
+        # shaders à noite (opcional): na tomada, sem jogo, de madrugada abre 1 jogo novo por vez por ~60 s
+        if not running and time.time() - getattr(power_loop, "_shaders", 0) > 600:
+            power_loop._shaders = time.time()
+            try:
+                if json.loads((paths.config / "shaders-noite.json").read_text("utf-8")).get("ligado"):
+                    from datetime import datetime as _dt
+                    from . import bench, espaco, remove, shaders_noite
+                    feitos = shaders_noite.rodada(
+                        remove.effective_map(paths), shaders_noite.Estado(paths.state / "shaders-noite.json"),
+                        espaco.ultimas_jogadas(paths.logs / "launch.log"),
+                        lambda g, s: bool(bench.run(paths, g, s, log=lambda m: _log(paths, "worker", f"shaders: {m}"))),
+                        _dt.now(), bool(reading.ac_online), ops.game_running, maximo=1,
+                        log=lambda m: _log(paths, "worker", f"shaders: {m}"))
+                    if feitos:
+                        _log(paths, "worker", f"shaders: cache gerado para {feitos}")
+            except (OSError, ValueError):
+                pass  # desligado (arquivo não existe)
+            except Exception as e:  # noqa: BLE001
+                _log(paths, "worker", f"shaders: {e}")
         if not running:  # qualidade por jogo: devolve o valor global se o jogo foi fechado à força
             try:
                 from . import quality

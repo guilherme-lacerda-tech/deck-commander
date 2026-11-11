@@ -79,6 +79,9 @@ if ($Instalar -or $Desinstalar) {
     $aqui = Split-Path -Parent $PSCommandPath
     Copy-Item -LiteralPath (Join-Path $aqui 'biblioteca-pc.ps1') -Destination $Destino -Force
     Copy-Item -LiteralPath (Join-Path $aqui 'fechar-jogo.ps1') -Destination $Destino -Force
+    if (Test-Path (Join-Path $aqui 'perfil-controle.ps1')) {
+        Copy-Item -LiteralPath (Join-Path $aqui 'perfil-controle.ps1') -Destination $Destino -Force
+    }
     $acao = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument (
         '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}"' -f (Join-Path $Destino 'biblioteca-pc.ps1'))
     $boot = New-ScheduledTaskTrigger -AtStartup
@@ -301,7 +304,14 @@ function Entrada($jogo) {
     # So "detached": o Sunshine mantem a sessao ate o Moonlight sair (como a "Desktop"); o lancador abre o jogo.
     $e['detached'] = [object[]]@($jogo.Lancar)
     $undo = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" -Pasta "{1}"' -f $FecharJogo, $jogo.Pasta.TrimEnd('\')
-    $e['prep-cmd'] = [object[]]@([ordered]@{ do = ''; undo = $undo; elevated = $false })
+    $prep = @([ordered]@{ do = ''; undo = $undo; elevated = $false })
+    $perfil = Join-Path (Split-Path -Parent $FecharJogo) 'perfil-controle.ps1'
+    if ($jogo.Loja -eq 'Atalho' -and (Test-Path -LiteralPath $perfil)) {
+        # jogo de emulador: antes do stream entra o perfil de controle "do Deck"; depois volta o da mesa
+        $base = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" -Acao ' -f $perfil
+        $prep += [ordered]@{ do = $base + 'Aplicar'; undo = $base + 'Restaurar'; elevated = $false }
+    }
+    $e['prep-cmd'] = [object[]]$prep
     $e['auto-detach'] = $true
     return $e
 }

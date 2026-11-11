@@ -617,7 +617,12 @@ function TelaPC() {
                 description: d.codigo_definido ? "já definido (deixe vazio para manter)" : "opcional" }),
             Bt("💾 Salvar", () => fazer("pc_salvar", f), { disabled: ocupado })),
         Sec("Jogos do PC (" + d.jogos.length + ")", d.jogos.length ? Txt(d.jogos.map((j) => "• " + j).join("\n"))
-            : Txt("Nenhum ainda. Com o PC acordado, toque em Sincronizar.")));
+            : Txt("Nenhum ainda. Com o PC acordado, toque em Sincronizar.")),
+        Sec("Fire TV Stick (jogar o PC em outra casa)",
+            Txt("No Fire: instale Tailscale (mesma conta) e Moonlight. No Moonlight, adicione o PC pelo IP abaixo; "
+                + "ele mostra um PIN de 4 números para digitar no Sunshine do PC (https://localhost:47990 → PIN)."),
+            Txt("IP do PC para o Moonlight: " + (d.host_tailscale || "configure o IP da Tailscale acima"), { fontWeight: "bold" }),
+            Txt("Guia completo no celular:"), Qr(d.guia_qr)));
 }
 
 // ---- 6. Transferências --------------------------------------------------------------------------
@@ -659,6 +664,23 @@ function TelaTransferir() {
 }
 
 // ---- 7. Qualidade e controles -------------------------------------------------------------------
+// Melhorias dos próprios emuladores (nada é baixado; a ROM não muda) + shaders à noite
+function Melhorias() {
+    const [d, recarregar] = useDados("melhorias");
+    const [msg, ocupado, fazer] = useAcao(recarregar);
+    if (!d || !d.ok) return Sec("Melhorias", Carregando(d));
+    const nomes = { widescreen: "Tela cheia 16:9", sem_entrelacamento: "Sem tremido (entrelaçamento)" };
+    return Sec("Melhorias (dos próprios emuladores)",
+        d.emuladores.length ? d.emuladores.map((e) => Object.keys(e.opcoes).map((o) =>
+            Toggle(e.nome + ": " + nomes[o], e.opcoes[o], (v) => fazer("melhorias_definir", { emulador: e.emulador, opcao: o, ligar: v }))))
+            : Txt("Abra PS1, PS2 ou GameCube uma vez para o emulador criar a configuração."),
+        Txt("16:9 usa os patches que o PCSX2/DuckStation/Dolphin já trazem; em alguns jogos a imagem pode esticar — é só desligar.",
+            { opacity: 0.8 }),
+        Toggle("Shaders à noite", d.shaders_noite, (v) => fazer("melhorias_definir", { shaders_noite: v }),
+            "De madrugada, na tomada e sem jogo: abre cada jogo novo ~1 min para não engasgar na 1ª vez"),
+        Msg(msg));
+}
+
 function TelaQualidade() {
     const [d, recarregar] = useDados("qualidade");
     const [busca, setBusca] = SP_REACT.useState("");
@@ -677,6 +699,7 @@ function TelaQualidade() {
             j ? Txt("Agora: " + j.atual + ". Vale a partir da próxima vez que abrir o jogo.") : null,
             Txt("Jogo pesado ou com gráfico estranho: escolha nativo. Padrão = o do console.", { opacity: 0.8 }),
             Msg(msg)),
+        h(Melhorias, { key: "mel" }),
         Sec("Botões A / B / X / Y", (d.layouts || []).length
             ? [Txt("Escolha como os botões funcionam em cada console:", null, "lh")].concat((d.layouts || []).map((l) =>
                 Lista(l.emulador, Object.keys(l.opcoes).map((k) => ({ data: k, label: l.opcoes[k] })), l.atual,
