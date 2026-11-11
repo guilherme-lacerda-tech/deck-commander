@@ -48,6 +48,41 @@ def coletar(disco: Disco) -> list[S.Trecho]:
     return trechos
 
 
+def agrupar(trechos: list[S.Trecho], dados: dict[str, bytes]) -> list[list[S.Trecho]]:
+    """Junta as linhas de uma mesma fala (trechos ASCII separados só por códigos de controle curtos, sem 0x00),
+    para a IA traduzir a frase inteira e não pedaços soltos ("Whatever we do," + "the castle…")."""
+    grupos: list[list[S.Trecho]] = []
+    for t in sorted(trechos, key=lambda x: (x.arquivo, x.pos)):
+        g = grupos[-1] if grupos else None
+        if g and t.tipo == "ascii" and g[-1].tipo == "ascii" and g[-1].arquivo == t.arquivo:
+            vao = dados[t.arquivo][g[-1].pos + g[-1].tam:t.pos]
+            if 0 < len(vao) <= 4 and all(0 < b < 0x20 for b in vao):
+                g.append(t)
+                continue
+        grupos.append([t])
+    return grupos
+
+
+def distribuir(texto: str, grupo: list[S.Trecho]) -> list[str]:
+    """Reparte a frase traduzida pelas linhas originais (cada linha cabe no espaço dela; palavra inteira)."""
+    palavras = S.sem_acento(texto).split()
+    saida = []
+    for k, t in enumerate(grupo):
+        linha = ""
+        while palavras:
+            cand = (linha + " " + palavras[0]).strip()
+            if len(S.codificar(cand, 10 ** 4, t.tipo).rstrip()) > t.tam and linha:
+                break
+            linha = cand
+            palavras.pop(0)
+            if k == len(grupo) - 1:
+                continue
+        saida.append(linha)
+    if palavras and saida:  # sobrou: vai para a última linha (codificar corta no espaço que couber)
+        saida[-1] = (saida[-1] + " " + " ".join(palavras)).strip()
+    return saida
+
+
 def translate_rom(paths: Paths, rom: Path, title: str = "", chain=None, progress=lambda d, t: None,
                   should_pause=lambda: False) -> RtsReport:
     cfg = ia.load_cfg(paths)
@@ -56,10 +91,13 @@ def translate_rom(paths: Paths, rom: Path, title: str = "", chain=None, progress
     disco = Disco(bin_)
     trechos = coletar(disco)
     rep.found = rep.candidates = len(trechos)
-    por_texto: dict[str, list[S.Trecho]] = {}
-    for t in trechos:
-        por_texto.setdefault(t.texto, []).append(t)
-    itens = [ia.Item(f"t{n}", txt, max_len=min(x.tam for x in ts)) for n, (txt, ts) in enumerate(por_texto.items())]
+    dados = {nome: disco.ler(nome) for nome in {t.arquivo for t in trechos}}
+    # cada fala (grupo de linhas) vira UMA frase para a IA; frases iguais em vários lugares traduzem uma vez só
+    por_texto: dict[str, list[list[S.Trecho]]] = {}
+    for g in agrupar(trechos, dados):
+        por_texto.setdefault(" ".join(t.texto for t in g), []).append(g)
+    itens = [ia.Item(f"t{n}", txt, max_len=min(sum(t.tam for t in g) for g in gs))
+             for n, (txt, gs) in enumerate(por_texto.items())]
     ids = {f"t{n}": txt for n, txt in enumerate(por_texto)}
     res = ia.translate(paths, cfg, itens, f"sotn-{rom.stem}", ia.load_glossary_jogo(paths, cfg, itens, title),
                        chain=chain, progress=progress, should_pause=should_pause)
@@ -69,15 +107,16 @@ def translate_rom(paths: Paths, rom: Path, title: str = "", chain=None, progress
         orig = ids.get(iid)
         if not orig or not novo.strip() or S.sem_acento(novo).strip() == orig.strip():
             continue
-        for t in por_texto[orig]:
-            trocas.setdefault(t.arquivo, []).append((t, novo))
+        for g in por_texto[orig]:
+            for t, linha in zip(g, distribuir(novo, g)):
+                trocas.setdefault(t.arquivo, []).append((t, linha))
             rep.translated += 1
     rep.flagged = len(res.flagged)
     rep.errors += res.errors[:3]
     if not trocas:
         rep.errors.append("nenhuma frase traduzida")
         return rep
-    novos = {nome: S.aplicar(disco.ler(nome), ts) for nome, ts in trocas.items()}
+    novos = {nome: S.aplicar(dados[nome], ts) for nome, ts in trocas.items()}
     stem = rom.stem
     bin_pt = bin_.with_name(f"{stem} (PT-BR).bin")
     disco.gravar_copia(bin_pt, novos)
@@ -87,5 +126,6 @@ def translate_rom(paths: Paths, rom: Path, title: str = "", chain=None, progress
         rep.output = str(cue_pt)
     else:
         rep.output = str(bin_pt)
-    rep.audit_left = sum(1 for t in coletar(Disco(bin_pt)) if t.texto in por_texto and t.texto.strip())
+    originais = {t.texto for t in trechos}
+    rep.audit_left = sum(1 for t in coletar(Disco(bin_pt)) if t.texto in originais)
     return rep

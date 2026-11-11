@@ -14,7 +14,7 @@ import unicodedata
 from dataclasses import dataclass
 
 APOSTROFO = b"\x81\x66"
-_PROIBIDOS = set("_\\/{}|<>=#$@~^")
+_PROIBIDOS = set("_\\/{}|<>=#$@~^%")  # "%" = texto de depuração ("col step %x")
 _EXT = (".BIN", ".VH", ".VB", ".TIM", ".STR", ".DAT", ".XA")
 
 
@@ -27,17 +27,45 @@ class Trecho:
     tipo: str     # "ascii" | "menos20"
 
 
+_COMUNS = set("""the of and to in is you that it he was for on are with as his they be at one have this from or had by not
+but what all were we when your can said there an each which she do how their if will up other about out many then
+them these so some her would make like him into time has look two more go see no way could my than first been who
+its now find long down day did get come made may part me here where why must am thy thee shall know never may
+sword shield attack defense magic potion heart hearts cape armor armour ring cloak helm hat boots damage strength
+vampire castle count lord dracula alucard richter maria death belmont blade spell card relic item items power life
+gold hit enemy enemies stone staff rod fire ice holy dark poison curse water air earth light thunder bolt
+mail plate shirt tunic robe crown mask glasses gauntlet bracelet necklace medal brooch knife axe cross bible stopwatch
+rebound book library master save room map exit equip use yes cancel start continue option sound stereo mono
+name status level exp hp mp str con int lck def atk soul bat wolf mist form jump double gravity leap
+increases restores resistance immune raises adds attacks against while when slightly greatly user nearby
+son father mother man men woman god evil night moon world time back again help kill destroy king queen""".split())
+
+
 def parece_texto(s: str) -> bool:
-    """Frase/nome em inglês, não lixo binário nem nome de arquivo."""
-    if sum(c.isalpha() for c in s) < 3 or len(set(s)) == 1:
+    """Frase/nome em inglês, não lixo binário nem nome de arquivo (filtro endurecido com o disco de verdade)."""
+    if sum(c.isalpha() for c in s) < 3 or len(set(s)) == 1 or set(s) & _PROIBIDOS or s.upper().endswith(_EXT):
         return False
-    if not any(re.search(r"[aeiouAEIOU]", w) for w in re.findall(r"[A-Za-z]{3,}", s)):
+    if sum(c.isalpha() or c in " '.,!?-" for c in s) / len(s) < 0.8:
         return False
-    if sum(c.isalpha() or c == " " for c in s) / len(s) < 0.7 or set(s) & _PROIBIDOS:
+    palavras = re.findall(r"[A-Za-z]+", s)
+    if len(palavras) == 1 and s.strip().islower():  # palavra-chave interna ("alucard", "axearmor"): nunca traduzir
         return False
-    if s.upper().endswith(_EXT):
+    for w in palavras:  # caixa de palavra de verdade: "word", "Word" ou "WORD" — nunca "CEqX4XZ"/"IHdaExW"
+        if len(w) > 1 and not (w.islower() or w.isupper() or (w[0].isupper() and w[1:].islower())):
+            return False
+        if re.search(r"[^aeiouyAEIOUY]{5,}", w):
+            return False
+    letras = "".join(palavras)
+    vogais = sum(c in "aeiouAEIOU" for c in letras) / len(letras)
+    if not 0.2 <= vogais <= 0.7:
         return False
-    return any(c.islower() for c in s) or " " in s.strip()  # "4ABCD"/"0OTION" (lixo, nome em -0x20) não passam
+    grandes = [w for w in palavras if len(w) >= 3]
+    if any(w.lower() in _COMUNS for w in palavras):
+        return True
+    return len(grandes) >= 2  # nome de item com 2 palavras ("Iron cuirass")
+
+
+_ANTES_DEPOIS_OK = set(range(0x00, 0x20)) | {0xFF}
 
 
 def _apara(t: Trecho, espaco: int, d: bytes) -> Trecho | None:
@@ -49,7 +77,12 @@ def _apara(t: Trecho, espaco: int, d: bytes) -> Trecho | None:
         fim -= 1
     if fim <= ini:
         return None
-    t.pos, t.tam, t.texto = ini, fim - ini, t.texto.strip()
+    texto = t.texto.strip()
+    m = re.match(r"^[A-Za-z0-9] {2,}", texto)  # letra solta de outro dado colada na frente ("i  Ring of Varda")
+    if m:
+        ini += m.end()
+        texto = texto[m.end():]
+    t.pos, t.tam, t.texto = ini, fim - ini, texto
     return t
 
 
@@ -68,6 +101,9 @@ def achar_ascii(arquivo: str, d: bytes, minimo: int = 4) -> list[Trecho]:
                 chars.append(chr(d[i]))
                 i += 1
         if i < n and d[i] == 0xFF:  # termina em 0xFF: é nome no formato -0x20 (achar_menos20 cuida)
+            continue
+        # texto de verdade começa e termina junto de código de controle/0x00 (lixo binário começa em qualquer byte)
+        if (ini > 0 and d[ini - 1] not in _ANTES_DEPOIS_OK) or (i < n and d[i] not in _ANTES_DEPOIS_OK):
             continue
         t = _apara(Trecho(arquivo, ini, i - ini, "".join(chars), "ascii"), 0x20, d)
         if t and len(t.texto) >= minimo and parece_texto(t.texto):

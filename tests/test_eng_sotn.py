@@ -28,7 +28,16 @@ def test_codificar_e_aplicar():
     assert len(novo) == len(FALA)
     assert novo[2:21] == b"A humanidade       " or novo[2:21].startswith(b"A humanidade")
     assert novo[:2] == FALA[:2] and novo[21:24] == FALA[21:24]  # códigos de controle intactos
-    assert S.achar_menos20("X", novo)[0].texto.strip() == "Pocao"
+    p = m[0].pos
+    assert novo[p:p + 6] == bytes(c - 0x20 for c in b"Pocao ") and novo[p + 6] == 0xFF  # o fim (0xFF) fica
+
+
+def test_filtro_do_disco_real():
+    """Amostras reais do disco: lixo binário e coisas internas não entram; texto de verdade entra."""
+    for lixo in ("CEqX4XZ", "oyxyxyxyxyxyxyv", "hijklmn", "IHdaExW", "col step %x", "alucard"):
+        assert not S.parece_texto(lixo), lixo
+    for bom in ("Iron cuirass", "Dracula's castle beckons for you...", "Whatever we do,", "It's all right!"):
+        assert S.parece_texto(bom), bom
 
 
 def _bin(arquivo: bytes) -> bytes:
@@ -77,3 +86,13 @@ def test_disco(tmp_path):
     (tmp_path / "jogo.cue").write_text('FILE "jogo.bin" BINARY\n  TRACK 01 MODE2/2352\n')
     P.gravar_cue(tmp_path / "jogo.cue", tmp_path / "pt.cue", "pt.bin")
     assert 'FILE "pt.bin" BINARY' in (tmp_path / "pt.cue").read_text() and "MODE2/2352" in (tmp_path / "pt.cue").read_text()
+
+
+def test_fala_inteira_vai_junta_e_volta_nas_linhas():
+    from dc.traducao import sotn
+    a = S.achar_ascii("X", FALA)
+    grupos = sotn.agrupar(a, {"X": FALA})
+    assert [len(g) for g in grupos] == [2, 1]  # as 2 linhas da fala juntas; a descrição sozinha
+    linhas = sotn.distribuir("Precisamos de alguém como você!", grupos[0])
+    assert len(linhas) == 2 and all(len(S.codificar(l, 999, "ascii").rstrip()) <= t.tam for l, t in zip(linhas, grupos[0]))
+    assert linhas == ["Precisamos de", "alguem como voce!"]
