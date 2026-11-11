@@ -199,3 +199,19 @@ def test_frase_nao_sai_cortada(monkeypatch):
     longa = "Uma frase comprida demais para duas linhas curtas"
     ok = sotn._completar(None, {}, [], {"t0": longa}, {ids["t0"]: [g]}, ids, None, lambda *a: None)
     assert ok == {"t0": "Frase curta."} and pedidos and pedidos[0][1] == longa  # encurtou a tradução que veio
+
+
+def test_glossario_antes_de_cortar(monkeypatch):
+    """Falha real 11/11/2026: 79 frases saíram cortadas porque a 1ª tradução não olhava o glossário à mão."""
+    from dc.traducao import sotn
+    monkeypatch.setattr(sotn.ia, "shorten", lambda *a, **k: {})
+    g = [S.Trecho("X", 0, 12, "Iron cuirass", "menos20")]
+    ids = {"t0": "Iron cuirass"}
+    sotn.CORTADAS.clear()
+    ok = sotn._completar(None, {}, [], {"t0": "Couraça de ferro muito longa"}, {"Iron cuirass": [g]}, ids, None,
+                         lambda *a: None)
+    assert ok == {"t0": "Couraça Fer."} and not sotn.CORTADAS
+    linhas = [S.Trecho("X", 0, 17, "If those are your", "ascii"), S.Trecho("X", 30, 9, "so be it.", "ascii")]
+    ids = {"t1": "If those are your so be it."}
+    ok = sotn._completar(None, {}, [], {"t1": "x" * 60}, {ids["t1"]: [linhas]}, ids, None, lambda *a: None)
+    assert ok == {"t1": "Se esse é Que seja."}  # linha a linha pelo glossário

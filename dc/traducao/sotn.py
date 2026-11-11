@@ -127,10 +127,16 @@ def _completar(paths, cfg, chain, faltam: dict[str, str], por_texto, ids, res, p
     if sem:
         longa.update(ia.translate(paths, cfg, sem, "sotn-2a-chance", chain=chain, progress=progress).translated)
     ok: dict[str, str] = {}
+    guardados = _encurtados(paths)
     for iid, txt in longa.items():
-        a = ajustar(txt, grupo_de[iid]) if txt.strip() else None
-        if a:
-            ok[iid] = a
+        g = grupo_de[iid]
+        # ordem: glossário à mão (inteiro ou linha a linha) > encurtado de antes > a tradução que veio
+        for cand in (GLOSSARIO.get(ids[iid]), " ".join(GLOSSARIO.get(t.texto, "\0") for t in g),
+                     guardados.get(ids[iid]), txt):
+            a = ajustar(cand, g) if cand and cand.strip() and "\0" not in cand else None
+            if a:
+                ok[iid] = a
+                break
     pendentes = {iid: longa[iid] for iid in longa if iid not in ok and longa[iid].strip()}
     for _ in range(5):  # encurtar com o limite real (bytes de todas as linhas), conferindo com ajustar()
         if not pendentes:
@@ -140,12 +146,36 @@ def _completar(paths, cfg, chain, faltam: dict[str, str], por_texto, ids, res, p
         curtos = ia.shorten(paths, cfg, pedidos, lambda i, s: ajustar(s, grupo_de[i]) is not None, chain=chain)
         for iid, txt in curtos.items():
             ok[iid] = ajustar(txt, grupo_de[iid]) or txt
+            guardados[ids[iid]] = ok[iid]
             pendentes.pop(iid, None)
+    _guardar_encurtados(paths, guardados)
     # último recurso (nunca deixa em inglês): sem acento e cortada em palavra inteira — contada no relatório
     for iid, txt in pendentes.items():
         ok[iid] = S.sem_acento(txt)
         CORTADAS.append(ids[iid])
     return ok
+
+
+def _arq_encurtados(paths) -> Path | None:
+    return Path(paths.data) / "traducao" / "cache" / "sotn-encurtados.json" if paths is not None else None
+
+
+def _encurtados(paths) -> dict[str, str]:
+    """Encurtamentos que já deram certo (inglês -> PT que cabe): refazer o disco não pede tudo de novo à IA."""
+    import json
+    p = _arq_encurtados(paths)
+    try:
+        return json.loads(p.read_text("utf-8")) if p and p.exists() else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _guardar_encurtados(paths, d: dict[str, str]) -> None:
+    import json
+    p = _arq_encurtados(paths)
+    if p:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps(d, ensure_ascii=False), "utf-8")
 
 
 CORTADAS: list[str] = []  # frases que nem encurtando couberam (relatório: devem ser zero ou quase)
@@ -192,6 +222,18 @@ GLOSSARIO = {
     "Well met,": "Salve,", "human side": "humanidade", "but my goal is": "mas meu fim é",
     "This world must be": "Este mundo será", "How is": "Como", "learn what caused": "saber a causa da",
     "Richter's madness.": "loucura de Richter", "I'm glad your": "Que bom que", "I can't let him": "Não o deixarei",
+    # 11/11/2026: o que saiu cortado na 1ª regeração (nem a IA encurtando coube) — à mão, linha a linha
+    "If those are your": "Se esse é", "so be it.": "Que seja.", "perhaps we'll": "talvez", "and join me": "e venha!",
+    "Then for the Master,": "Então, pelo Mestre,", "Alucard!": "Alucard!", "not until I": "não até eu",
+    "would not see each other again.": "não nos veríamos mais.", "but I found a Belmont...": "mas achei um Belmont...",
+    "Count Dracula rises but once every": "Drácula só renasce uma vez a cada",
+    "No Alucard! Don't come here!": "Não, Alucard! Não venha!", "remaking this world!": "refazendo o mundo!",
+    "Heart broach": "Broche Cor.", "Beryl circlet": "Tiara Berilo", "Platinum mail": "Cota Platina",
+    "Iron cuirass": "Couraça Fer.", "Final Save point": "Salvar Final", "Defeat Succubus": "Vença Succubus",
+    "Defeat Beelzebub": "Vença Beelzebub", "Defeat Scylla": "Vença Scylla", "Defeat Olrox": "Vença Olrox",
+    "Killer Fish": "Peixe Mat.", "Fake Grant": "Grant Fal.", "Medusa Head": "Cab.Medusa",
+    "Blade Soldier": "Sold.Lâmina", "Enemy list": "Inimigos", "Custom cloak settings": "Ajustar a capa",
+    "Select file": "Escolha", "Copying data.": "Copiando...", "File erased.": "Apagado.",
 }
 IGUAIS = {"CON", "INT", "EXP", "Exp", "STR", "LCK", "DEF", "ATT", "HP", "MP", "Def HP", "Mono", "Long"}  # iguais em PT
 
