@@ -117,6 +117,13 @@ def estado(paths: Paths, chamar=api) -> dict:
            "tocando": None}
     if not out["instalado"]:
         return out
+    # antes do login o /status não responde (fica esperando a sessão): o código de login vem primeiro
+    cod, ac = chamar("GET", "/auth/code")
+    if cod == 200 and isinstance(ac, dict) and ac.get("url"):
+        out.update(rodando=True, login={"url": ac["url"], "code": ac.get("code", ""), "expira": ac.get("expires_at")})
+        return out
+    if cod == 0:
+        return out
     cod, st = chamar("GET", "/status")
     if cod == 0:
         return out
@@ -128,9 +135,6 @@ def estado(paths: Paths, chamar=api) -> dict:
             out["tocando"] = {"titulo": t.get("name", ""), "artista": ", ".join(t.get("artist_names") or []),
                               "estado": "Paused" if st.get("paused") else "Playing", "capa": t.get("album_cover_url")}
         return out
-    cod, ac = chamar("GET", "/auth/code")
-    if cod == 200 and isinstance(ac, dict) and ac.get("url"):
-        out["login"] = {"url": ac["url"], "code": ac.get("code", ""), "expira": ac.get("expires_at")}
     return out
 
 

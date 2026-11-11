@@ -45,6 +45,7 @@ def test_estado_login_e_conectado(tmp_path, monkeypatch):
     resp = {"/status": (204, None), "/auth/code": (200, {"url": "https://spotify.com/pair?code=AB12", "code": "AB12"})}
     st = spotify.estado(paths, lambda m, c, *a, **k: resp[c])
     assert not st["conectado"] and st["login"]["code"] == "AB12"
+    resp["/auth/code"] = (204, None)  # já entrou: não há código pendente
     resp["/status"] = (200, {"username": "gui", "paused": False,
                              "track": {"name": "Faixa", "artist_names": ["A", "B"], "album_cover_url": None}})
     st = spotify.estado(paths, lambda m, c, *a, **k: resp[c])
