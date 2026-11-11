@@ -17,7 +17,7 @@ from pathlib import Path
 
 from . import vdf
 
-NOME = "Deck Commander"
+NOME = "deckcommander"  # vira o endereço uioverride-<NOME>.steamscreensavers.host: sem espaço nem maiúscula (espaço deu erro -105)
 MAX_IMAGENS = 60
 
 HTML = """<!DOCTYPE html>

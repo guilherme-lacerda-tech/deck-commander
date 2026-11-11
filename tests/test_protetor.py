@@ -33,10 +33,16 @@ def test_recentes_primeiro_sem_apps_nem_sem_arte(tmp_path):
 def test_monta_pasta_do_steam(tmp_path):
     _deck(tmp_path, 3)
     assert "3 jogo" in protetor.montar(tmp_path)
-    pasta = tmp_path / ".steam/root/config/uioverrides/screensavers/Deck Commander"
+    pasta = tmp_path / ".steam/root/config/uioverrides/screensavers/deckcommander"
     html = (pasta / "index.html").read_text("utf-8")
     lista = json.loads(html.split("const JOGOS = ")[1].split(";\n")[0])
     assert lista[0]["titulo"] == "Jogo 2" and (pasta / lista[0]["fundo"]).read_bytes() == b"jpg"
     assert lista[1]["logo"] and (pasta / lista[1]["logo"]).exists()
     protetor.montar(tmp_path)  # refazer não deixa sobra
-    assert sorted(p.name for p in pasta.parent.iterdir()) == ["Deck Commander"]
+    assert sorted(p.name for p in pasta.parent.iterdir()) == ["deckcommander"]
+
+
+def test_nome_vale_como_endereco():
+    """Falha real: o Steam abre uioverride-<pasta>.steamscreensavers.host; "Deck Commander" (com espaço) deu erro -105."""
+    import re
+    assert re.fullmatch(r"[a-z0-9-]+", protetor.NOME)
