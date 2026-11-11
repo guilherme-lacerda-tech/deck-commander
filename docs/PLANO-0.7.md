@@ -5,8 +5,8 @@ especificações curtas; revisão, testes e integração feitos depois. Ordem: d
 
 | # | Módulo | O que entra | Situação |
 |---|---|---|---|
-| 1 | dc-power | TDP automático por console ao abrir o jogo (SteamOS Manager, sem root) e volta ao fechar; dock/TV detectada → TDP máximo | em andamento |
-| 2 | dc-audio | Mixer jogo × música (PipeWire/pactl), play/pause/próxima e "tocando agora" (MPRIS pelo busctl), playlists rápidas, `/musica` | precisa do Spotify instalado no Deck (Flathub) — pedir OK |
+| 1 | dc-power | TDP automático por console ao abrir o jogo (SteamOS Manager, sem root) e volta ao fechar; dock/TV detectada → TDP máximo | ✅ no ar (testado: 12→7→12 W) |
+| 2 | dc-audio | Mixer jogo × música (PipeWire/pactl), play/pause/próxima e "tocando agora" (MPRIS pelo busctl), playlists rápidas, `/musica` | ✅ no ar (Spotify instalado; falta você entrar na conta) |
 | 3 | TV | Botão "Jogar na TV" e `/tv`: o agente da casa liga a TV no PC e o Sunshine transmite | agente já tem o modo TV |
 | 4 | Limpeza de disco | "Não joga X há 3 meses e ocupa 20 GB: levar para o PC ou desinstalar?" (último jogo pelo log do dc-launch) | — |
 | 5 | Glossário de franquia | Termos guardados por série (ex.: Mario) e usados em todos os jogos dela | — |
