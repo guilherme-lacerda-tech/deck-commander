@@ -1,6 +1,6 @@
 from typing import Dict, List, Optional, Set, Tuple, Union
 
-TECLAS = {"salvar": "F13", "carregar": "F14", "voltar": "F15", "turbo": "F16"}
+TECLAS = {"salvar": "F9", "carregar": "F10", "voltar": "F11", "turbo": "F12"}
 
 def definir(texto: str, valores: Dict[str, str]) -> str:
     """Substitui ou adiciona linhas no formato 'chave = "valor"'."""
@@ -22,19 +22,28 @@ def definir(texto: str, valores: Dict[str, str]) -> str:
 def cfg_retroarch(texto: str, turbo: float = 2.0) -> str:
     """Configura retroarch.cfg com teclas de trás do Steam Deck."""
     valores = {
-        "input_save_state": "f13",
-        "input_load_state": "f14",
-        "input_rewind": "f15",
-        "input_hold_fast_forward": "add",
+        "input_save_state": "f9",
+        "input_load_state": "f10",
+        "input_rewind": "f11",
+        "input_hold_fast_forward": "f12",
         "fastforward_ratio": f"{turbo:.6f}",
         "rewind_enable": "true",
         "rewind_granularity": "2",
         "audio_fastforward_mute": "false",
         "network_cmd_enable": "true",
         "network_cmd_port": "55355",
-        "apply_cheats_after_load": "true"
+        "apply_cheats_after_load": "true",
+        "video_font_enable": "true",  # avisos na tela: "estado salvo", "carregado", turbo
     }
-    return definir(texto, valores)
+    texto = definir(texto, valores)
+    # a mesma tecla em outra função do RetroArch (ex.: f9 = mudo, f11 = prender o mouse) vira "nul"
+    nossas = set(valores) | {k + s for k in valores for s in ("_btn", "_axis", "_mbtn")}
+    linhas = texto.splitlines(keepends=True)
+    for i, linha in enumerate(linhas):
+        chave, _, valor = linha.partition(" = ")
+        if chave.startswith("input_") and chave not in nossas and valor.strip() in ('"f9"', '"f10"', '"f11"', '"f12"'):
+            linhas[i] = chave + ' = "nul"' + ("\n" if linha.endswith("\n") else "")
+    return "".join(linhas)
 
 def override_nucleo(texto: Optional[str], runahead: bool, rewind: bool, shader: Optional[str]) -> str:
     """Cria ou atualiza arquivo de exceção por núcleo."""
@@ -74,26 +83,20 @@ def preset_shader(tipo: str) -> str:
 def ini_definir(texto: str, secao: str, valores: Dict[str, str]) -> str:
     """Define chaves em uma seção do arquivo .ini."""
     linhas = texto.splitlines(keepends=True)
-    if not linhas or not linhas[-1].endswith('\n'):
-        linhas.append('\n')
-    
-    secao_inicial = -1
-    secao_final = len(linhas)
-    
-    for i, linha in enumerate(linhas):
-        if linha.startswith(f'[{secao}]'):
-            secao_inicial = i
-        elif secao_inicial >= 0 and linha.strip() == '' and i > secao_inicial:
-            secao_final = i
-            break
-        elif secao_inicial >= 0 and linha.startswith('[') and i > secao_inicial:
-            secao_final = i
-            break
-    
-    if secao_inicial < 0:
-        linhas.append(f'\n[{secao}]\n')
+    if linhas and not linhas[-1].endswith("\n"):
+        linhas[-1] += "\n"
+    secao_inicial = next((i for i, l in enumerate(linhas) if l.strip() == f"[{secao}]"), -1)
+    if secao_inicial < 0:  # seção nova no fim do arquivo (corrigido: antes inseria as chaves ANTES do cabeçalho)
+        if linhas and linhas[-1].strip():
+            linhas.append("\n")
+        linhas.append(f"[{secao}]\n")
         secao_inicial = len(linhas) - 1
-    
+    # fim da seção = próxima seção; linhas em branco no fim dela ficam depois das chaves novas
+    secao_final = next((i for i in range(secao_inicial + 1, len(linhas)) if linhas[i].lstrip().startswith("[")),
+                       len(linhas))
+    while secao_final - 1 > secao_inicial and not linhas[secao_final - 1].strip():
+        secao_final -= 1
+
     chaves_existentes = {}
     for i in range(secao_inicial + 1, secao_final):
         if '=' in linhas[i]:
@@ -150,10 +153,10 @@ def ini_remover_tecla(texto: str, secao: str, tecla: str, manter: Set[str]) -> s
 def ini_duckstation(texto: str, turbo: float = 2.0) -> str:
     """Configura DuckStation.ini com teclas de trás do Steam Deck."""
     hotkeys = {
-        "SaveSelectedSaveState": "Keyboard/F13",
-        "LoadSelectedSaveState": "Keyboard/F14",
-        "Rewind": "Keyboard/F15",
-        "FastForward": "Keyboard/F16"
+        "SaveSelectedSaveState": "Keyboard/F9",
+        "LoadSelectedSaveState": "Keyboard/F10",
+        "Rewind": "Keyboard/F11",
+        "FastForward": "Keyboard/F12"
     }
     
     main = {
@@ -165,21 +168,23 @@ def ini_duckstation(texto: str, turbo: float = 2.0) -> str:
     
     texto = ini_definir(texto, "Hotkeys", hotkeys)
     texto = ini_definir(texto, "Main", main)
-    
+    # avisos na tela ("estado salvo no espaço 1", ícone de turbo) — pedido do usuário: saber que funcionou
+    texto = ini_definir(texto, "Display", {"ShowOSDMessages": "true", "ShowStatusIndicators": "true"})
+
     manter = set(hotkeys.keys())
-    texto = ini_remover_tecla(texto, "Hotkeys", "Keyboard/F13", manter)
-    texto = ini_remover_tecla(texto, "Hotkeys", "Keyboard/F14", manter)
-    texto = ini_remover_tecla(texto, "Hotkeys", "Keyboard/F15", manter)
-    texto = ini_remover_tecla(texto, "Hotkeys", "Keyboard/F16", manter)
+    texto = ini_remover_tecla(texto, "Hotkeys", "Keyboard/F9", manter)
+    texto = ini_remover_tecla(texto, "Hotkeys", "Keyboard/F10", manter)
+    texto = ini_remover_tecla(texto, "Hotkeys", "Keyboard/F11", manter)
+    texto = ini_remover_tecla(texto, "Hotkeys", "Keyboard/F12", manter)
     
     return texto
 
 def ini_pcsx2(texto: str, turbo: float = 2.0) -> str:
     """Configura PCSX2.ini com teclas de trás do Steam Deck."""
     hotkeys = {
-        "SaveStateToSlot": "Keyboard/F13",
-        "LoadStateFromSlot": "Keyboard/F14",
-        "HoldTurbo": "Keyboard/F16"
+        "SaveStateToSlot": "Keyboard/F9",
+        "LoadStateFromSlot": "Keyboard/F10",
+        "HoldTurbo": "Keyboard/F12"
     }
     
     framerate = {
@@ -188,11 +193,11 @@ def ini_pcsx2(texto: str, turbo: float = 2.0) -> str:
     
     texto = ini_definir(texto, "Hotkeys", hotkeys)
     texto = ini_definir(texto, "Framerate", framerate)
-    
+    texto = ini_definir(texto, "EmuCore/GS", {"OsdShowMessages": "true", "OsdShowIndicators": "true"})  # avisos na tela
+
     manter = set(hotkeys.keys())
-    texto = ini_remover_tecla(texto, "Hotkeys", "Keyboard/F13", manter)
-    texto = ini_remover_tecla(texto, "Hotkeys", "Keyboard/F14", manter)
-    texto = ini_remover_tecla(texto, "Hotkeys", "Keyboard/F16", manter)
+    for f in ("F9", "F10", "F11", "F12"):  # F9 era "renderização por software" no PCSX2
+        texto = ini_remover_tecla(texto, "Hotkeys", "Keyboard/" + f, manter)
     
     return texto
 
@@ -202,18 +207,18 @@ def hotkeys_dolphin(texto: Optional[str]) -> str:
         texto = "[Hotkeys]\nDevice = XInput2/0/Virtual core pointer\n\n"
     
     valores = {
-        "Save State/Save to Selected Slot": "`F13`",
-        "Load State/Load from Selected Slot": "`F14`",
-        "Emulation Speed/Disable Emulation Speed Limit": "`F16`"
+        "Save State/Save to Selected Slot": "`F9`",
+        "Load State/Load from Selected Slot": "`F10`",
+        "Emulation Speed/Disable Emulation Speed Limit": "`F12`"
     }
     
     return ini_definir(texto, "Hotkeys", valores)
 
 BOTOES_DE_TRAS = {
-    "button_back_left": ["key_press F13, Salvar estado"],
-    "button_back_right": ["key_press F14, Carregar estado"],
-    "button_back_left_upper": ["key_press F15, Voltar no tempo"],
-    "button_back_right_upper": ["key_press F16, Turbo", "key_press KEYPAD_PLUS, Turbo"],
+    "button_back_left": ["key_press F9, Salvar estado"],
+    "button_back_right": ["key_press F10, Carregar estado"],
+    "button_back_left_upper": ["key_press F11, Voltar no tempo"],
+    "button_back_right_upper": ["key_press F12, Turbo"],
 }
 
 

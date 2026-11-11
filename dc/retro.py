@@ -1,7 +1,7 @@
 """Aplica no disco a 0.8 "retrô" (dc.retro_hacks faz as contas; aqui só lê, guarda cópia e grava):
 
 - emuladores: RetroArch (teclas, rewind, turbo, comandos pela rede local, cheats, exceções por núcleo + filtros),
-  DuckStation, PCSX2 e Dolphin com as mesmas teclas reservadas (F13–F16);
+  DuckStation, PCSX2 e Dolphin com as mesmas teclas reservadas (F9–F12);
 - Steam Input: em cada atalho de jogo desses emuladores, os botões de trás viram essas teclas
   (L4 salvar, R4 carregar, L5 voltar no tempo, R5 turbo). O resto do layout do jogo não muda.
 Antes da 1ª mudança de cada arquivo fica uma cópia "<arquivo>.antes-dc" (desfazer = /retro desfazer).
@@ -193,7 +193,7 @@ def estado(home: Path | None = None) -> dict:
     home = home or Path.home()
     ra = home / ARQUIVOS["RetroArch"]
     txt = ra.read_text("utf-8", "replace") if ra.exists() else ""
-    return {"aplicado": 'input_save_state = "f13"' in txt, "filtros": 'video_shader_enable = "true"' in txt,
+    return {"aplicado": 'input_save_state = "f9"' in txt, "filtros": 'video_shader_enable = "true"' in txt,
             "turbo": next((float(l.split('"')[1]) for l in txt.splitlines() if l.startswith("fastforward_ratio")), 0.0),
             "emuladores": [n for n, r in ARQUIVOS.items() if (home / r).exists() or (n == "Dolphin" and (home / r).parent.exists())]}
 

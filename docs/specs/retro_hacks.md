@@ -3,19 +3,19 @@ trás do Steam Deck. Nada de ler/gravar disco nestas funções (outra parte do p
 biblioteca padrão, type hints, docstrings curtas em português.
 
 Teclas reservadas (os botões de trás do Deck viram estas teclas pelo Steam Input):
-  L4 = F13 (salvar estado), R4 = F14 (carregar estado), L5 = F15 (voltar no tempo, segurar),
-  R5 = F16 e também KEYPAD_PLUS (turbo, segurar).
+  L4 = F9 (salvar estado), R4 = F10 (carregar estado), L5 = F11 (voltar no tempo, segurar),
+  R5 = F12 e também KEYPAD_PLUS (turbo, segurar).
 
 Constante:
-  TECLAS = {"salvar": "F13", "carregar": "F14", "voltar": "F15", "turbo": "F16"}
+  TECLAS = {"salvar": "F9", "carregar": "F10", "voltar": "F11", "turbo": "F12"}
 
 1) def cfg_retroarch(texto: str, turbo: float = 2.0) -> str
    Formato do retroarch.cfg: uma linha por chave, `chave = "valor"` (valor SEMPRE entre aspas duplas).
    Troca o valor se a chave existe (mantendo a posição da linha), senão acrescenta no fim. Não mexe nas outras linhas.
    Chaves a definir:
-     input_save_state = "f13"
-     input_load_state = "f14"
-     input_rewind = "f15"
+     input_save_state = "f9"
+     input_load_state = "f10"
+     input_rewind = "f11"
      input_hold_fast_forward = "add"        (tecla + do teclado numérico; o RetroArch não conhece f16)
      fastforward_ratio = "<turbo com 6 casas, ex. 2.000000>"
      rewind_enable = "true"
@@ -58,18 +58,18 @@ Constante:
    - Se não existe: acrescenta no fim do texto "\n[secao]\n" + linhas.
    - Não altera nada fora da seção. Comparação de chave exata (sensível a maiúsculas).
    def ini_remover_tecla(texto: str, secao: str, tecla: str, manter: set[str]) -> str
-   - Dentro da seção, remove linhas cujo valor seja exatamente `tecla` (ex.: "Keyboard/F13") e cuja chave NÃO
+   - Dentro da seção, remove linhas cujo valor seja exatamente `tecla` (ex.: "Keyboard/F9") e cuja chave NÃO
      esteja em `manter` (evita a mesma tecla em duas ações).
 
 6) def ini_duckstation(texto: str, turbo: float = 2.0) -> str
-   [Hotkeys]: SaveSelectedSaveState = Keyboard/F13, LoadSelectedSaveState = Keyboard/F14, Rewind = Keyboard/F15,
-              FastForward = Keyboard/F16
+   [Hotkeys]: SaveSelectedSaveState = Keyboard/F9, LoadSelectedSaveState = Keyboard/F10, Rewind = Keyboard/F11,
+              FastForward = Keyboard/F12
    [Main]: RewindEnable = false (ligado travou o jogo no Deck), RewindFrequency = 0.100000, RewindSaveSlots = 100,
            FastForwardSpeed = <turbo com 6 casas>
    Depois remove de [Hotkeys] outras ações que usem as mesmas teclas (ini_remover_tecla com manter = as 4 acima).
 
 7) def ini_pcsx2(texto: str, turbo: float = 2.0) -> str
-   [Hotkeys]: SaveStateToSlot = Keyboard/F13, LoadStateFromSlot = Keyboard/F14, HoldTurbo = Keyboard/F16
+   [Hotkeys]: SaveStateToSlot = Keyboard/F9, LoadStateFromSlot = Keyboard/F10, HoldTurbo = Keyboard/F12
    [Framerate]: TurboScalar = <turbo com 6 casas>
    Mesma limpeza de teclas repetidas.
 
@@ -78,9 +78,9 @@ Constante:
      [Hotkeys]
      Device = XInput2/0/Virtual core pointer
    Define (ini_definir; os valores levam crases):
-     Save State/Save to Selected Slot = `F13`
-     Load State/Load from Selected Slot = `F14`
-     Emulation Speed/Disable Emulation Speed Limit = `F16`
+     Save State/Save to Selected Slot = `F9`
+     Load State/Load from Selected Slot = `F10`
+     Emulation Speed/Disable Emulation Speed Limit = `F12`
 
 9) Steam Input (layout do Steam para cada jogo). Formato VDF texto: blocos `"nome" { ... }`, pares
    `"chave"\t\t"valor"`. Os botões de trás aparecem assim (bindings vazio ou com linhas "binding"):
@@ -99,10 +99,10 @@ Constante:
    def layout_com_botoes_de_tras(texto: str) -> str
    Para cada um dos 4 nomes abaixo, troca TODO o conteúdo do bloco "bindings" do PRIMEIRO "Full_Press" daquele
    botão pelas linhas indicadas (preservando a indentação do bloco; use tabs):
-     button_back_left        -> "binding"		"key_press F13, Salvar estado"
-     button_back_right       -> "binding"		"key_press F14, Carregar estado"
-     button_back_left_upper  -> "binding"		"key_press F15, Voltar no tempo"
-     button_back_right_upper -> "binding"		"key_press F16, Turbo"  E  "binding"		"key_press KEYPAD_PLUS, Turbo"
+     button_back_left        -> "binding"		"key_press F9, Salvar estado"
+     button_back_right       -> "binding"		"key_press F10, Carregar estado"
+     button_back_left_upper  -> "binding"		"key_press F11, Voltar no tempo"
+     button_back_right_upper -> "binding"		"key_press F12, Turbo"  E  "binding"		"key_press KEYPAD_PLUS, Turbo"
    Se um botão não existir no texto, deixa como está. Use um parser simples por chaves {} (não regex gulosa que
    atravesse blocos). Deve funcionar com o arquivo inteiro de ~800 linhas.
    def tem_botoes_de_tras(texto: str) -> bool : True se os 4 botões já têm a tecla certa.
@@ -110,7 +110,7 @@ Constante:
 Exemplo de teste (o arquivo precisa passar):
    t = 'a = "1"\nfastforward_ratio = "0.000000"\n'
    r = cfg_retroarch(t)
-   assert 'fastforward_ratio = "2.000000"' in r and r.startswith('a = "1"\n') and 'input_save_state = "f13"' in r
-   i = "[Hotkeys]\nFastForward = Keyboard/Tab\nScreenshot = Keyboard/F16\n\n[Main]\nX = 1\n"
+   assert 'fastforward_ratio = "2.000000"' in r and r.startswith('a = "1"\n') and 'input_save_state = "f9"' in r
+   i = "[Hotkeys]\nFastForward = Keyboard/Tab\nScreenshot = Keyboard/F12\n\n[Main]\nX = 1\n"
    d = ini_duckstation(i)
-   assert "FastForward = Keyboard/F16" in d and "Screenshot" not in d and "X = 1" in d and "RewindEnable = false" in d
+   assert "FastForward = Keyboard/F12" in d and "Screenshot" not in d and "X = 1" in d and "RewindEnable = false" in d
