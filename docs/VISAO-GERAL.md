@@ -1,14 +1,14 @@
 # Deck Commander — Visão geral do projeto
 
 Tudo o que o sistema faz hoje, o que foi testado de verdade, os limites conhecidos e ideias do que adicionar.
-Situação em 11/11/2026, versão 0.7. São 690 testes automáticos passando, 196 versões salvas no histórico e cerca de
-26 mil linhas de código em 91 módulos. O repositório é público: github.com/guilherme-lacerda-tech/deck-commander.
+Situação em 12/11/2026, versão 0.8.2. São 804 testes automáticos passando, 247 versões salvas no histórico e cerca de
+30 mil linhas de código em 119 módulos. O repositório é público: github.com/guilherme-lacerda-tech/deck-commander.
 
 > **Legenda:**
 > - ✅ funcionando e testado de verdade no Deck ou no PC
 > - 🧪 pronto e com testes automáticos, mas ainda sem uso real
 > - ⚠️ funciona com limitação
-> - 🆕 novo desde o último relatório (10/11)
+> - 🆕 novo desde o último relatório (11/11, versão 0.7)
 
 ---
 
@@ -38,7 +38,8 @@ Telas do painel:
 - 🆕 Música;
 - 🆕 Família;
 - Qualidade e controles;
-- 🆕 Melhorias;
+- 🆕 Retrô (botões de trás, turbo e filtros de tela);
+- Melhorias;
 - 🆕 Espaço;
 - Desinstalar;
 - Diagnóstico;
@@ -105,12 +106,17 @@ Telas do painel:
 | Luigi's Mansion 3 | init.patch | ✅ mod instalado |
 | Pokémon FireRed / LeafGreen (GBA no Switch) | Meowth | ✅ |
 | Castlevania Belmont's Curse | Unity | ✅ já tinha PT-BR oficial, configurado para abrir em português |
+| 🆕 Castlevania: Symphony of the Night (PS1) | formato próprio, por engenharia reversa | ✅ falas e menus com acento (fonte nova), botões da tela de arquivos em português, patch .bps de 57 KB |
+| 🆕 Zelda: Tears of the Kingdom | PT-BR oficial + dublagem | ✅ abre em português, com 360 falas das cenas dubladas |
 
 ### 5.3 Formatos que o sistema lê
 - ✅ **Testados com jogo real:** Nintendo MSBT, SARC, Trinity, Next Level Games, Unreal (sem criptografia) e Unity.
 - 🧪 **Prontos, ainda sem jogo real:** GameMaker, Godot, RE Engine (Capcom), RPG Maker MV/MZ e CRI. Eles perguntam
   antes, mostrando quantas frases o jogo tem e quanto tempo leva.
 - ✅ **Retrô** (PS1, PS2, PSP, SNES, NES, N64, GameCube, DS, GBA), pelo RomTranslate Studio.
+- 🆕✅ **Patch para compartilhar:** tradução de cartucho e de disco gera também um arquivo `.bps` (um patch pequeno).
+  Quem tem o jogo original aplica com o Floating IPS e fica com a mesma tradução, sem você mandar o jogo.
+- 🆕✅ **Vídeos com legenda:** cenas em vídeo sem legenda ganham legenda em português (dublar é opcional).
 - ⚠️ **Não traduz:** Unreal com pacote criptografado (seria quebrar a proteção do jogo) e formatos ainda
   desconhecidos. No Hercules, por exemplo, o painel explica o motivo.
 
@@ -129,6 +135,32 @@ Telas do painel:
 - ⚠️ **Controle manual:** Azahar (3DS), Cemu (Wii U) e RPCS3 (PS3) pedem que você escolha o controle uma vez no modo
   Desktop.
 
+## 6.1 Jogos retrô de verdade 🆕
+Feito pensando em quem joga retrô a sério (revisão de "retrogamer" em 12/11).
+- ✅ **Botões de trás** em todo jogo de RetroArch, DuckStation (PS1), PCSX2 (PS2) e Dolphin (GameCube/Wii):
+  - **L4** salva o estado (save rápido);
+  - **R4** carrega o mais novo;
+  - **L5** (segurando) volta no tempo;
+  - **R5** liga/desliga o turbo (2x, 3x ou 4x).
+
+  Cada jogo recebe esse layout **uma vez**. Se você trocar o layout de um jogo, ninguém sobrescreve.
+- ✅ **Save rápido que não apaga o anterior:** o RetroArch guarda os 10 últimos; o DuckStation guarda cópia do anterior.
+- ✅ **Cópia automática dos saves:** antes de cada vez que um jogo abre, os saves dele (o do jogo e os rápidos) são
+  copiados. Ficam as 5 últimas cópias em `~/Backups/DeckCommander/saves/<jogo>/`. Voltar: `/saves copias <jogo>` e
+  `/saves voltar <jogo> <n>` (o save de agora vira cópia antes). Medido no Deck: menos de meio segundo por jogo.
+- ✅ **Save do cartucho gravado na hora:** o RetroArch grava a bateria do cartucho a cada 10 s, não só ao fechar.
+- ✅ **Aviso de emulador atualizado:** se o emulador mudou de versão, aparece um aviso ao abrir o jogo (save rápido
+  antigo pode não abrir; o save do jogo sempre abre).
+- ✅ **Atraso de controle menor:** run-ahead de 1 quadro nos consoles leves (NES, SNES, Mega Drive, GB/GBA, Arcade,
+  PC Engine); desligado no N64 e no Saturn, onde pesa.
+- ✅ **Filtros de tela:** TV antiga (zfast-crt, feito para tela de portátil) e grade de LCD nos portáteis.
+- ✅ **DuckStation a 100%:** a camada de vídeo do modo de jogo segurava o PS1 em 60% da velocidade; agora abre sem ela.
+- ✅ **Seguro na rede:** a porta de comandos do RetroArch (que aceitava comandos de qualquer aparelho do Wi-Fi) está
+  fechada, e o modo "hardcore" das conquistas não tira mais o save rápido sem aviso.
+- ⚠️ **Conquistas (RetroAchievements):** funcionam nos 4 emuladores depois de você entrar na sua conta em cada um.
+  A Steam não deixa mostrar conquistas de atalhos de fora; elas aparecem na tela do jogo e no site
+  retroachievements.org.
+
 ## 7. Música (Spotify) 🆕
 - ✅ **Volume separado** do jogo e da música, e controle (tocar/pausar/próxima) pelo painel e pelo `/musica`.
 - ✅ **Playlists rápidas:** cole o link de uma playlist no bot ou no painel e ela vira um botão.
@@ -144,7 +176,9 @@ Telas do painel:
 
 ## 8. Organizar, espaço e desinstalar
 - ✅ **Duplicados:** `/duplicados` lista e remove os repetidos.
-- ✅ **Desinstalar como no Steam:** "Gerenciar → Remover" pergunta se apaga os arquivos também. Funciona também pelo
+- 🆕✅ **Desinstalar o Deck Commander tira tudo:** atalhos, layouts e teclas dos botões de trás, protetor de tela,
+  serviços e o código. No fim, o Decky pergunta na tela se tira o plugin também. ROMs e saves nunca são tocados.
+- ✅ **Desinstalar um jogo como no Steam:** "Gerenciar → Remover" pergunta se apaga os arquivos também. Funciona também pelo
   painel ou pelo Telegram, e os arquivos ficam 30 dias na quarentena.
 - 🆕✅ **Espaço:** o painel lista os jogos grandes que você não abre há tempo e quanto liberaria. Ele só sugere, nunca
   apaga sozinho.
@@ -191,7 +225,11 @@ Telas do painel:
 - ✅ **Backup diário** de configurações e saves, com teste de restauração.
 - ✅ **Quarentena de 30 dias:** nada é apagado sozinho.
 - ✅ **Modo seguro e diagnóstico** (`/sos`, painel).
-- ✅ **Testes:** 690 testes automáticos. Rodam toda semana no Deck e antes de toda atualização.
+- ✅ **Testes:** 804 testes automáticos. Rodam toda semana no Deck e antes de toda atualização.
+- 🆕✅ **Revisão ao vivo:** depois de toda atualização, 14 conferências no próprio Deck (serviços, painel, botões de
+  trás, Castlevania, Zelda, IA, Tailscale, protetor de tela, Spotify, espaço…). Hoje: 14 de 14.
+- 🆕✅ **Painel mais leve na bateria:** a checagem dos botões de trás passou de 1 por minuto para só quando entra jogo
+  novo (e uma a cada 30 min).
 - 🆕✅ **Atualização segura** (`tools/implantar.py`): só instala se os testes passarem no PC e no Deck. Se algo falhar,
   o Deck continua na versão anterior.
 - 🆕🧪 **`/voltar`:** desfaz a última atualização com um toque. Os jogos e as configurações não mudam.
@@ -215,32 +253,46 @@ Telas do painel:
 
 ---
 
-## 15. O que mudou desde o último relatório (10/11 → 11/11)
-**Novos módulos da versão 0.7:**
-- energia (TDP);
-- áudio e Spotify;
-- espaço;
-- glossário por franquia;
-- `/corrigir`;
-- melhorias por emulador;
-- shaders à noite;
-- perfil de controle;
-- saves sincronizados;
-- família;
-- jogar na TV;
-- guia do Fire Stick;
-- estudo de texturas.
+## 15. O que mudou desde o último relatório (11/11 → 12/11)
+**Versão 0.8.0 — retrô e revisão de lançamento**
+- botões de trás, turbo, voltar no tempo e filtros de tela nos jogos retrô;
+- Castlevania: Symphony of the Night em português, com acentos;
+- Zelda: Tears of the Kingdom em português e dublado;
+- legenda em português nos vídeos;
+- desinstalar que tira tudo;
+- erro ao abrir jogo explicado na tela (antes, todo erro dizia "jogo removido");
+- correção de uma disputa entre o plugin e o `/pc sincronizar` (a marca de um jogo podia ser apagada).
 
-**Depois da revisão noturna:**
-- `/voltar`;
-- saves automáticos;
-- aviso de cópia parada;
-- progresso da cópia;
-- limpeza de backups;
-- Spotify sem app com login por QR;
-- família comparando arquivos por pedaços;
-- trava contra aspas perdidas no ssh;
-- código sem sobras.
+**Versão 0.8.1 — revisão de retrogamer**
+- porta de comandos do RetroArch fechada e "hardcore" desmarcado;
+- aviso de emulador atualizado;
+- patch `.bps` das traduções de disco.
+
+**Versão 0.8.2 — saves que não se perdem**
+- cópia automática dos saves (5 últimas), com `/saves copias` e `/saves voltar`;
+- save do cartucho gravado a cada 10 s.
+
+## 15.1 O que ainda falta (com honestidade)
+**Testes que só você faz, com as mãos no Deck**
+- jogar e conferir os botões de trás num jogo retrô;
+- as falas do Castlevania em português dentro do jogo;
+- uma cena dublada do Zelda;
+- um jogo do PC transmitido para o Deck, do começo ao fim;
+- a desinstalação completa (não foi rodada no seu Deck, para não desmontar nada).
+
+**Prontos, mas sem uso real ainda**
+- Família (Deck do seu irmão), jogar na TV, assistente do PC, `/corrigir` por foto.
+- Cópia automática dos saves no RetroArch: testada no PC; no Deck ainda não há jogo de RetroArch.
+
+**Limites que não dependem do Deck Commander**
+- Conquistas retrô não aparecem na página do jogo da Steam (a Steam só permite isso para jogos vendidos nela).
+- O Spotify só toca pelo app oficial.
+- Jogos com pacote criptografado não são traduzidos.
+
+**Não feito**
+- Deck OLED (tela de 90 Hz): falta um OLED para testar o ajuste de 60 quadros.
+- Trapaças (começado, não ligado no painel) e benchmark reproduzível.
+- Tradução por IA não tem revisão humana: frases estranhas se corrigem com `/corrigir`.
 
 ## 16. Ideias do que adicionar
 **Mais fácil de usar**
@@ -251,8 +303,8 @@ Telas do painel:
 4. **Atualizar pelo painel** com um botão, com página de novidades.
 
 **Saves e nuvem**
-5. **Histórico de saves** com "voltar para ontem" pelo painel.
-6. Backup dos saves na **nuvem** (Google Drive/OneDrive).
+5. **Cópias dos saves no painel** (hoje é pelo bot), com "voltar para ontem" num toque.
+6. **Aba de conquistas** (RetroAchievements) no painel, com o progresso de cada jogo.
 
 **Tradução**
 7. **Legendas de cutscenes** com IA local.

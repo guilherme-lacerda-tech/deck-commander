@@ -40,6 +40,7 @@ Validado num Steam Deck LCD (SteamOS 3.9.5). 804 testes automatizados (CI no Git
 - As coleções guardam referências a atalhos já removidos (o Steam as ignora; não aparecem nas abas).
 
 ## Próximos passos sugeridos
-1. Publicar o plugin na loja do Decky (evita o modo desenvolvedor).
-2. Benchmark reproduzível com MangoHud (M10.2) e E2E com jogos homebrew (M10.4).
-3. XDelta (empacotar `xdelta3` estático) e mapeamento de shader/aspect ratio por emulador.
+1. Benchmark reproduzível com MangoHud (M10.2) e E2E com jogos homebrew (M10.4).
+2. Deck OLED (tela de 90 Hz): ajuste para jogos de 60 quadros — precisa de um OLED para testar.
+3. Trapaças (`dc/cheats.py`): começado, ainda não ligado no painel.
+4. Aplicar patch XDelta (hoje IPS/BPS/UPS; as traduções do Deck Commander já saem em BPS).

@@ -45,6 +45,30 @@ Não precisa abrir o modo Desktop no dia a dia. Instalação: [TUTORIAL-INSTALAC
 - `/controles` mostra em quais emuladores o controle ainda precisa ser escolhido uma vez (no modo Desktop, abra o
   emulador → Controles → escolha o controle do Deck).
 
+## 5.1 Jogos retrô: botões de trás e saves
+Ligue uma vez no painel: **Deck Commander → Retrô → Ligar**. Depois, em todo jogo retrô:
+
+| Botão | O que faz |
+|---|---|
+| **L4** | salva o estado (save rápido); cada toque vai para um espaço novo, ficam os 10 últimos |
+| **R4** | carrega o save rápido mais novo |
+| **L5** (segurando) | volta no tempo |
+| **R5** | liga/desliga o turbo (2x, 3x ou 4x, escolhido no painel) |
+
+- **Save rápido x save do jogo:** o save rápido é uma "foto" do emulador e pode não abrir depois que o emulador
+  atualiza (aparece um aviso quando isso acontece). O save do jogo, feito pelo menu dele, sempre abre. Use os dois.
+- **Cópias automáticas:** antes de cada vez que o jogo abre, os saves dele são copiados (ficam as 5 últimas).
+  `/saves copias <jogo>` mostra as cópias; `/saves voltar <jogo> <n>` volta para uma delas (feche o jogo antes; o save
+  de agora também vira cópia).
+- **Filtros de tela:** painel → Retrô → Ligar/Desligar filtros (TV antiga nos consoles, grade de LCD nos portáteis).
+  Com o jogo aberto, a troca vale quando você fecha e abre o jogo.
+- **Seu layout:** se você trocar o layout de controle de um jogo no Steam, o Deck Commander não mexe mais nele.
+  Desfazer tudo: painel → Retrô → Desfazer.
+- **Conquistas (RetroAchievements):** crie a conta em retroachievements.org e entre nela dentro de cada emulador
+  (RetroArch: Configurações → Conquistas). Elas aparecem na tela do jogo e no site.
+- **Tradução para compartilhar:** ao lado da cópia "(PT-BR)" fica um arquivo `.bps`. Quem tem o jogo original aplica
+  com o Floating IPS.
+
 ## 6. Jogar os jogos do PC no Deck (aba "Computador")
 1. No Deck, abra a aba **Computador** e escolha o jogo.
 2. O Deck acorda o PC e espera ele ficar pronto (de 30 a 90 s; a tela fica parada nesse tempo, é normal).
@@ -144,4 +168,5 @@ errado, aparece uma mensagem simples na própria tela; detalhes ficam em `~/.loc
 | `/familia` · `/familia puxar <jogo>` | jogos + tradução pronta do Deck do irmão |
 | `/corrigir` (foto com a legenda) | corrigir uma frase traduzida estranha |
 | `/saves <jogo> [deck\|pc]` | saves iguais no Deck e no PC |
+| `/saves copias <jogo>` · `/saves voltar <jogo> <n>` | cópias automáticas dos saves (5 últimas) |
 | `/help` | lista curta no próprio bot |
