@@ -33,6 +33,10 @@ def cfg_retroarch(texto: str, turbo: float = 2.0) -> str:
         "network_cmd_port": "55355",
         "apply_cheats_after_load": "true",
         "video_font_enable": "true",  # avisos na tela: "estado salvo", "carregado", turbo
+        # Revisão retrô 12/11/2026: L4 gravava sempre no MESMO espaço — um toque sem querer apagava o save bom.
+        # Agora cada L4 vai para o espaço seguinte (R4 carrega o mais novo) e ficam os 10 últimos.
+        "savestate_auto_index": "true",
+        "savestate_max_keep": "10",
     }
     texto = definir(texto, valores)
     # a mesma tecla em outra função do RetroArch (ex.: f9 = mudo, f11 = prender o mouse) vira "nul"
@@ -69,7 +73,9 @@ NUCLEOS = {
 }
 
 SHADERS = {
-    "crt": "/app/share/libretro/shaders/shaders_slang/crt/crt-easymode.slangp",
+    # zfast-crt: feito para portáteis e escala não inteira. O crt-easymode (antes) pede escala inteira: na tela de
+    # 800 linhas do Deck (SNES 224 linhas = 3,57x) as linhas de varredura saíam irregulares (revisão retrô 12/11/2026)
+    "crt": "/app/share/libretro/shaders/shaders_slang/crt/zfast-crt.slangp",
     "lcd": "/app/share/libretro/shaders/shaders_slang/handheld/lcd-grid-v2.slangp"
 }
 
@@ -162,7 +168,8 @@ def ini_duckstation(texto: str, turbo: float = 2.0) -> str:
         "RewindEnable": "true",  # leve: 2 cópias por segundo, 10 s para trás (a lentidão de 11/11 era a camada WSI)
         "RewindFrequency": "0.500000",
         "RewindSaveSlots": "20",
-        "FastForwardSpeed": f"{turbo:.6f}"
+        "FastForwardSpeed": f"{turbo:.6f}",
+        "CreateSaveStateBackups": "true",  # o save anterior do espaço vira .bak (toque sem querer no L4 não apaga)
     }
     
     texto = ini_definir(texto, "Hotkeys", hotkeys)

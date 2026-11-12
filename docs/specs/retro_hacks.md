@@ -45,7 +45,7 @@ Constante:
      "Beetle Saturn": runahead False, rewind False, shader None
    Cada valor: {"runahead": bool, "rewind": bool, "shader": str | None}
 
-4) SHADERS = {"crt": "/app/share/libretro/shaders/shaders_slang/crt/crt-easymode.slangp",
+4) SHADERS = {"crt": "/app/share/libretro/shaders/shaders_slang/crt/zfast-crt.slangp",
               "lcd": "/app/share/libretro/shaders/shaders_slang/handheld/lcd-grid-v2.slangp"}
    def preset_shader(tipo: str) -> str
    Devolve o conteúdo de um preset .slangp que só referencia o shader:  '#reference "<caminho>"\n'

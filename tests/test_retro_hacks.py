@@ -98,7 +98,7 @@ def test_override_e_shader():
     o = R.override_nucleo(None, runahead=True, rewind=False, shader="crt")
     assert 'run_ahead_enabled = "true"' in o and 'rewind_enable = "false"' in o and 'run_ahead_frames = "1"' in o
     assert R.NUCLEOS["Mupen64Plus-Next"]["runahead"] is False and R.NUCLEOS["Snes9x"]["shader"] == "crt"
-    assert R.preset_shader("crt") == '#reference "/app/share/libretro/shaders/shaders_slang/crt/crt-easymode.slangp"\n'
+    assert R.preset_shader("crt") == '#reference "/app/share/libretro/shaders/shaders_slang/crt/zfast-crt.slangp"\n'
 
 
 def test_duckstation_e_pcsx2():

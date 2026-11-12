@@ -115,3 +115,13 @@ def test_painel_nao_abre_python_a_cada_minuto():
     js = (Path(__file__).resolve().parents[1] / "decky-plugin/dist/index.js").read_text("utf-8")
     assert "retroConta++ % 6" not in js and "% 180 !== 0" in js
     assert js.count("retroPendente = 12") == 2  # fila (atalho novo) e autocorreção (atalho recriado)
+
+
+def test_save_state_nao_apaga_o_anterior(tmp_path):
+    """Revisão retrô 12/11/2026: L4 gravava sempre no mesmo espaço; um toque sem querer apagava o save bom."""
+    h, _base = _deck(tmp_path)
+    retro.aplicar(h, MAPA)
+    ra = (h / retro.ARQUIVOS["RetroArch"]).read_text()
+    assert 'savestate_auto_index = "true"' in ra and 'savestate_max_keep = "10"' in ra
+    ds = (h / retro.ARQUIVOS["DuckStation"]).read_text()
+    assert "CreateSaveStateBackups = true" in ds
