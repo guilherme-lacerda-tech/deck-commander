@@ -43,6 +43,7 @@ def test_atualizou_e_quebrou_volta_tudo(tmp_path):
     home, cfg = _home(tmp_path)
     run = Run()
     g = G.Guardiao(home, tmp_path / "dados", run=run)
+    g.espera = 0
     g.rodada()
     run.commit = "def456\n"
     (cfg / "retroarch.cfg").unlink()
@@ -57,8 +58,42 @@ def test_atualizou_e_passou(tmp_path):
     home, cfg = _home(tmp_path)
     run = Run()
     g = G.Guardiao(home, tmp_path / "dados", run=run)
+    g.espera = 0
     g.rodada()
     run.commit = "def456\n"
     avisos = g.rodada()
     assert avisos and "passou" in avisos[0]
     assert not any("--commit=" in str(a) for a in run.chamadas)
+
+
+def test_falha_passageira_nao_desfaz_nada(tmp_path):
+    """Revisão 11/11/2026: uma falha única no teste restaurava cópia velha E voltava a versão do emulador."""
+    home, cfg = _home(tmp_path)
+    run = Run()
+    g = G.Guardiao(home, tmp_path / "dados", run=run)
+    g.espera = 0
+    g.rodada()
+    run.commit = "def456\n"
+    falhas = iter([1])  # o 1º "flatpak run" falha, o 2º abre
+
+    def run2(args, **k):
+        if args[:2] == ["flatpak", "run"] and next(falhas, 0):
+            run.chamadas.append(args)
+            return SimpleNamespace(returncode=1, stdout="", stderr="")
+        return run(args, **k)
+    g.run = run2
+    avisos = g.rodada()
+    assert avisos and "passou" in avisos[0] and not any("--commit=" in str(a) for a in run.chamadas)
+
+
+def test_restaurou_e_as_teclas_dos_botoes_voltam(tmp_path):
+    """A cópia restaurada é de antes das teclas F9–F12: se o retrô estava ligado, elas são reaplicadas."""
+    home, cfg = _home(tmp_path)
+    run = Run()
+    g = G.Guardiao(home, tmp_path / "dados", run=run)
+    g.espera = 0
+    g.rodada()  # cópia SEM as teclas
+    (cfg / "retroarch.cfg").write_text('input_save_state = "f9"\n')  # depois o usuário ligou o retrô
+    run.commit, run.abre = "def456\n", False
+    g.rodada()
+    assert 'input_save_state = "f9"' in (cfg / "retroarch.cfg").read_text()

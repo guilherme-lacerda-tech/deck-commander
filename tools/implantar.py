@@ -57,6 +57,14 @@ def main():
     print(saida.strip())
     if "IMPLANTADO" not in saida:
         parar("os testes no Deck falharam ou a cópia não terminou (o Deck continua com a versão anterior)")
+    # revisão AO VIVO (pedido do usuário 11/11/2026: "o que tava funcionando parou de funcionar"): confere no
+    # aparelho cada coisa que já funcionou. Não desfaz a implantação, mas avisa alto.
+    rv = subprocess.run(ssh + ["cd ~/deck-commander && XDG_RUNTIME_DIR=/run/user/$(id -u) timeout 600 python3 -m dc.revisao_viva"],
+                        capture_output=True, timeout=700)
+    texto = rv.stdout.decode("utf-8", "replace").strip()
+    print(texto)
+    if rv.returncode != 0:
+        print("ATENÇÃO: a revisão ao vivo achou FALHA (acima). Corrigir antes de dizer que está pronto.")
 
 
 if __name__ == "__main__":

@@ -39,6 +39,7 @@ class Guardiao:
         self.dados = dados
         self.run = run
         self.agora = agora
+        self.espera = 20  # segundos entre os 2 testes
         self.estado_path = dados / "estado.json"
         self.estado = self._carregar_estado()
 
@@ -125,6 +126,24 @@ class Guardiao:
                 tar.extract(member, path=config_path.parent)
         return f"🛡️ {nome}: configuração restaurada de {copia_path.name}"
 
+    def estado_retro(self) -> dict:
+        try:
+            from . import retro
+            return retro.estado(self.home)
+        except Exception:  # noqa: BLE001
+            return {"aplicado": False}
+
+    def reaplicar_retro(self, antes: dict) -> None:
+        """Revisão 11/11/2026: a cópia restaurada pode ser de antes das teclas dos botões de trás (F9–F12); se o
+        retrô estava ligado, as teclas voltam na hora (senão turbo/salvar "param de funcionar")."""
+        if not antes.get("aplicado"):
+            return
+        try:
+            from . import retro
+            retro.emuladores(self.home, antes.get("turbo") or 2.0)
+        except Exception:  # noqa: BLE001 — o guardião nunca para por isso
+            pass
+
     def voltar_versao(self, nome: str, commit_antigo: str) -> bool:
         emul = EMULADORES[nome]
         if emul["tipo"] != "flatpak":
@@ -153,13 +172,18 @@ class Guardiao:
                     self.copiar(nome)
                 continue
 
-            # Versão mudou, testar
+            # Versão mudou, testar (2 vezes: uma falha passageira não pode desfazer configuração nem versão)
             ok, msg = self.testar(nome)
+            if not ok:
+                time.sleep(self.espera)
+                ok, msg = self.testar(nome)
             if ok:
                 self.copiar(nome)
                 avisos.append(f"✅ {nome} atualizou e passou no teste")
             else:
+                retro_antes = self.estado_retro()  # lido ANTES: a cópia restaurada pode não ter as teclas
                 self.restaurar(nome)
+                self.reaplicar_retro(retro_antes)
                 if EMULADORES[nome]["tipo"] == "flatpak":
                     commit_antigo = estado["versao"]
                     self.voltar_versao(nome, commit_antigo)
