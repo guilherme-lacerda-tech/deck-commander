@@ -125,3 +125,17 @@ def test_save_state_nao_apaga_o_anterior(tmp_path):
     assert 'savestate_auto_index = "true"' in ra and 'savestate_max_keep = "10"' in ra
     ds = (h / retro.ARQUIVOS["DuckStation"]).read_text()
     assert "CreateSaveStateBackups = true" in ds
+
+
+def test_config_antiga_fecha_a_porta_e_tira_o_hardcore(tmp_path, monkeypatch):
+    """Quem ligou o Retrô antes da 0.8.1 ficou com a porta 55355 aberta para a rede e o hardcore marcado."""
+    ra = tmp_path / retro.ARQUIVOS["RetroArch"]
+    ra.parent.mkdir(parents=True)
+    ra.write_text('network_cmd_enable = "true"\ncheevos_enable = "false"\ncheevos_hardcore_mode_enable = "true"\n')
+    monkeypatch.setattr(retro, "_retroarch_aberto", lambda: True)
+    assert retro.corrigir_retroarch_antigo(tmp_path) is False  # aberto: ele regravaria ao fechar
+    monkeypatch.setattr(retro, "_retroarch_aberto", lambda: False)
+    assert retro.corrigir_retroarch_antigo(tmp_path) is True
+    t = ra.read_text()
+    assert 'network_cmd_enable = "false"' in t and 'cheevos_hardcore_mode_enable = "false"' in t
+    assert retro.corrigir_retroarch_antigo(tmp_path) is False  # já está certo: não regrava

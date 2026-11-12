@@ -134,6 +134,8 @@ class Plugin:
             os.remove(path)
         except OSError:
             pass
+        if err.get("title"):  # aviso (ex.: emulador atualizado), não erro: o painel mostra com este título
+            return {"title": err["title"], "message": err.get("message")}
         return err.get("message")
 
     async def get_status(self):

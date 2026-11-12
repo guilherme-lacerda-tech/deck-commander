@@ -404,6 +404,11 @@ def translate_rom(paths: Paths, rom: Path, title: str = "", chain=None, progress
         rep.output = str(cue_pt)
     else:
         rep.output = str(bin_pt)
+    try:  # patch .bps ao lado: é o que dá para compartilhar (a cópia do disco não) — aplica no .bin original
+        from .. import patches
+        patches.create_bps_arquivos(bin_, bin_pt, bin_pt.with_suffix(".bps"))
+    except Exception as e:  # noqa: BLE001 — o jogo traduzido já está pronto; o patch é extra
+        rep.errors.append(f"patch .bps não gerado ({e})")
     originais = {t.texto for t in trechos}
     rep.audit_left = sum(1 for t in coletar(Disco(bin_pt)) if t.texto in originais)
     return rep

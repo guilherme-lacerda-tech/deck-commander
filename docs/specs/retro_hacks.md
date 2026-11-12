@@ -21,8 +21,8 @@ Constante:
      rewind_enable = "true"
      rewind_granularity = "2"
      audio_fastforward_mute = "false"
-     network_cmd_enable = "true"
-     network_cmd_port = "55355"
+     network_cmd_enable = "false"   # fechada: a porta UDP aceitava comandos de toda a rede local
+     cheevos_hardcore_mode_enable = "false"   # só enquanto as conquistas estão desligadas
      apply_cheats_after_load = "true"
    Se o texto não termina com "\n", garante uma quebra antes de acrescentar.
    Função auxiliar pública: def definir(texto: str, valores: dict[str, str]) -> str  (faz o trabalho acima para

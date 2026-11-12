@@ -29,8 +29,10 @@ def cfg_retroarch(texto: str, turbo: float = 2.0) -> str:
         "rewind_enable": "true",
         "rewind_granularity": "2",
         "audio_fastforward_mute": "false",
-        "network_cmd_enable": "true",
-        "network_cmd_port": "55355",
+        # Revisão retrô 12/11/2026: os comandos pela rede (porta UDP 55355) ficam abertos para TODA a rede local — num
+        # Wi-Fi público qualquer um mandaria "fechar jogo"/"apagar save". O RetroArch não deixa limitar ao próprio
+        # aparelho, então fica desligado (o único uso era trocar o filtro com o jogo aberto; agora vale ao reabrir).
+        "network_cmd_enable": "false",
         "apply_cheats_after_load": "true",
         "video_font_enable": "true",  # avisos na tela: "estado salvo", "carregado", turbo
         # Revisão retrô 12/11/2026: L4 gravava sempre no MESMO espaço — um toque sem querer apagava o save bom.
@@ -39,6 +41,7 @@ def cfg_retroarch(texto: str, turbo: float = 2.0) -> str:
         "savestate_max_keep": "10",
     }
     texto = definir(texto, valores)
+    texto = seguranca_retroarch(texto)
     # a mesma tecla em outra função do RetroArch (ex.: f9 = mudo, f11 = prender o mouse) vira "nul"
     nossas = set(valores) | {k + s for k in valores for s in ("_btn", "_axis", "_mbtn")}
     linhas = texto.splitlines(keepends=True)
@@ -47,6 +50,16 @@ def cfg_retroarch(texto: str, turbo: float = 2.0) -> str:
         if chave.startswith("input_") and chave not in nossas and valor.strip() in ('"f9"', '"f10"', '"f11"', '"f12"'):
             linhas[i] = chave + ' = "nul"' + ("\n" if linha.endswith("\n") else "")
     return "".join(linhas)
+
+def seguranca_retroarch(texto: str) -> str:
+    """Comandos pela rede desligados e, com as conquistas DESLIGADAS, o modo "hardcore" também. Com ele marcado, quem
+    ligasse as RetroAchievements perdia salvar/carregar, voltar no tempo e turbo sem aviso nenhum (revisão retrô
+    12/11/2026). Se a pessoa já ligou as conquistas, a escolha dela fica como está."""
+    v = {"network_cmd_enable": "false"}
+    if 'cheevos_enable = "true"' not in texto:
+        v["cheevos_hardcore_mode_enable"] = "false"
+    return definir(texto, v)
+
 
 def override_nucleo(texto: str | None, runahead: bool, rewind: bool, shader: str | None) -> str:
     """Cria ou atualiza arquivo de exceção por núcleo."""

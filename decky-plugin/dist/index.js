@@ -158,7 +158,10 @@ async function reconcile() {
 async function showLaunchError() {
     let msg;
     try { msg = await call("get_launch_error"); } catch (e) { return; } // backend antigo
-    if (msg) {
+    if (msg && typeof msg === "object") {  // aviso com título próprio (ex.: emulador atualizado)
+        toaster.toast({ title: msg.title, body: msg.message, duration: 8000 });
+        note("aviso: " + msg.message);
+    } else if (msg) {
         toaster.toast({ title: "Deck Commander — o jogo não abriu", body: msg, duration: 8000 });
         note("não abriu: " + msg);
     }

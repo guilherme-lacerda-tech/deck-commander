@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.1 — 2026-11-12 — revisão de retrogamer
+- RetroArch: **porta de comandos pela rede fechada** (a UDP 55355 aceitava "fechar jogo"/"carregar estado" de
+  qualquer aparelho da rede local). Trocar o filtro de tela com o jogo aberto agora vale ao reabrir o jogo.
+- RetroAchievements: o modo **hardcore** fica desmarcado enquanto as conquistas estiverem desligadas (antes, ligar as
+  conquistas tirava salvar/carregar, voltar no tempo e turbo sem aviso). Quem já usa conquistas não é afetado.
+- **Aviso de emulador atualizado**: ao abrir um jogo depois de o emulador mudar de versão, aparece um aviso de que
+  save states antigos podem não abrir (o save do próprio jogo sempre abre).
+- Tradução de disco (Castlevania) gera também o **patch .bps** ao lado da cópia PT-BR, para compartilhar sem o jogo.
+- Configurações feitas pela 0.8.0 são corrigidas sozinhas (com o RetroArch fechado).
+
 ## 0.8.0 — 2026-11-12 — retrô de verdade e revisão de lançamento
 - **Botões de trás** nos jogos retrô (RetroArch, DuckStation, PCSX2, Dolphin): L4 salva, R4 carrega, L5 (segurar)
   volta no tempo, R5 liga/desliga o turbo. Aplicado **uma vez** por jogo: o layout que você escolher depois é

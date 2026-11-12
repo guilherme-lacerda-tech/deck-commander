@@ -73,6 +73,9 @@ def test_plugin_backend_removal_and_launch_error(tmp_path, monkeypatch):
     assert run(p.get_launch_error()) is None
     (base / "launch-error.json").write_text(json.dumps({"message": "cartão SD?"}))
     assert run(p.get_launch_error()) == "cartão SD?" and run(p.get_launch_error()) is None  # mostra 1 vez
+    (base / "launch-error.json").write_text(json.dumps({"title": "Deck Commander — emulador atualizado",
+                                                         "message": "save state"}))
+    assert run(p.get_launch_error()) == {"title": "Deck Commander — emulador atualizado", "message": "save state"}
 
 
 def test_launch_failure_leaves_message_for_plugin(tmp_path, monkeypatch):

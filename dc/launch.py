@@ -103,6 +103,16 @@ def main(argv: list[str]) -> None:
                 say(gmsg)
         except Exception as e:  # noqa: BLE001 — a conferência nunca impede o jogo de abrir
             say(f"conferência da tradução: ignorada ({e})")
+    try:  # emulador atualizado desde a última vez: save state antigo pode não abrir (só avisa, nunca impede)
+        from . import versao_emulador
+        aviso = versao_emulador.conferir(paths.state, launch_map[game_id].get("console", ""), cmd)
+        if aviso:
+            say(f"aviso: {aviso}")
+            (paths.data / "launch-error.json").write_text(json.dumps(
+                {"at": datetime.now(timezone.utc).isoformat(), "title": "Deck Commander — emulador atualizado",
+                 "message": aviso}, ensure_ascii=False), "utf-8")
+    except Exception as e:  # noqa: BLE001
+        say(f"versão do emulador: não conferi ({e})")
     from . import quality
     try:
         msg = quality.restore(paths)  # sobra de um jogo anterior fechado à força

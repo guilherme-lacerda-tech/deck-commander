@@ -1,6 +1,6 @@
 {
   "name": "deck-commander",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Ponte entre o Deck Commander e o Steam: cria atalhos ao vivo.",
   "type": "module",
   "license": "MIT",

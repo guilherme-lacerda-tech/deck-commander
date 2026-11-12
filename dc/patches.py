@@ -188,3 +188,56 @@ def apply_file(rom: Path, patch: Path, out: Path | None = None) -> Path:
     tmp.write_bytes(result)
     os.replace(tmp, out)
     return out
+
+
+def create_bps_arquivos(src_path: Path, tgt_path: Path, out_path: Path, bloco: int = 1 << 16) -> Path:
+    """BPS de arquivos grandes (imagem de disco de ~700 MB) sem carregar tudo na memória. Pedaços iguais viram
+    "copia do original" de uma vez; só os pedaços que mudaram são comparados byte a byte. Revisão retrô 12/11/2026:
+    a tradução de disco (Castlevania) só gerava a cópia inteira do jogo; o patch é o que dá para compartilhar."""
+    n_src, n_tgt = os.path.getsize(src_path), os.path.getsize(tgt_path)
+    if n_src != n_tgt:  # disco traduzido sempre tem o mesmo tamanho; outro caso usa o gerador comum
+        out = create_bps(Path(src_path).read_bytes(), Path(tgt_path).read_bytes())
+        Path(out_path).write_bytes(out)
+        return Path(out_path)
+    out = bytearray(b"BPS1" + _varint(n_src) + _varint(n_tgt) + _varint(0))
+    crc_s = crc_t = 0
+    tipo, tam, dados = None, 0, bytearray()  # trecho em andamento: 0 = igual ao original, 1 = dados novos
+
+    def fecha():
+        nonlocal tipo, tam, dados
+        if tipo == 0:
+            out.extend(_varint(((tam - 1) << 2) | 0))
+        elif tipo == 1:
+            out.extend(_varint(((tam - 1) << 2) | 1)); out.extend(dados)
+        tipo, tam, dados = None, 0, bytearray()
+
+    def soma(t, n, pedaco=b""):
+        nonlocal tipo, tam
+        if t != tipo:
+            fecha(); tipo = t
+        tam += n
+        if t == 1:
+            dados.extend(pedaco)
+
+    with open(src_path, "rb") as fs, open(tgt_path, "rb") as ft:
+        while True:
+            a, b = fs.read(bloco), ft.read(bloco)
+            if not b:
+                break
+            crc_s, crc_t = zlib.crc32(a, crc_s), zlib.crc32(b, crc_t)
+            if a == b:
+                soma(0, len(b))
+                continue
+            i = 0
+            while i < len(b):
+                igual = a[i] == b[i]
+                j = i
+                while j < len(b) and (a[j] == b[j]) == igual:
+                    j += 1
+                soma(0 if igual else 1, j - i, b"" if igual else b[i:j])
+                i = j
+    fecha()
+    out += (crc_s & 0xFFFFFFFF).to_bytes(4, "little") + (crc_t & 0xFFFFFFFF).to_bytes(4, "little")
+    out += _crc(bytes(out)).to_bytes(4, "little")
+    Path(out_path).write_bytes(bytes(out))
+    return Path(out_path)

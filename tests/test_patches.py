@@ -75,3 +75,23 @@ def test_xdelta_and_exe_detected_and_refused(tmp_path):
         p = tmp_path / f"p.{kind}"; p.write_bytes(data)
         with pytest.raises(patches.PatchError, match=kind):
             patches.apply_file(rom, p)
+
+
+def test_bps_de_disco_grande_aos_pedacos(tmp_path):
+    """Revisão retrô 12/11/2026: tradução de disco (Castlevania) não gerava patch para compartilhar."""
+    import random
+
+    from dc import patches as P
+    rnd = random.Random(7)
+    orig = bytes(rnd.getrandbits(8) for _ in range(300_000))
+    novo = bytearray(orig)
+    novo[10:20] = b"PORTUGUES!"            # mudança no começo
+    novo[65_530:65_545] = b"X" * 15         # atravessa a divisa de dois pedaços
+    novo[-3:] = b"fim"                      # última parte
+    (tmp_path / "o.bin").write_bytes(orig); (tmp_path / "n.bin").write_bytes(bytes(novo))
+    bps = P.create_bps_arquivos(tmp_path / "o.bin", tmp_path / "n.bin", tmp_path / "n.bps")
+    patch = bps.read_bytes()
+    assert len(patch) < 200  # só o que mudou
+    assert P.apply_bps(orig, patch) == bytes(novo)
+    assert P.create_bps_arquivos(tmp_path / "o.bin", tmp_path / "n.bin", tmp_path / "m.bps", bloco=4096).read_bytes() \
+        and P.apply_bps(orig, (tmp_path / "m.bps").read_bytes()) == bytes(novo)

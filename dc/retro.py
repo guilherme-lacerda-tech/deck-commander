@@ -11,7 +11,6 @@ from __future__ import annotations
 import glob
 import json
 import shutil
-import socket
 from pathlib import Path
 
 from . import retro_hacks as R
@@ -238,15 +237,22 @@ def desfazer(home: Path | None = None) -> str:
             + (f"; layouts de controle devolvidos em {n} jogo(s)" if n else ""))
 
 
-# ------------------------------------------------------------------------------------------- RetroArch ao vivo
-def comando_retroarch(cmd: str, porta: int = 55355) -> bool:
-    """Manda um comando para o RetroArch aberto (ex.: "SHADER_TOGGLE", "SAVE_STATE"). Só na própria máquina."""
+# --------------------------------------------------------------------------- configs feitas por versões antigas
+def _retroarch_aberto() -> bool:
+    import subprocess
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            s.sendto(cmd.encode(), ("127.0.0.1", porta))
-        return True
+        return subprocess.run(["pgrep", "-f", "retroarch"], capture_output=True).returncode == 0
     except OSError:
         return False
+
+
+def corrigir_retroarch_antigo(home: Path) -> bool:
+    """Quem ligou o Retrô antes da 0.8.1 ficou com a porta de comandos aberta e o "hardcore" marcado. Com o RetroArch
+    aberto não mexe: ele regrava o arquivo ao fechar e desfaria a troca (tenta de novo na próxima volta do painel)."""
+    ra = home / ARQUIVOS["RetroArch"]
+    if not ra.exists() or _retroarch_aberto():
+        return False
+    return _gravar(ra, R.seguranca_retroarch(ra.read_text("utf-8", "replace")))
 
 
 def jogos_para_o_painel(home: Path | None = None, mapa: dict | None = None) -> dict:
@@ -261,6 +267,7 @@ def jogos_para_o_painel(home: Path | None = None, mapa: dict | None = None) -> d
         mapa = transferir.carregar_mapa()
     # Só jogo que ainda não passou por aqui. Antes: TODO reinício do Decky reaplicava o modelo em todos e apagava o
     # layout que o usuário tivesse escolhido (revisão de lançamento 12/11/2026).
+    corrigir_retroarch_antigo(home)
     reg = registro(home)
     contas = _contas(home)
     novos = [(n, a) for n, a in jogos_dos_emuladores(home, mapa)

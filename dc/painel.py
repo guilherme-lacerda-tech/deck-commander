@@ -868,8 +868,9 @@ def retro_definir(p: Ponte, a: dict) -> dict:
         if cfg.exists():
             cfg.write_text(RH.definir(cfg.read_text("utf-8", "replace"),
                                       {"video_shader_enable": "true" if a["filtros"] else "false"}), "utf-8")
-        RT.comando_retroarch("SHADER_TOGGLE") if a.get("agora") else None  # jogo aberto: troca na hora
-        return {"texto": "Filtros de tela " + ("ligados" if a["filtros"] else "desligados") + "."}
+        # jogo aberto: sem a porta de comandos pela rede (fechada por segurança), a troca vale ao reabrir o jogo
+        return {"texto": "Filtros de tela " + ("ligados" if a["filtros"] else "desligados") + "."
+                + (" Feche e abra o jogo para ver a troca." if a.get("agora") else "")}
     turbo = float(a.get("turbo") or 2.0)
     if turbo not in (2.0, 3.0, 4.0):
         raise Erro("Turbo: 2x, 3x ou 4x.")

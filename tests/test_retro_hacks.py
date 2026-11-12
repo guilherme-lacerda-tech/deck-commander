@@ -82,7 +82,7 @@ def test_retroarch():
     r = R.cfg_retroarch(t)
     assert r.startswith('a = "1"\nfastforward_ratio = "2.000000"\n')
     for k, v in (("input_save_state", "f9"), ("input_load_state", "f10"), ("input_rewind", "f11"),
-                 ("input_toggle_fast_forward", "f12"), ("input_hold_fast_forward", "nul"), ("rewind_enable", "true"), ("network_cmd_enable", "true"),
+                 ("input_toggle_fast_forward", "f12"), ("input_hold_fast_forward", "nul"), ("rewind_enable", "true"), ("network_cmd_enable", "false"),
                  ("apply_cheats_after_load", "true")):
         assert f'{k} = "{v}"' in r
     assert r.count("input_rewind") == 1 and '"r"' not in r
@@ -127,3 +127,14 @@ def test_layout_steam():
     assert '"xinput_button shoulder_left"' in r  # o resto ficou
     assert r.count("{") == r.count("}")
     assert R.layout_com_botoes_de_tras(r) == r
+
+
+def test_porta_de_comandos_fechada_e_sem_hardcore_escondido():
+    """Revisão retrô 12/11/2026: a porta UDP 55355 aceitava comandos de toda a rede local, e o "hardcore" marcado
+    tirava save state/voltar no tempo/turbo sem aviso de quem ligasse as conquistas."""
+    r = R.cfg_retroarch('network_cmd_enable = "true"\nnetwork_cmd_port = "55355"\ncheevos_enable = "false"\n'
+                        'cheevos_hardcore_mode_enable = "true"\n')
+    assert 'network_cmd_enable = "false"' in r and 'cheevos_hardcore_mode_enable = "false"' in r
+    # quem já ligou as conquistas com hardcore escolheu isso: não mexe
+    j = R.seguranca_retroarch('cheevos_enable = "true"\ncheevos_hardcore_mode_enable = "true"\n')
+    assert 'cheevos_hardcore_mode_enable = "true"' in j
