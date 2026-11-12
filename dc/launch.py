@@ -103,6 +103,13 @@ def main(argv: list[str]) -> None:
                 say(gmsg)
         except Exception as e:  # noqa: BLE001 — a conferência nunca impede o jogo de abrir
             say(f"conferência da tradução: ignorada ({e})")
+    try:  # cópia dos saves ANTES de jogar (5 últimas), em segundo plano: o jogo não espera
+        import subprocess
+        subprocess.Popen([sys.executable, "-m", "dc.copia_saves", game_id], cwd=str(Path(__file__).resolve().parents[1]),
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         start_new_session=True)
+    except Exception as e:  # noqa: BLE001 — nunca impede o jogo de abrir
+        say(f"cópia dos saves: não iniciei ({e})")
     try:  # emulador atualizado desde a última vez: save state antigo pode não abrir (só avisa, nunca impede)
         from . import versao_emulador
         aviso = versao_emulador.conferir(paths.state, launch_map[game_id].get("console", ""), cmd)

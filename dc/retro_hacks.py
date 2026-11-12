@@ -55,7 +55,9 @@ def seguranca_retroarch(texto: str) -> str:
     """Comandos pela rede desligados e, com as conquistas DESLIGADAS, o modo "hardcore" também. Com ele marcado, quem
     ligasse as RetroAchievements perdia salvar/carregar, voltar no tempo e turbo sem aviso nenhum (revisão retrô
     12/11/2026). Se a pessoa já ligou as conquistas, a escolha dela fica como está."""
-    v = {"network_cmd_enable": "false"}
+    # O RetroArch só gravava a bateria do cartucho (o save do próprio jogo) ao FECHAR: se travasse ou a bateria do
+    # Deck acabasse, o save do jogo daquela sessão sumia. Agora grava a cada 10 s quando ela muda.
+    v = {"network_cmd_enable": "false", "autosave_interval": "10"}
     if 'cheevos_enable = "true"' not in texto:
         v["cheevos_hardcore_mode_enable"] = "false"
     return definir(texto, v)

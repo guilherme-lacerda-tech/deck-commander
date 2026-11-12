@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.2 — 2026-11-12 — saves que não se perdem
+- **Cópia automática dos saves** de cada jogo (save do jogo e saves rápidos) antes de cada vez que ele abre; ficam as
+  5 últimas em `~/Backups/DeckCommander/saves/<jogo>/`. No bot: `/saves copias <jogo>` e `/saves voltar <jogo> <n>`
+  (o save de agora vira cópia antes de voltar).
+- RetroArch grava a bateria do cartucho (save do próprio jogo) a cada 10 s, não só ao fechar.
+
 ## 0.8.1 — 2026-11-12 — revisão de retrogamer
 - RetroArch: **porta de comandos pela rede fechada** (a UDP 55355 aceitava "fechar jogo"/"carregar estado" de
   qualquer aparelho da rede local). Trocar o filtro de tela com o jogo aberto agora vale ao reabrir o jogo.

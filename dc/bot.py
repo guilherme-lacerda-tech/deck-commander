@@ -602,6 +602,7 @@ class Bot:
         if not args:
             pend = saves_sync.conflitos(self.paths)
             return ("Uso: /saves <jogo> — deixa os saves iguais no Deck e no PC (o mais novo vale).\n"
+                    "/saves copias <jogo> — as 5 cópias automáticas (feitas antes de cada vez que o jogo abre).\n"
                     + ("Conflitos esperando você: " + ", ".join(pend) + " → /saves <jogo> deck  ou  /saves <jogo> pc"
                        if pend else "Nenhum conflito pendente."))
         if args[0].lower() == "auto":  # /saves auto [sim|nao]: sincronizar sozinho ao fechar o jogo
@@ -613,6 +614,8 @@ class Bot:
             return ("💾 Saves automáticos: " + ("DESLIGADOS" if flag.exists() else "LIGADOS") + ". Ligados, ao fechar um jogo "
                     "que já foi sincronizado uma vez, os saves vão para a fila e o PC iguala quando estiver ligado "
                     "(só aviso se der conflito). /saves auto sim|nao")
+        if args[0].lower() in ("copias", "cópias", "voltar"):  # cópias automáticas (5 últimas, antes de cada sessão)
+            return self._copias_saves(args)
         lado = args[-1].lower() if args[-1].lower() in ("deck", "pc") else None
         q = " ".join(args[:-1] if lado else args)
         lm = self._map()
@@ -623,6 +626,34 @@ class Bot:
         msg = (saves_sync.escolher(self.paths, gid, lado) + " ") if lado else ""
         transferir.enfileirar(gid, lm[gid].get("title", gid), direcao="saves")
         return f"💾 {msg}Sincronização dos saves de {lm[gid].get('title', gid)} na fila: o PC faz em até 5 min e eu aviso."
+
+    def _copias_saves(self, args: list[str]) -> str:
+        """/saves copias <jogo>  ·  /saves voltar <jogo> <n> — o estado atual vira cópia antes de voltar."""
+        from . import copia_saves as C
+        from .remove import find
+        n = int(args[-1]) if args[0].lower() == "voltar" and len(args) > 2 and args[-1].isdigit() else None
+        q = " ".join(args[1:-1] if n else args[1:])
+        lm = self._map()
+        hits = find(lm, q) if q else []
+        if len(hits) != 1:
+            return ("Uso: /saves copias <jogo>  ·  /saves voltar <jogo> <número>" if not q else
+                    "Não achei um só jogo com esse nome." if not hits else "Achei mais de um: seja mais específico.")
+        gid, titulo = hits[0], lm[hits[0]].get("title", hits[0])
+        if n is None:
+            cs = C.copias(self.paths, gid)
+            if not cs:
+                return f"💾 {titulo}: nenhuma cópia ainda (ela é feita sozinha toda vez que o jogo abre)."
+            self.next_buttons = [(f"↩ Voltar a {i}", f"/saves voltar {q} {i}") for i in range(1, min(len(cs), 3) + 1)]
+            return (f"💾 Cópias dos saves de {titulo} (1 = a mais nova, feita antes da última vez que você jogou):\n"
+                    + "\n".join(f"{i}. {c.name.replace('_', ' ')} UTC" for i, c in enumerate(cs, 1))
+                    + f"\nPara voltar: /saves voltar {q} <número> (feche o jogo antes; o save de agora vira cópia).")
+        from .ops import game_running
+        if game_running():
+            return "Feche o jogo antes de voltar um save (o emulador regravaria por cima)."
+        try:
+            return "💾 " + C.voltar(self.paths, gid, n) + f" — {titulo}."
+        except ValueError as e:
+            return f"💾 {e}"
 
     def _guardar_playlist(self, nome: str, link: str) -> str:
         from . import painel
