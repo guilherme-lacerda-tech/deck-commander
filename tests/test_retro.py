@@ -139,3 +139,12 @@ def test_config_antiga_fecha_a_porta_e_tira_o_hardcore(tmp_path, monkeypatch):
     t = ra.read_text()
     assert 'network_cmd_enable = "false"' in t and 'cheevos_hardcore_mode_enable = "false"' in t
     assert retro.corrigir_retroarch_antigo(tmp_path) is False  # já está certo: não regrava
+
+
+def test_retroarch_aberto_procura_pelo_nome_do_processo(monkeypatch):
+    """Falha vista no Deck 12/11/2026: "pgrep -f retroarch" achava qualquer linha de comando com a palavra (até o
+    próprio comando de correção) e a correção nunca rodava. Agora é o nome exato do processo."""
+    import subprocess
+    visto = {}
+    monkeypatch.setattr(subprocess, "run", lambda a, **k: visto.setdefault("a", a) and subprocess.CompletedProcess(a, 1))
+    assert retro._retroarch_aberto() is False and visto["a"] == ["pgrep", "-x", "retroarch"]

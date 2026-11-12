@@ -241,7 +241,7 @@ def desfazer(home: Path | None = None) -> str:
 def _retroarch_aberto() -> bool:
     import subprocess
     try:
-        return subprocess.run(["pgrep", "-f", "retroarch"], capture_output=True).returncode == 0
+        return subprocess.run(["pgrep", "-x", "retroarch"], capture_output=True).returncode == 0
     except OSError:
         return False
 
