@@ -1,10 +1,12 @@
 from __future__ import annotations
-from pathlib import Path
+
 import csv
 import json
-import tempfile
 import os
+import tempfile
 from datetime import datetime, timezone
+from pathlib import Path
+
 
 def parse_mangohud(path: Path) -> dict | None:
     """Analisa o arquivo MangoHUD e extrai estatísticas de desempenho."""
@@ -58,7 +60,7 @@ def parse_mangohud(path: Path) -> dict | None:
                 "slow_share": slow_share,
                 "samples": samples
             }
-    except (FileNotFoundError, IOError):
+    except (OSError, FileNotFoundError):
         return None
 
 
@@ -237,7 +239,7 @@ class Sampler:
         self._stop = threading.Event()
         self._t = threading.Thread(target=self._run, daemon=True)
 
-    def start(self) -> "Sampler":
+    def start(self) -> Sampler:
         self._t.start()
         return self
 
@@ -262,7 +264,7 @@ class Sampler:
         self._stop.set()
 
 
-def finish_session(paths, game_id: str, console: str, title: str, log_dir, t0: float, sampler: "Sampler",
+def finish_session(paths, game_id: str, console: str, title: str, log_dir, t0: float, sampler: Sampler,
                    rec=None) -> str:
     """Fecha a medição de uma partida: lê o log de FPS, junta o consumo e guarda no histórico do jogo.
     O resumo também vai para data/perf-last.json (o bot avisa no Telegram e o plugin mostra)."""

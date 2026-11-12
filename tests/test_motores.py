@@ -2,9 +2,7 @@
 import sys
 import types
 
-
 from dc.traducao import comandos, ia, motores, run
-from tests.test_traducao_bot import b  # noqa: F401 - fixture
 
 
 def _fake_adapter(monkeypatch):

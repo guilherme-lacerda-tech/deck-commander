@@ -13,7 +13,6 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 from .ini import IniDoc
 
@@ -32,7 +31,7 @@ class ManualOverride(RuntimeError):
 class Change:
     section: str
     key: str
-    old: Optional[str]
+    old: str | None
     new: str
 
 

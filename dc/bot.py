@@ -61,7 +61,7 @@ def parse_console(text: str):
         if re.fullmatch(rf"\s*(?:{rx})\s*", t) or re.search(rf"(?:^|\W)(?:{rx})(?:$|\W)", t):
             return c
     return None
-MAGNET_RX = re.compile(r"magnet:\?\S+", re.I)
+MAGNET_RX = re.compile(r"magnet:\?\S+", re.IGNORECASE)
 
 
 def valid_magnet(m: str) -> bool:
@@ -81,7 +81,7 @@ UNKNOWN_CONSOLE = ("Uso: Switch, 3DS, DS, Wii U, Wii, GameCube, N64, SNES, NES, 
 # comando citado numa mensagem (só palavras simples: ids de jogo, códigos de tarefa, opções)
 COMMAND_IN_TEXT = re.compile(
     r"(/(?:traduzir|converter|sync|devolver|remover|qualidade|controles|status|disk|calibrar)"
-    r"(?: (?!<)[A-Za-z0-9_\-]+)*?)(?=[ 	]*(?:$|[—(.,:;→]| - ))", re.M)
+    r"(?: (?!<)[A-Za-z0-9_\-]+)*?)(?=[ 	]*(?:$|[—(.,:;→]| - ))", re.MULTILINE)
 HELP = """Deck Commander — comandos
 Mais fácil: mande o nome do console (ex.: Switch 1, PS2) e depois encaminhe o .torrent ou cole o magnet.
 Aviso aqui quando o download terminar.
@@ -581,7 +581,8 @@ class Bot:
 
     def _corrigir_foto(self, foto: dict, legenda: str) -> str:
         """Foto/print de uma frase traduzida estranha + /corrigir [jogo] [| orientação]: troca só aquela frase."""
-        from .traducao import comandos as trad, corrigir_servico, ia
+        from .traducao import comandos as trad
+        from .traducao import corrigir_servico, ia
         try:
             info = self.call("getFile", file_id=foto["file_id"])
             with urllib.request.urlopen(f"https://api.telegram.org/file/bot{self.token}/{info['file_path']}",

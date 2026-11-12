@@ -4,8 +4,8 @@ import json
 import os
 import struct
 import time
-from types import SimpleNamespace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -357,3 +357,22 @@ def test_avisa_uma_vez_quando_a_copia_para(tmp_path, monkeypatch):
     agora[0] += 31 * 60
     transferir.notificar(x)
     assert len(sent) == 2 and "não dá sinal" in sent[1]
+
+
+def test_transferir_roda_sozinho_sem_o_pacote():
+    """O PC manda dc/transferir.py pela entrada padrão para um Deck sem o projeto (tools/pc/transferir-do-deck.ps1).
+    Na revisão de 12/11/2026 quase troquei as funções copiadas por um import do pacote, o que quebraria isso."""
+    import ast
+    from pathlib import Path
+    src = (Path(__file__).resolve().parents[1] / "dc/transferir.py").read_text("utf-8")
+    topo = [n for n in ast.parse(src).body if isinstance(n, ast.ImportFrom)]
+    assert all(n.level == 0 and not (n.module or "").startswith("dc") for n in topo)
+
+
+def test_receber_tambem_roda_sozinho():
+    """Mesmo caso: tools/pc/enviar-para-deck.ps1 manda dc/receber.py pela entrada padrão."""
+    import ast
+    from pathlib import Path
+    src = (Path(__file__).resolve().parents[1] / "dc/receber.py").read_text("utf-8")
+    topo = [n for n in ast.parse(src).body if isinstance(n, ast.ImportFrom)]
+    assert all(n.level == 0 and not (n.module or "").startswith("dc") for n in topo)

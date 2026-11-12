@@ -7,14 +7,14 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Callable
 from datetime import datetime, timezone
-from typing import Callable, Optional
 
 from .lock import OperationLock, lock_is_held
 from .paths import Paths
 from .store import Operation, Store
 
-Handler = Callable[[Operation, dict], Optional[dict]]
+Handler = Callable[[Operation, dict], dict | None]
 
 
 def log_operation(paths: Paths, record: dict) -> None:
@@ -35,7 +35,7 @@ def recover(store: Store, paths: Paths) -> list[str]:
     return ids
 
 
-def run_once(store: Store, paths: Paths, handlers: dict[str, Handler], lock_timeout: float = 300.0) -> Optional[str]:
+def run_once(store: Store, paths: Paths, handlers: dict[str, Handler], lock_timeout: float = 300.0) -> str | None:
     op = store.claim_next()
     if op is None:
         return None

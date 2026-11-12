@@ -13,7 +13,6 @@ import re
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 from . import safe_extract
 from .emulators import CONSOLES
@@ -21,11 +20,11 @@ from .quarantine import quarantine
 
 ARCHIVES = {".zip", ".7z", ".rar"}
 AMBIGUOUS = {".iso", ".chd", ".zip", ".7z", ".bin", ".cue", ".pbp"}  # existe em vários consoles
-_DISC = re.compile(r"\s*[\(\[]?\s*(disc|disco|cd)\s*([0-9]+)\s*[\)\]]?", re.I)
-_HACK = re.compile(r"\[(br|pt-?br|t[-+]?por?)\]|\((br|pt-?br|translated|traduzido)\)|\(t\s?\d", re.I)
+_DISC = re.compile(r"\s*[\(\[]?\s*(disc|disco|cd)\s*([0-9]+)\s*[\)\]]?", re.IGNORECASE)
+_HACK = re.compile(r"\[(br|pt-?br|t[-+]?por?)\]|\((br|pt-?br|translated|traduzido)\)|\(t\s?\d", re.IGNORECASE)
 # A ordem importa: o mais específico vem antes ("Wii U" antes de "Wii", "Switch 2" antes de "Switch",
 # "PlayStation Portable" antes de "PlayStation"). GoD só entre parênteses/colchetes: "God of War" não é Xbox 360.
-NAME_HINTS = [(re.compile(p, re.I), c) for p, c in (
+NAME_HINTS = [(re.compile(p, re.IGNORECASE), c) for p, c in (
     (r"\bps2\b|playstation 2", "ps2"), (r"\bpsp\b|playstation portable", "psp"),
     (r"\bps3\b|playstation 3", "ps3"), (r"\bpsx\b|\bps1\b|playstation(?! [2-9])", "psx"),
     (r"gamecube|\bngc\b", "gc"), (r"\bwii ?u\b", "wiiu"), (r"\bwii\b", "wii"),
@@ -44,7 +43,7 @@ def _link_or_copy(src: Path, dst: Path) -> None:
         shutil.copy2(src, dst)
 
 
-def classify(name: str, explicit: Optional[str] = None) -> Optional[str]:
+def classify(name: str, explicit: str | None = None) -> str | None:
     if explicit and explicit != "auto":  # "auto" = /add sem console: decide pelo nome
         return explicit if explicit in CONSOLES and not CONSOLES[explicit].get("remoto") else None
     for rx, c in NAME_HINTS:
@@ -60,7 +59,7 @@ def classify(name: str, explicit: Optional[str] = None) -> Optional[str]:
 GAME_EXTS = {e for spec in CONSOLES.values() for e in spec["exts"]} | ARCHIVES | {".bin", ".mdf"}
 
 
-def _structure(files: list[Path]) -> Optional[str]:
+def _structure(files: list[Path]) -> str | None:
     """Pastas que só se reconhecem pela estrutura: PS3 (PS3_GAME/USRDIR/EBOOT.BIN), Xbox 360 GoD
     (<TitleID>/00007000/<cabeçalho>) e dump de Switch 2 (base/exefs/main)."""
     for f in files:
@@ -90,7 +89,7 @@ def _files(content: Path) -> list[Path]:
     return [content] if content.is_file() else sorted(f for f in content.rglob("*") if f.is_file())
 
 
-def guess_console(content: Path) -> Optional[str]:
+def guess_console(content: Path) -> str | None:
     """/add sem console: nome do download > estrutura da pasta > nomes dos arquivos (inclusive os de dentro
     de .zip/.7z/.rar, só pelo índice). None = continua ambíguo (o bot pergunta)."""
     c = classify(content.name)
@@ -138,7 +137,7 @@ def switch_extras(files: list[Path]) -> list[Path]:
     return [f for f in files if f.suffix.lower() in CONSOLES["switch"]["exts"] and switch_kind(f.name) in ("update", "dlc")]
 
 
-def make_m3u(discs: list[Path], folder: Path) -> Optional[Path]:
+def make_m3u(discs: list[Path], folder: Path) -> Path | None:
     """PS1 multidisco: (Disc 1)/(Disc 2) -> '<jogo>.m3u' com caminhos relativos, preservando nomes."""
     numbered = [(int(m.group(2)), d) for d in discs if (m := _DISC.search(d.stem))]
     if len(numbered) < 2:
@@ -153,14 +152,14 @@ def make_m3u(discs: list[Path], folder: Path) -> Optional[Path]:
 @dataclass
 class SyncItem:
     name: str
-    console: Optional[str]
+    console: str | None
     status: str                    # added / ask_console / ask_many / quarantined / skipped
     files: list[str] = field(default_factory=list)
     note: str = ""
     integrity: str = "unverified"
 
 
-_VOLUME = re.compile(r"\.(r\d{2,3}|s\d{2})$|\.part(?!0*1\.rar$)\d+\.rar$", re.I)
+_VOLUME = re.compile(r"\.(r\d{2,3}|s\d{2})$|\.part(?!0*1\.rar$)\d+\.rar$", re.IGNORECASE)
 
 
 def _extra_volume(f: Path, files: list[Path]) -> bool:
@@ -168,8 +167,8 @@ def _extra_volume(f: Path, files: list[Path]) -> bool:
     if not _VOLUME.search(f.name):
         return False
     if f.suffix.lower() == ".rar":  # nome.part2.rar -> precisa do nome.part1.rar
-        base = re.sub(r"\.part\d+\.rar$", "", f.name, flags=re.I)
-        return any(re.fullmatch(re.escape(base) + r"\.part0*1\.rar", g.name, re.I) for g in files)
+        base = re.sub(r"\.part\d+\.rar$", "", f.name, flags=re.IGNORECASE)
+        return any(re.fullmatch(re.escape(base) + r"\.part0*1\.rar", g.name, re.IGNORECASE) for g in files)
     return any(g.name.lower() == f.stem.lower() + ".rar" and g.parent == f.parent for g in files)
 
 
@@ -203,10 +202,10 @@ def _msf(sector: int) -> str:
     return f"{sector // 4500:02d}:{sector // 75 % 60:02d}:{sector % 75:02d}"
 
 
-_SERIAL = re.compile(r"^[A-Z]{4}[_-]?\d{3}\.?\d{2}$", re.I)  # SLES_005.24, SLUS-00067…
+_SERIAL = re.compile(r"^[A-Z]{4}[_-]?\d{3}\.?\d{2}$", re.IGNORECASE)  # SLES_005.24, SLUS-00067…
 
 
-def mdf_to_cue(mdf: Path, title: str = "") -> Optional[Path]:
+def mdf_to_cue(mdf: Path, title: str = "") -> Path | None:
     """CD de PS1 em .mdf/.mds (Alcohol 120%) vira .bin + .cue, que o DuckStation e o tradutor abrem. Lê as faixas
     do .mds (dados + áudio); setores de 2448 bytes (2352 + 96 de subcanal) perdem o subcanal."""
     mds = mdf.with_suffix(".mds")
@@ -252,7 +251,7 @@ def mdf_to_cue(mdf: Path, title: str = "") -> Optional[Path]:
     return cue
 
 
-def ingest(content: Path, console: Optional[str], roms_root: Path, quarantine_root: Path,
+def ingest(content: Path, console: str | None, roms_root: Path, quarantine_root: Path,
            work: Path, confirm_many: bool = False) -> SyncItem:
     """Leva um download concluído (arquivo ou pasta) para roms_root/<console>/<pasta>/."""
     content = Path(content)
@@ -298,11 +297,11 @@ def ingest(content: Path, console: Optional[str], roms_root: Path, quarantine_ro
         if console == "psx":  # imagem .mdf/.mds de CD: vira .bin + .cue (o DuckStation e o tradutor abrem)
             for i, f in enumerate(collected):
                 if f.suffix.lower() == ".mdf":
-                    cue = mdf_to_cue(f, re.sub(r"\.(zip|7z|rar)$", "", name, flags=re.I))
+                    cue = mdf_to_cue(f, re.sub(r"\.(zip|7z|rar)$", "", name, flags=re.IGNORECASE))
                     if cue:
                         collected[i] = cue
         games = playable(collected, console)
-        title = re.sub(r"\.(zip|7z|rar)$", "", name, flags=re.I)
+        title = re.sub(r"\.(zip|7z|rar)$", "", name, flags=re.IGNORECASE)
         if not games and console == "switch" and switch_extras(collected):
             # atualização/DLC baixada sozinha: vai para a pasta do Switch, que o Ryujinx lê sozinho (sem atalho)
             dest, n = roms_root / "switch" / title, 1

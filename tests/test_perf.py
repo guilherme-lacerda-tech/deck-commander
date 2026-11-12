@@ -105,7 +105,8 @@ def test_record_session_keeps_history(tmp_path):
 
 
 def test_newest_log(tmp_path):
-    import os, time
+    import os
+    import time
     a = tmp_path / "a.csv"; a.write_text("x"); b = tmp_path / "b.csv"; b.write_text("y")
     os.utime(a, (time.time() - 100, time.time() - 100))
     assert perf.newest_log(tmp_path, since=time.time() - 50) == b
@@ -113,7 +114,8 @@ def test_newest_log(tmp_path):
 
 
 def test_finish_session_records_and_flags_for_bot(tmp_path):
-    import json, time
+    import json
+    import time
     from types import SimpleNamespace
     paths = SimpleNamespace(state=tmp_path / "state", data=tmp_path / "data", config=tmp_path / "cfg")
     paths.data.mkdir()
@@ -123,6 +125,7 @@ def test_finish_session_records_and_flags_for_bot(tmp_path):
     s = perf.Sampler(hwmon_root=tmp_path / "x", sysfs_root=tmp_path / "y")
     s.bat, s.wh_left = [12.0, 14.0], 39.0
     out = perf.finish_session(paths, "ps2-sotc", "ps2", "Shadow of the Colossus", logs, t0, s)
+    assert out  # o resumo da partida volta para o lançador registrar
     h = perf.history(paths.state, "ps2-sotc")[-1]
     assert h["fps_avg"] == 52.5 and h["watts_avg"] == 13.0 and h["hours_left"] == 3.0 and h["verdict"] == "travando"
     assert h["fonte_watts"] == "bateria" and h["minutos"] == 10.0

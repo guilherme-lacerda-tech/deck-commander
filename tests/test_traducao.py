@@ -352,6 +352,7 @@ def test_transient_error_keeps_fast_provider_and_quotes_survive(tmp_path):
 
 def test_ensure_update_selected_fixes_ryujinx(tmp_path, monkeypatch):
     import json as _j
+
     from dc.traducao import converter, extract
     ryu = tmp_path / "Ryujinx"
     monkeypatch.setattr(switch, "RYU_DIRS", [ryu])
@@ -462,6 +463,7 @@ def test_mod_remembers_its_version_and_launch_selects_it(tmp_path, monkeypatch):
     """Mod feito sem atualização (BotW v0): baixar uma atualização depois NÃO pode fazer o Ryujinx abrir a
     atualização com textos da base — seleciona a versão do mod e avisa como refazer."""
     import json as _j
+
     from dc.traducao import converter, extract
     paths = get_paths(tmp_path / "dc").ensure()
     ryu = tmp_path / "Ryujinx"

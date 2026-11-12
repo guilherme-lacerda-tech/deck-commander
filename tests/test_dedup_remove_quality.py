@@ -224,6 +224,7 @@ def test_controls_check_flags_unmapped_dolphin(tmp_path):
 # ---------------------------------------------------------------- brechas do /sync
 def test_no_space_is_not_quarantined(tmp_path, monkeypatch):
     import zipfile
+
     from dc import content, safe_extract
     src = tmp_path / "dl" / "Jogo.zip"
     src.parent.mkdir()
@@ -299,6 +300,7 @@ def test_sync_slow_extraction_continues_later_without_losing_state(tmp_path, mon
 def test_pt_version_hides_the_other_copy(tmp_path):
     """Shadow of the Colossus duplicado (09/11): original + "(Dub-e-Leg)" → fica só o em português, sem apagar arquivo."""
     import json as _json
+
     from dc import dedup, syncer
     from dc.paths import get_paths
     paths = get_paths(tmp_path).ensure()

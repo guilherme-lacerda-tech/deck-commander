@@ -7,15 +7,15 @@ A política decide RUN/PAUSE para downloads; quem aplica é o cliente do qBittor
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Optional
 
 DEFAULT_SYSFS = Path("/sys/class/power_supply")
 EXTERNAL_TYPES = {"Mains", "USB", "USB_C", "USB_PD", "USB_PD_DRP", "Wireless"}
 
 
-def _read(p: Path) -> Optional[str]:
+def _read(p: Path) -> str | None:
     try:
         return p.read_text("utf-8").strip()
     except OSError:
@@ -25,18 +25,18 @@ def _read(p: Path) -> Optional[str]:
 @dataclass
 class Supply:
     name: str
-    type: Optional[str]
-    online: Optional[bool]
-    capacity: Optional[int]
-    status: Optional[str]
-    scope: Optional[str] = None   # "Device" = periférico (mouse/controle), não alimenta o Deck
+    type: str | None
+    online: bool | None
+    capacity: int | None
+    status: str | None
+    scope: str | None = None   # "Device" = periférico (mouse/controle), não alimenta o Deck
 
 
 @dataclass
 class PowerReading:
-    ac_online: Optional[bool]          # None = unknown
-    battery_pct: Optional[int]         # None = unknown
-    battery_status: Optional[str]      # Charging/Discharging/Full/Not charging/None
+    ac_online: bool | None          # None = unknown
+    battery_pct: int | None         # None = unknown
+    battery_status: str | None      # Charging/Discharging/Full/Not charging/None
     supplies: list[Supply] = field(default_factory=list)
 
 
@@ -73,10 +73,10 @@ class PowerPolicy:
     debounce_s: float = 60.0           # mudança precisa persistir esse tempo
     clock: Callable[[], float] = time.monotonic
     state: str = "PAUSE"
-    _pending: Optional[str] = None
+    _pending: str | None = None
     _pending_since: float = 0.0
 
-    def desired(self, r: PowerReading) -> tuple[Optional[str], str]:
+    def desired(self, r: PowerReading) -> tuple[str | None, str]:
         if r.ac_online is None and r.battery_pct is None:
             return None, "leituras de energia indisponíveis (unknown) — mantém estado"
         if r.battery_pct is not None and r.battery_pct < self.min_battery_pct:

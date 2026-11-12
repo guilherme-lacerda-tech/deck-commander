@@ -17,7 +17,6 @@ import shutil
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 from .. import dedup
 from ..paths import Paths
@@ -40,7 +39,7 @@ class TitleFiles:
         return self.base + self.updates + self.dlc
 
 
-def kind_of(name: str) -> Optional[str]:
+def kind_of(name: str) -> str | None:
     m = re.search(r"\[([0-9A-Fa-f]{16})\]", name)
     if not m:
         return None
@@ -124,7 +123,7 @@ def organize(tf: TitleFiles, title: str) -> list[str]:
     return out or ["já estava organizado"]
 
 
-def nsz_bin() -> Optional[str]:
+def nsz_bin() -> str | None:
     for c in (H / ".local/share/deck-commander/nsz-venv/bin/nsz",):
         if c.exists():
             return str(c)
@@ -145,7 +144,7 @@ def ensure_keys() -> bool:
     return True
 
 
-def decompress_temp(p: Path, work: Path) -> Optional[Path]:
+def decompress_temp(p: Path, work: Path) -> Path | None:
     """Descompacta um .nsz/.xcz numa pasta temporária SÓ para ler (o arquivo da biblioteca não muda).
     Devolve o .nsp/.xci temporário, ou None se não der (sem nsz, sem chaves, sem espaço)."""
     tool = nsz_bin()
@@ -186,7 +185,9 @@ def decompress(paths: Paths, tf: TitleFiles) -> list[str]:
             out.append(f"já existe {final.name}; nada feito"); continue
         os.replace(made[0], final)
         shutil.rmtree(tmp, ignore_errors=True)
-        from ..remove import _quarantine_root  # no cartão SD, a quarentena fica no próprio cartão
+        from ..remove import (
+            _quarantine_root,  # no cartão SD, a quarentena fica no próprio cartão
+        )
         q = quarantine(p, _quarantine_root(p, paths.quarantine), f"original comprimido de {final.name} (descompactado)")
         out.append(f"✅ {p.name} → {final.name} (original na quarentena: {q.name})")
     return out or ["nada comprimido"]

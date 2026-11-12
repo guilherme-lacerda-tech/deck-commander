@@ -1,11 +1,10 @@
-import re
+import base64
 import difflib
 import json
-import base64
-import urllib.request
+import re
 import urllib.error
+import urllib.request
 from pathlib import Path
-from typing import List, Tuple, Dict
 
 MARCADOR = re.compile(r"⟦\d+⟧")
 
@@ -18,7 +17,7 @@ def normalizar(t: str) -> str:
     t = re.sub(r"\s+", " ", t).strip()
     return t
 
-def parecidas(ocr: str, frases: Dict[str, str], limite: int = 3, minimo: float = 0.55) -> List[Tuple[str, float, str]]:
+def parecidas(ocr: str, frases: dict[str, str], limite: int = 3, minimo: float = 0.55) -> list[tuple[str, float, str]]:
     """Encontra frases do cache mais parecidas com o OCR."""
     ocr_norm = normalizar(ocr)
     palavras_ocr = set(ocr_norm.split())
@@ -62,7 +61,7 @@ def marcadores_ok(antiga: str, nova: str) -> bool:
     novos = MARCADOR.findall(nova)
     return sorted(antigos) == sorted(novos)  # a ordem pode mudar na tradução; os códigos não
 
-def pedido_ia(frase: str, pedido_usuario: str = "") -> Tuple[str, str]:
+def pedido_ia(frase: str, pedido_usuario: str = "") -> tuple[str, str]:
     """Monta prompt para IA com instruções de tradução."""
     sistema = (
         "Você é um tradutor profissional de jogos eletrônicos. "
@@ -78,14 +77,14 @@ def pedido_ia(frase: str, pedido_usuario: str = "") -> Tuple[str, str]:
 def limpar_resposta(txt: str) -> str:
     """Tira prefixo tipo "Tradução:" e aspas/crases em volta da frase."""
     t = txt.strip()
-    t = re.sub(r"^(tradu[cç][aã]o|resposta|frase|vers[aã]o)\s*(corrigida|melhor)?\s*:\s*", "", t, flags=re.I)
+    t = re.sub(r"^(tradu[cç][aã]o|resposta|frase|vers[aã]o)\s*(corrigida|melhor)?\s*:\s*", "", t, flags=re.IGNORECASE)
     t = t.strip().strip("`").strip()
     if len(t) >= 2 and t[0] in "\"'“«" and t[-1] in "\"'”»":
         t = t[1:-1]
     return t.strip()
 
 
-def aplicar(arquivos: List[Path], chave: str, nova: str) -> List[Path]:
+def aplicar(arquivos: list[Path], chave: str, nova: str) -> list[Path]:
     """Aplica a nova tradução em arquivos de cache."""
     alterados = []
     for arquivo in arquivos:
@@ -118,7 +117,7 @@ def aplicar(arquivos: List[Path], chave: str, nova: str) -> List[Path]:
 
     return alterados
 
-def pedido_ocr(imagem: bytes, modelo: str) -> Dict:
+def pedido_ocr(imagem: bytes, modelo: str) -> dict:
     """Monta corpo da requisição OCR para Ollama."""
     return {
         "model": modelo,
@@ -144,4 +143,4 @@ def ocr(url_base: str, modelo: str, imagem: bytes, timeout: int = 180, abrir=url
             data = json.loads(response.read().decode("utf-8"))
             return data["response"].strip()
     except Exception as e:
-        raise RuntimeError(f"Erro na requisição OCR: {str(e)}")
+        raise RuntimeError(f"Erro na requisição OCR: {e!s}")

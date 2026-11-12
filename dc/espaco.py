@@ -3,11 +3,12 @@
 Escrito pela IA local (qwen3-coder) e revisado.
 """
 import re
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
 
-def ultimas_jogadas(log_path: Path) -> Dict[str, datetime]:
+
+def ultimas_jogadas(log_path: Path) -> dict[str, datetime]:
     """Retorna mapeamento de game_id para a última vez que foi jogado."""
     if not log_path.exists():
         return {}
@@ -33,14 +34,14 @@ def ultimas_jogadas(log_path: Path) -> Dict[str, datetime]:
     return ultimas
 
 def sugestoes(
-    launch_map: Dict[str, Dict],
-    ultimas: Dict[str, datetime],
+    launch_map: dict[str, dict],
+    ultimas: dict[str, datetime],
     tamanho: Callable[[str], int],
     agora: datetime,
     dias: int = 90,
     min_bytes: int = 2 * 1024**3,
-    data_instalacao: Callable[[str], Optional[datetime]] = lambda gid: None
-) -> List[Dict]:
+    data_instalacao: Callable[[str], datetime | None] = lambda gid: None
+) -> list[dict]:
     """Gera sugestões de jogos para limpar espaço."""
     sugestoes = []
     

@@ -10,9 +10,12 @@ from __future__ import annotations
 import glob
 import json
 import os
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .arquivo_json import gravar as _save
+from .arquivo_json import ler as _load
 from .paths import Paths
 from .store import Store
 
@@ -44,18 +47,46 @@ def active(home: Path = H) -> bool:
     return installed(home) and loader_running()
 
 
-def _load(p: Path, default):
-    try:
-        return json.loads(p.read_text("utf-8"))
-    except (OSError, ValueError):
-        return default
 
-
-def _save(p: Path, data) -> None:
+@contextmanager
+def trava(p: Path):
+    """Trava do arquivo (o mesmo `<arquivo>.lock` que o backend do plugin usa). Sem ela o plugin e o Deck Commander
+    liam-mexiam-gravavam ao mesmo tempo e um apagava a mudança do outro (revisão de lançamento 12/11/2026)."""
     p.parent.mkdir(parents=True, exist_ok=True)
-    tmp = p.with_name(p.name + ".tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), "utf-8")
-    os.replace(tmp, p)
+    with open(p.with_name(p.name + ".lock"), "a") as f:
+        if os.name == "posix":
+            import fcntl
+            fcntl.flock(f, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            if os.name == "posix":
+                fcntl.flock(f, fcntl.LOCK_UN)
+
+
+def atualizar(p: Path, padrao, fn):
+    """Lê, muda (fn mexe no objeto) e grava `p` sob a trava. Devolve o que fn devolver."""
+    with trava(p):
+        dados = _load(p, padrao)
+        r = fn(dados)
+        _save(p, dados)
+        return r
+
+
+def marcar_removido(paths: Paths, game_id: str, appids=(), motivo: str = "", so_com_plugin: bool = True) -> bool:
+    """Atalho do Deck Commander sai: registro (a autocorreção não recria), item, fila e pedido de remoção ao
+    plugin. Era copiado em remove.apply, remove.hide e pc_remoto (cada um um pouco diferente). Devolve se pediu
+    a remoção do atalho ao plugin."""
+    marca = {"appid": 0, "error": "", "removed": True, **({"motivo": motivo} if motivo else {})}
+    atualizar(done_path(paths), {}, lambda d: d.__setitem__(game_id, marca))
+    atualizar(paths.data / "plugin-items.json", {}, lambda d: d.pop(game_id, None))
+    atualizar(queue_path(paths), [], lambda q: q.__setitem__(slice(None), [x for x in q if x.get("game_id") != game_id]))
+    ids = [int(a) & 0xFFFFFFFF for a in appids if a]
+    if ids and (installed() or not so_com_plugin):
+        atualizar(paths.data / "plugin-remove.json", [],
+                  lambda rq: rq.extend({"game_id": game_id, "appid": a} for a in ids))
+        return True
+    return False
 
 
 def queue_path(paths: Paths) -> Path:
@@ -82,20 +113,23 @@ def prepare_art(paths: Paths, game_id: str, title: str) -> dict:
 
 
 def enqueue(paths: Paths, rows: list[dict], with_art: bool = True) -> int:
-    q = _load(queue_path(paths), [])
-    have = {x["game_id"] for x in q}
-    n = 0
-    for r in rows:
+    have = {x["game_id"] for x in _load(queue_path(paths), [])}
+    novos = []
+    for r in rows:  # capas baixadas FORA da trava (rede): o plugin não fica esperando
         gid = r["LaunchOptions"]
-        if gid in have:
+        if gid in have or any(x["game_id"] == gid for x in novos):
             continue
-        q.append({"game_id": gid, "name": r["AppName"], "exe": r["exe"], "start_dir": r["StartDir"],
-                  "launch_options": gid, "art": prepare_art(paths, gid, r["AppName"]) if with_art else {}})
-        n += 1
-    _save(queue_path(paths), q)
-    items = _load(paths.data / "plugin-items.json", {})  # para a autocorreção do plugin
-    items.update({x["game_id"]: x for x in q})
-    _save(paths.data / "plugin-items.json", items)
+        novos.append({"game_id": gid, "name": r["AppName"], "exe": r["exe"], "start_dir": r["StartDir"],
+                      "launch_options": gid, "art": prepare_art(paths, gid, r["AppName"]) if with_art else {}})
+
+    def por(q):
+        ja = {x["game_id"] for x in q}
+        add = [x for x in novos if x["game_id"] not in ja]
+        q.extend(add)
+        return len(add)
+    n = atualizar(queue_path(paths), [], por)
+    # para a autocorreção do plugin
+    atualizar(paths.data / "plugin-items.json", {}, lambda items: items.update({x["game_id"]: x for x in novos}))
     return n
 
 

@@ -42,7 +42,7 @@ MODOS = {"xbox": "Controle de Xbox (A embaixo — apertar A no Deck = A no jogo)
          "switch": "Controle de Switch (A na direita, igual ao Switch)"}
 # Lichii (Switch 2, base yuzu/eden): botões SDL 0=embaixo, 1=direita, 2=esquerda, 3=em cima
 _LICHII_BOTOES = {"xbox": {"a": 0, "b": 1, "x": 2, "y": 3}, "switch": {"a": 1, "b": 0, "x": 3, "y": 2}}
-_LICHII_RX = re.compile(r'^(player_0_button_([abxy]))="(engine:sdl,[^"]*?button:)(\d+)(.*)"$', re.M)
+_LICHII_RX = re.compile(r'^(player_0_button_([abxy]))="(engine:sdl,[^"]*?button:)(\d+)(.*)"$', re.MULTILINE)
 
 
 def _lichii(home: Path) -> list[Path]:

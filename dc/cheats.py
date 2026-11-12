@@ -1,6 +1,5 @@
 import re
 import unicodedata
-from typing import List, Dict, Set, Optional
 
 # TRADUCOES: dicionário de termos em inglês para português
 TRADUCOES = {
@@ -32,7 +31,7 @@ TRADUCOES = {
     "Max Exp": "Experiência máxima"
 }
 
-def ler_cht(texto: str) -> List[Dict]:
+def ler_cht(texto: str) -> list[dict]:
     """Lê um conteúdo .cht e retorna lista de cheats."""
     linhas = [l.strip() for l in texto.splitlines() if l.strip() and not l.strip().startswith("#")]
     n_cheats = 0
@@ -79,7 +78,7 @@ def ler_cht(texto: str) -> List[Dict]:
 
     return sorted(cheats, key=lambda x: x["i"])
 
-def escrever_cht(cheats: List[Dict]) -> str:
+def escrever_cht(cheats: list[dict]) -> str:
     """Gera texto no formato .cht a partir de lista de cheats."""
     if not cheats:
         return ""
@@ -104,7 +103,7 @@ def normalizar(nome: str) -> str:
     nome = re.sub(r"\s+", " ", nome).strip()
     return nome
 
-def achar_cht(arquivos: List[str], jogo: str) -> Optional[str]:
+def achar_cht(arquivos: list[str], jogo: str) -> str | None:
     """Encontra o arquivo .cht que casa com o nome do jogo."""
     norm_jogo = normalizar(jogo)
     if not norm_jogo:
@@ -124,7 +123,7 @@ def traduzir_desc(desc: str) -> str:
             desc = re.sub(re.escape(termo), traducao, desc, flags=re.IGNORECASE)
     return desc
 
-def com_ativos(cheats: List[Dict], ativos: Set[int]) -> List[Dict]:
+def com_ativos(cheats: list[dict], ativos: set[int]) -> list[dict]:
     """Retorna cópia dos cheats com apenas os índices em `ativos` ativados."""
     novos = []
     for c in cheats:

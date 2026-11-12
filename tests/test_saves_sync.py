@@ -4,6 +4,7 @@
 def test_saves_automaticos_ao_fechar(tmp_path, monkeypatch):
     """Melhoria: jogo já sincronizado uma vez entra na fila sozinho ao fechar; aviso só se der conflito/falha."""
     from types import SimpleNamespace
+
     from dc import saves_sync, transferir
     from dc.paths import get_paths
     paths = get_paths(tmp_path / "dc").ensure()

@@ -17,10 +17,11 @@ import os
 import re
 import shutil
 import subprocess
-import tomllib
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Optional
+
+import tomllib
 
 from ..paths import Paths
 from . import ia, nx
@@ -37,7 +38,7 @@ _LANG = re.compile(r"(?<![A-Za-z])(US|EU|JP|KR|CN|TW)(en|es|fr|de|it|nl|ru|ja|ko
 @dataclass
 class TextFile:
     rel: str                    # caminho dentro do romfs
-    inner: Optional[str]        # nome dentro do SARC (None = MSBT solto)
+    inner: str | None        # nome dentro do SARC (None = MSBT solto)
     msbt: nx.Msbt
 
 
@@ -53,14 +54,14 @@ class Report:
     compression: set = field(default_factory=set)
     font: str = "fonte do sistema (tem acentos)"
     font_ok: bool = True
-    similarity: Optional[float] = None
+    similarity: float | None = None
     reference: str = ""
     provider: str = ""
     tokens: int = 0
     mod_dir: str = ""
     applied: bool = False
     errors: list[str] = field(default_factory=list)
-    version: Optional[dict] = None  # de qual versão do jogo o mod foi feito ({'base':…, 'update': nome|None})
+    version: dict | None = None  # de qual versão do jogo o mod foi feito ({'base':…, 'update': nome|None})
     flagged_samples: list[str] = field(default_factory=list)
     rescued: int = 0      # 2ª chance: códigos remontados
     by_pieces: int = 0    # ... dessas, traduzidas por pedaços
@@ -93,7 +94,7 @@ def ryujinx_dir() -> Path:
     return next((d for d in RYU_DIRS if d.exists()), RYU_DIRS[0])
 
 
-def keys_path() -> Optional[Path]:
+def keys_path() -> Path | None:
     for d in RYU_DIRS:
         p = d / "system/prod.keys"
         if p.exists():
@@ -106,14 +107,14 @@ def romfs_candidates(title_id: str) -> list[Path]:
     return [base / title_id / "romfs", base / title_id, base / title_id.lower() / "romfs", base / title_id.lower()]
 
 
-def find_romfs(title_id: str) -> Optional[Path]:
+def find_romfs(title_id: str) -> Path | None:
     for c in romfs_candidates(title_id):
         if c.is_dir() and any(c.iterdir()):
             return c
     return None
 
 
-def extract_with_hactool(rom: Path, title_id: str, log: Callable[[str], None] = print) -> Optional[Path]:
+def extract_with_hactool(rom: Path, title_id: str, log: Callable[[str], None] = print) -> Path | None:
     """Extração automática (opcional) com hactool + prod.keys do próprio Ryujinx. Só jogo-base .nsp."""
     tool = shutil.which("hactool") or next((str(p) for p in (H / ".local/share/deck-commander/bin/hactool",)
                                             if p.exists()), None)
@@ -165,7 +166,7 @@ def scan(romfs: Path, report: Report, source: str = "en") -> tuple[list[TextFile
     rels = sorted(str(p.relative_to(romfs)).replace(os.sep, "/") for p in romfs.rglob("*") if p.is_file())
     rels = pick_language(rels, source)
     files: list[TextFile] = []
-    containers: dict[str, tuple[nx.Sarc, Optional[str], bytes]] = {}
+    containers: dict[str, tuple[nx.Sarc, str | None, bytes]] = {}
     fonts: list[tuple[str, bytes]] = []
     if (romfs / "Pack/ZsDic.pack.zs").exists():  # Zelda TotK e outros: zstd com dicionário do jogo
         nx.registrar_dicionarios((romfs / "Pack/ZsDic.pack.zs").read_bytes())
@@ -224,7 +225,7 @@ NESTED_EXT = ARCHIVE_EXT | {".ssarc", ".sblarc", ".sbfarc", ".sgenvb", ".sbactor
 MAX_NEST = 3
 
 
-def _scan_sarc(rel: str, s: "nx.Sarc", prefix: str, report: Report, fonts: list, containers: dict,
+def _scan_sarc(rel: str, s: nx.Sarc, prefix: str, report: Report, fonts: list, containers: dict,
                depth: int = 0) -> list[TextFile]:
     """MSBT dentro de um SARC, abrindo SARC (com ou sem Yaz0/zstd) que estejam dentro dele — ex.: Zelda BotW:
     Pack/Bootup_USen.pack → Message/Msg_USen.product.ssarc (Yaz0) → *.msbt."""
@@ -264,7 +265,7 @@ def _scan_sarc(rel: str, s: "nx.Sarc", prefix: str, report: Report, fonts: list,
     return out
 
 
-def _rebuild_sarc(rel: str, sarc: "nx.Sarc", prefix: str, fs: list[TextFile], containers: dict) -> None:
+def _rebuild_sarc(rel: str, sarc: nx.Sarc, prefix: str, fs: list[TextFile], containers: dict) -> None:
     """Grava as traduções no SARC, remontando de dentro para fora os pacotes internos."""
     children: dict[str, list[TextFile]] = {}
     for f in fs:
@@ -284,7 +285,7 @@ def _rebuild_sarc(rel: str, sarc: "nx.Sarc", prefix: str, fs: list[TextFile], co
         sarc.files[name] = packed
 
 
-def _inner_bytes(sarc: "nx.Sarc", inner: str) -> bytes:
+def _inner_bytes(sarc: nx.Sarc, inner: str) -> bytes:
     parts = inner.split(NEST_SEP)
     for name in parts[:-1]:
         sarc = nx.read_sarc(nx.unpack_layer(name, sarc.files[name])[0])
@@ -358,7 +359,7 @@ def item_id(f: TextFile, i: int) -> str:
 def translate_game(paths: Paths, title_id: str, romfs: Path, game_name: str = "",
                    force_font: bool = False, chain=None, log: Callable[[str], None] = lambda s: None,
                    progress=lambda d, t: None, should_pause=lambda: False,
-                   install: Optional[Callable[[str, Path], Path]] = None, tag: str = "switch") -> Report:
+                   install: Callable[[str, Path], Path] | None = None, tag: str = "switch") -> Report:
     """Traduz os MSBT de um RomFS e grava o mod. `install` decide onde o mod vai (padrão: Ryujinx);
     o 3DS (Azahar) e o Wii U (Cemu) usam a mesma tradução com outro destino."""
     cfg = ia.load_cfg(paths)
@@ -487,7 +488,7 @@ def uninstall_mod(title_id: str) -> bool:
     return False
 
 
-def mod_version(title_id: str, data_dir: Optional[Path] = None) -> Optional[dict]:
+def mod_version(title_id: str, data_dir: Path | None = None) -> dict | None:
     """De qual versão o mod de tradução foi feito (None = não se sabe: mods antigos, Z-A, LM3)."""
     if data_dir is None:
         from ..paths import get_paths
@@ -499,7 +500,7 @@ def mod_version(title_id: str, data_dir: Optional[Path] = None) -> Optional[dict
         return None
 
 
-def ensure_update_selected(title_id: str, roots: list[Path], data_dir: Optional[Path] = None) -> Optional[str]:
+def ensure_update_selected(title_id: str, roots: list[Path], data_dir: Path | None = None) -> str | None:
     """Antes de abrir, põe o Ryujinx na MESMA versão de que o mod de tradução foi feito (games/<tid>/updates.json).
     Versão diferente = textos que não batem (jogo em inglês ou travando — lição do LM3/Z-A). Se o mod guardou a
     versão (versao.json), vale ela — inclusive "sem atualização"; senão (mods antigos), a atualização mais nova.

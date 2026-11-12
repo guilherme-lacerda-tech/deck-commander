@@ -1,6 +1,7 @@
 import shutil
 from pathlib import Path
-from typing import Dict, Tuple, BinaryIO
+from typing import BinaryIO
+
 
 class Disco:
     def __init__(self, caminho: Path):
@@ -19,20 +20,20 @@ class Disco:
             n += 1
         return bytes(out[:tamanho])
 
-    def arquivos(self) -> Dict[str, Tuple[int, int]]:
+    def arquivos(self) -> dict[str, tuple[int, int]]:
         """nome completo ("ST/ST0/ST0.BIN", sem ";1") -> (setor inicial, tamanho). Guardado depois da 1ª leitura."""
         if getattr(self, "_cache", None) is None:
             with open(self._caminho, "rb") as f:
                 pvd = self._bloco(f, 16, 2048)
                 raiz = pvd[156:190]
-                arqs: Dict[str, Tuple[int, int]] = {}
+                arqs: dict[str, tuple[int, int]] = {}
                 self._ler_diretorio(f, int.from_bytes(raiz[2:6], "little"), int.from_bytes(raiz[10:14], "little"),
                                     "", arqs, set())
             self._cache = arqs
         return dict(self._cache)
 
     def _ler_diretorio(self, f: BinaryIO, setor: int, tamanho: int, caminho: str,
-                       arquivos: Dict[str, Tuple[int, int]], vistos: set) -> None:
+                       arquivos: dict[str, tuple[int, int]], vistos: set) -> None:
         """Lê um diretório (recursivo). Pula "." e ".." e nunca visita o mesmo setor duas vezes."""
         if setor in vistos:
             return
@@ -81,7 +82,7 @@ class Disco:
                 
         return dados
     
-    def gravar_copia(self, destino: Path, novos: Dict[str, bytes]) -> None:
+    def gravar_copia(self, destino: Path, novos: dict[str, bytes]) -> None:
         """Grava uma cópia do disco com novos dados."""
         # Verificar tamanhos
         arqs = self.arquivos()

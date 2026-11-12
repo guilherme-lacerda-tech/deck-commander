@@ -14,6 +14,8 @@ import sys
 from pathlib import Path
 
 from . import saves_regra
+from .arquivo_json import gravar as _save
+from .arquivo_json import ler as _load
 from .paths import Paths, get_paths
 
 
@@ -23,22 +25,11 @@ def _dir(paths: Paths) -> Path:
     return d
 
 
-def _load(p: Path, default):
-    try:
-        return json.loads(p.read_text("utf-8"))
-    except (OSError, ValueError):
-        return default
-
-
-def _save(p: Path, data) -> None:
-    tmp = p.with_name(p.name + ".tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), "utf-8")
-    tmp.replace(p)
-
 
 def saves_do_deck(game_id: str) -> dict[str, dict]:
     """destino -> {sha256, mtime, caminho} dos saves deste jogo no Deck (mesma lista da transferência)."""
     import hashlib
+
     from . import transferir
     man = transferir.preparar(game_id, com_hash=False, so_dados=True)  # só saves: sem listar o jogo inteiro
     out = {}

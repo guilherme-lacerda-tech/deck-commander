@@ -3,13 +3,13 @@ import re
 import subprocess
 import time
 from pathlib import Path
-from typing import List, Dict, Optional, Any
+from typing import Any
 
 PORTA = 55435
 VALIDADE = 300
 
 
-def ip_tailscale(run=subprocess.run) -> Optional[str]:
+def ip_tailscale(run=subprocess.run) -> str | None:
     """Obtém o IP Tailscale IPv4 ou None se não disponível."""
     # no Steam Deck a Tailscale fica em /opt/tailscale (fora do PATH) — falha real no teste de 11/11
     for exe in ("tailscale", "/opt/tailscale/tailscale"):
@@ -28,7 +28,7 @@ def ip_tailscale(run=subprocess.run) -> Optional[str]:
         return None
 
 
-def pedir(estado: Path, game_id: str, papel: str, ip: Optional[str] = None, agora: Optional[float] = None) -> None:
+def pedir(estado: Path, game_id: str, papel: str, ip: str | None = None, agora: float | None = None) -> None:
     """Grava um pedido de netplay."""
     if papel == "cliente" and not ip:
         raise ValueError("Cliente precisa de IP")
@@ -41,7 +41,7 @@ def pedir(estado: Path, game_id: str, papel: str, ip: Optional[str] = None, agor
     (estado / "netplay-pedido.json").write_text(json.dumps(data))
 
 
-def argumentos(estado: Path, game_id: str, agora: Optional[float] = None) -> List[str]:
+def argumentos(estado: Path, game_id: str, agora: float | None = None) -> list[str]:
     """Lê o pedido de netplay e retorna os argumentos para RetroArch."""
     arquivo = estado / "netplay-pedido.json"
     if not arquivo.exists():
@@ -68,7 +68,7 @@ def argumentos(estado: Path, game_id: str, agora: Optional[float] = None) -> Lis
     return []
 
 
-def aplicar_no_comando(cmd: List[str], extra: List[str]) -> List[str]:
+def aplicar_no_comando(cmd: list[str], extra: list[str]) -> list[str]:
     """Insere argumentos extras antes do arquivo de ROM em comandos RetroArch."""
     retroarch = any("org.libretro.RetroArch" in c or c.endswith("retroarch") for c in cmd)
     if not retroarch:
@@ -79,7 +79,7 @@ def aplicar_no_comando(cmd: List[str], extra: List[str]) -> List[str]:
     return cmd[:-1] + list(extra) + cmd[-1:]
 
 
-def convite(estado: Path, de: str, game_id: str, titulo: str, ip: str, agora: Optional[float] = None) -> None:
+def convite(estado: Path, de: str, game_id: str, titulo: str, ip: str, agora: float | None = None) -> None:
     """Grava um convite para outro Deck."""
     data = {
         "de": de,
@@ -91,7 +91,7 @@ def convite(estado: Path, de: str, game_id: str, titulo: str, ip: str, agora: Op
     (estado / "netplay-convite.json").write_text(json.dumps(data))
 
 
-def convite_pendente(estado: Path, agora: Optional[float] = None) -> Optional[Dict[str, Any]]:
+def convite_pendente(estado: Path, agora: float | None = None) -> dict[str, Any] | None:
     """Lê o convite pendente ou None se vencido."""
     arquivo = estado / "netplay-convite.json"
     if not arquivo.exists():
@@ -110,7 +110,7 @@ def convite_pendente(estado: Path, agora: Optional[float] = None) -> Optional[Di
     return dados
 
 
-def aceitar(estado: Path) -> Dict[str, Any]:
+def aceitar(estado: Path) -> dict[str, Any]:
     """Aceita o convite e inicia como cliente."""
     conv = convite_pendente(estado)
     if not conv:
@@ -120,7 +120,7 @@ def aceitar(estado: Path) -> Dict[str, Any]:
     return conv
 
 
-def comando_convidar_remoto(alvo: str, chave: str, de: str, game_id: str, titulo: str, ip: str) -> List[str]:
+def comando_convidar_remoto(alvo: str, chave: str, de: str, game_id: str, titulo: str, ip: str) -> list[str]:
     """Gera o comando SSH para enviar um convite ao Deck remoto."""
     import shlex
     dados = {
@@ -137,7 +137,7 @@ def comando_convidar_remoto(alvo: str, chave: str, de: str, game_id: str, titulo
     return cmd
 
 
-def main(argv: List[str]) -> None:
+def main(argv: list[str]) -> None:
     """Subcomando 'receber' para processar convites recebidos via SSH."""
     if len(argv) < 2 or argv[1] != "receber":
         raise SystemExit("Uso: dc.netplay receber <json>")

@@ -17,13 +17,14 @@ import json
 import os
 import re
 import time
-import tomllib
 import urllib.error
 import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
-from typing import Callable, Optional
+
+import tomllib
 
 from ..paths import Paths
 
@@ -273,7 +274,7 @@ def _ollama_up(spec: dict) -> bool:
 class Item:
     id: str
     text: str                 # já com ⟦n⟧ no lugar dos códigos
-    max_len: Optional[int] = None
+    max_len: int | None = None
 
 
 @dataclass
@@ -318,7 +319,7 @@ def _system_prompt(cfg: dict, glossary: dict, examples: list[tuple[str, str]], b
 
 
 def _parse_batch(raw: str) -> dict:
-    m = re.search(r"\{.*\}", raw, re.S)
+    m = re.search(r"\{.*\}", raw, re.DOTALL)
     if not m:
         raise ValueError("sem JSON na resposta")
     return json.loads(m.group(0))
@@ -336,11 +337,11 @@ PARALLEL_CHUNK = 40
 DECK_LOCAL = ("127.0.0.1:11434", "localhost:11434")
 
 
-def _is_deck_local(p: "Provider") -> bool:
+def _is_deck_local(p: Provider) -> bool:
     return p.spec.get("tipo") == "ollama" and any(h in (p.spec.get("url") or "") for h in DECK_LOCAL)
 
 
-def _translate_parallel(paths, cfg, items, job, glossary, examples, pool, progress, should_pause) -> "Result":
+def _translate_parallel(paths, cfg, items, job, glossary, examples, pool, progress, should_pause) -> Result:
     """Vários provedores ao mesmo tempo (internet + PC + Deck): as frases ficam numa fila de pacotes e cada
     provedor puxa o próximo quando termina o dele; o mais rápido faz mais. Um provedor que falha 3 pacotes
     seguidos sai e os pacotes dele voltam para a fila. A IA do Deck só trabalha sem jogo aberto (não rouba
@@ -348,6 +349,7 @@ def _translate_parallel(paths, cfg, items, job, glossary, examples, pool, progre
     retomar uma tradução interrompida reaproveita tudo o que já tinha sido feito."""
     import queue
     import threading
+
     from .. import ops
     res = Result()
     cdir = _cache_path(paths, job).parent
@@ -368,14 +370,14 @@ def _translate_parallel(paths, cfg, items, job, glossary, examples, pool, progre
     total = len(items)
     state = {"done": total - len(todo)}
     progress(state["done"], total)
-    q: "queue.Queue[list]" = queue.Queue()
+    q: queue.Queue[list] = queue.Queue()
     for i in range(0, len(todo), PARALLEL_CHUNK):
         q.put(todo[i:i + PARALLEL_CHUNK])
     lock = threading.Lock()
     alive = {p.name for p in pool}
     pending = {"n": q.qsize()}
 
-    def worker(prov: "Provider") -> None:
+    def worker(prov: Provider) -> None:
         fails = 0
         while True:
             with lock:
@@ -452,8 +454,8 @@ def _translate_parallel(paths, cfg, items, job, glossary, examples, pool, progre
     return res
 
 
-def translate(paths: Paths, cfg: dict, items: list[Item], job: str, glossary: Optional[dict] = None,
-              examples: Optional[list[tuple[str, str]]] = None, chain: Optional[list[Provider]] = None,
+def translate(paths: Paths, cfg: dict, items: list[Item], job: str, glossary: dict | None = None,
+              examples: list[tuple[str, str]] | None = None, chain: list[Provider] | None = None,
               progress: Callable[[int, int], None] = lambda done, total: None,
               should_pause: Callable[[], bool] = lambda: False) -> Result:
     """Traduz `items`. Nunca levanta exceção por causa de uma frase: o problema vira `flagged`."""
@@ -609,7 +611,7 @@ def _relevant_examples(examples: list[tuple[str, str]], batch: list[Item], n: in
     return scored[:n]
 
 
-def apply_glossary_check(src: str, out: str, glossary: dict) -> Optional[str]:
+def apply_glossary_check(src: str, out: str, glossary: dict) -> str | None:
     """Glossário obrigatório: termo da origem presente => tradução fixa deve aparecer."""
     for k, v in glossary.items():
         want = k if v == "=" else v
@@ -671,7 +673,7 @@ def _instructable(p: Provider) -> bool:
     return not p.single and "index-translate" not in (p.spec.get("url") or "")
 
 
-def _ask(chain: list[Provider], system: str, user: str, ok: Callable[[str], bool]) -> Optional[str]:
+def _ask(chain: list[Provider], system: str, user: str, ok: Callable[[str], bool]) -> str | None:
     for p in chain:
         try:
             raw, _tok = p.chat(system, user, timeout=120)
@@ -685,8 +687,8 @@ def _ask(chain: list[Provider], system: str, user: str, ok: Callable[[str], bool
     return None
 
 
-def fix_codes(paths: Paths, cfg: dict, items: list[Item], glossary: Optional[dict] = None,
-              chain: Optional[list[Provider]] = None) -> tuple[dict[str, str], dict[str, str]]:
+def fix_codes(paths: Paths, cfg: dict, items: list[Item], glossary: dict | None = None,
+              chain: list[Provider] | None = None) -> tuple[dict[str, str], dict[str, str]]:
     """Frases em que a IA perdeu/trocou os códigos ⟦n⟧ (nome do Pokémon, número…).
     1ª tentativa: uma a uma, numa IA que segue instrução, explicando que pode MOVER os códigos.
     2ª: traduz só os pedaços de texto entre os códigos e remonta na mesma ordem (sempre válida; pode ficar
@@ -722,7 +724,7 @@ def fix_codes(paths: Paths, cfg: dict, items: list[Item], glossary: Optional[dic
 
 
 def shorten(paths: Paths, cfg: dict, items: list[tuple[str, str, int, int]],
-            fits: Callable[[str, str], bool], chain: Optional[list[Provider]] = None) -> dict[str, str]:
+            fits: Callable[[str, str], bool], chain: list[Provider] | None = None) -> dict[str, str]:
     """Tradução que não coube na caixa: pede uma versão mais curta (mesmo sentido, mesmos códigos).
     items: (id, texto traduzido, linhas, letras por linha). `fits(id, texto)` confere de verdade."""
     chain = chain if chain is not None else build_chain(paths, cfg)

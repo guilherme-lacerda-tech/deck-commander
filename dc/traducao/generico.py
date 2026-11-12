@@ -10,7 +10,6 @@ from __future__ import annotations
 import zlib
 from collections import Counter
 from dataclasses import dataclass
-from typing import Optional
 
 from . import idioma
 
@@ -160,7 +159,7 @@ def _zstd():
         return None
 
 
-def unpack(data: bytes) -> tuple[bytes, Optional[str]]:
+def unpack(data: bytes) -> tuple[bytes, str | None]:
     """Tira a compressão do arquivo inteiro (zlib/zstd), se houver."""
     if data[:1] == b"\x78":
         try:
@@ -177,7 +176,7 @@ def unpack(data: bytes) -> tuple[bytes, Optional[str]]:
     return data, None
 
 
-def pack(data: bytes, kind: Optional[str]) -> bytes:
+def pack(data: bytes, kind: str | None) -> bytes:
     if kind == "zlib":
         return zlib.compress(data, 9)
     if kind == "zstd":

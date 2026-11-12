@@ -18,7 +18,9 @@ def test_outros_emuladores_ficam_iguais():
 def test_netplay_com_erro_nao_impede_o_jogo(tmp_path, monkeypatch):
     """Revisão 11/11/2026: um erro no netplay caía no mesmo bloco do "jogo removido" e o jogo não abria."""
     import json
+
     import pytest
+
     from dc import launch, netplay
     from dc.paths import get_paths
     p = get_paths(tmp_path)
@@ -51,3 +53,67 @@ def test_netplay_com_erro_nao_impede_o_jogo(tmp_path, monkeypatch):
         launch.main(["psx-x"])
     assert abriu and abriu[0][-1] == str(rom)
     assert not (p.data / "launch-error.json").exists()
+
+
+def _jogo(tmp_path, monkeypatch):
+    import json
+
+    from dc import launch
+    from dc.paths import get_paths
+    p = get_paths(tmp_path)
+    p.ensure()
+    rom = tmp_path / "x.cue"
+    rom.write_text("FILE")
+    (p.data / "launch-map.json").write_text(json.dumps({"psx-x": {"console": "psx", "title": "X", "rom": str(rom)}}))
+    monkeypatch.setattr(launch, "get_paths", lambda: p)
+    return p, rom
+
+
+def test_configuracao_quebrada_nao_diz_que_o_jogo_foi_removido(tmp_path, monkeypatch):
+    """Revisão de lançamento 12/11/2026: qualquer erro ao montar o comando virava "Esse jogo foi removido"."""
+    import json
+
+    import pytest
+
+    from dc import launch
+    p, _rom = _jogo(tmp_path, monkeypatch)
+
+    def quebra(*a):
+        raise ValueError("emulators.json estragado")
+    monkeypatch.setattr(launch, "build_command", quebra)
+    with pytest.raises(SystemExit):
+        launch.main(["psx-x"])
+    msg = json.loads((p.data / "launch-error.json").read_text("utf-8"))["message"]
+    assert "removido" not in msg and "emulador" in msg
+
+
+def test_emulador_que_cai_ao_abrir_vira_aviso_na_tela(tmp_path, monkeypatch):
+    """Revisão de lançamento 12/11/2026: emulador que fecha com erro logo ao abrir não mostrava nada no Deck."""
+    import json
+    import subprocess
+    import sys
+
+    import pytest
+
+    from dc import launch, saves_sync
+    p, rom = _jogo(tmp_path, monkeypatch)
+    monkeypatch.setattr(launch, "build_command", lambda *a: [sys.executable, str(rom)])
+    monkeypatch.setattr(saves_sync, "auto_ligado", lambda *a: True)  # força o caminho que acompanha o emulador
+    monkeypatch.setattr(saves_sync, "pedir_ao_fechar", lambda *a: False)
+    import signal
+    monkeypatch.setattr(signal, "SIGHUP", getattr(signal, "SIGHUP", signal.SIGTERM), raising=False)  # Windows
+    monkeypatch.setattr(signal, "signal", lambda *a: None)
+
+    class Caiu:
+        def wait(self, timeout=None):
+            return 3
+
+    def popen(cmd, *a, **k):
+        if cmd[-1] != str(rom):
+            raise OSError("fora do Deck")
+        return Caiu()
+    monkeypatch.setattr(subprocess, "Popen", popen)
+    with pytest.raises(SystemExit):
+        launch.main(["psx-x"])
+    msg = json.loads((p.data / "launch-error.json").read_text("utf-8"))["message"]
+    assert "X:" in msg and "código 3" in msg

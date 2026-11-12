@@ -358,7 +358,7 @@ def regravar_cpk(cpk: Cpk, novos: dict[int, bytes]) -> bytes:
     nova_pos: dict[int, tuple[int, int]] = {}
     feito: dict[int, int] = {}  # arquivos que dividiam o mesmo lugar no original continuam dividindo
     for x in ints:
-        dados = novos.get(x.linha, None)
+        dados = novos.get(x.linha)
         if dados is None and x.pos in feito:
             nova_pos[x.linha] = (feito[x.pos], x.tam)
             continue
@@ -421,7 +421,7 @@ def regravar_cpk(cpk: Cpk, novos: dict[int, bytes]) -> bytes:
     for x, y in zip(sorted(cpk.internos, key=lambda i: i.linha), sorted(back.internos, key=lambda i: i.linha)):
         if x.caminho != y.caminho:
             raise MotorError("nomes do CPK mudaram")
-        esperado = novos.get(x.linha, None)
+        esperado = novos.get(x.linha)
         if esperado is None:
             if back.bruto(y) != cpk.bruto(x):
                 raise MotorError(f"{x.caminho}: mudou sem querer")

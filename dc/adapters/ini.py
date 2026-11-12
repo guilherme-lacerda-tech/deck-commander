@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Optional
 
 _SECTION = re.compile(r"^\s*\[(.+?)\]\s*$")
 _KV = re.compile(r"^(\s*)([^=;#\[][^=]*?)(\s*=\s*)(.*?)(\r?\n?)$")
@@ -14,13 +13,13 @@ class IniDoc:
         self.lines = lines
 
     @classmethod
-    def load(cls, path: Path) -> "IniDoc":
+    def load(cls, path: Path) -> IniDoc:
         return cls(Path(path).read_bytes().decode("utf-8").splitlines(keepends=True))
 
     def dump(self) -> bytes:
         return "".join(self.lines).encode("utf-8")
 
-    def _find(self, section: str, key: str) -> Optional[int]:
+    def _find(self, section: str, key: str) -> int | None:
         cur = None
         for i, ln in enumerate(self.lines):
             m = _SECTION.match(ln)
@@ -33,7 +32,7 @@ class IniDoc:
                     return i
         return None
 
-    def get(self, section: str, key: str) -> Optional[str]:
+    def get(self, section: str, key: str) -> str | None:
         i = self._find(section, key)
         return None if i is None else _KV.match(self.lines[i]).group(4)
 
@@ -79,14 +78,14 @@ class CfgDoc:
         self.lines = lines
 
     @classmethod
-    def load(cls, path: Path) -> "CfgDoc":
+    def load(cls, path: Path) -> CfgDoc:
         p = Path(path)
         return cls(p.read_text("utf-8").splitlines(keepends=True) if p.exists() else [])
 
     def dump(self) -> bytes:
         return "".join(self.lines).encode("utf-8")
 
-    def get(self, key: str) -> Optional[str]:
+    def get(self, key: str) -> str | None:
         for ln in self.lines:
             m = self._RX.match(ln)
             if m and m.group(2) == key:

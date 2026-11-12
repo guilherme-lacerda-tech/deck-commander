@@ -14,9 +14,9 @@ import re
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Optional
 
 from .. import patches
 from ..paths import Paths
@@ -59,7 +59,7 @@ class RetroReport:
         return "\n".join(L)
 
 
-def meowth_bin() -> Optional[str]:
+def meowth_bin() -> str | None:
     for c in MEOWTH_CANDIDATES:
         if c.exists():
             return str(c)
@@ -119,13 +119,13 @@ def pairs_from_reference(ref: dict, source: str = "en") -> list[tuple[str, str]]
 
 
 def output_paths(rom: Path) -> tuple[Path, Path]:
-    stem = re.sub(r"\s*\((pt-?br|br)\)\s*$", "", rom.stem, flags=re.I)
+    stem = re.sub(r"\s*\((pt-?br|br)\)\s*$", "", rom.stem, flags=re.IGNORECASE)
     return rom.with_name(f"{stem} (PT-BR){rom.suffix}"), rom.with_name(f"{stem} (PT-BR).bps")
 
 
 def translate_rom(paths: Paths, rom: Path, game_name: str = "", chain=None,
                   progress=lambda d, t: None, should_pause=lambda: False,
-                  log: Callable[[str], None] = lambda s: None, source: Optional[str] = None) -> RetroReport:
+                  log: Callable[[str], None] = lambda s: None, source: str | None = None) -> RetroReport:
     cfg = ia.load_cfg(paths)
     if source:  # ex.: versão espanhola de um jogo: traduz do espanhol
         cfg["idioma_origem"] = source

@@ -17,7 +17,6 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from . import backup, ops, power, quarantine, vdf
 from .paths import Paths
@@ -31,11 +30,11 @@ H = Path.home()
 class Sensor:
     name: str
     state: str           # ok / indisponivel / erro
-    value: Optional[float]
+    value: float | None
     unit: str = ""
 
 
-def _read(p) -> Optional[str]:
+def _read(p) -> str | None:
     try:
         return Path(p).read_text().strip()
     except OSError:

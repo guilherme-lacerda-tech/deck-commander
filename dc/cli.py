@@ -5,8 +5,9 @@ import argparse
 import glob
 import json
 import sys
-import tomllib
 from pathlib import Path
+
+import tomllib
 
 from . import backup, quarantine, safe_extract, worker
 from .paths import get_paths
@@ -67,7 +68,17 @@ def _library(paths, apply: bool) -> int:
 
 def _extra(paths, args) -> int:
     """Subcomandos do projeto completo (M0, M3, M5, M6, M7, M10, M11, M17, M19, M20, M21)."""
-    from . import emulators, export, health, ops, patches, services, syncer, library, vdf
+    from . import (
+        emulators,
+        export,
+        health,
+        library,
+        ops,
+        patches,
+        services,
+        syncer,
+        vdf,
+    )
     if not args:
         print(open(Path(__file__).resolve().parents[1] / "docs/COMANDOS.md", encoding="utf-8").read()); return 0
     c, r = args[0], args[1:]
@@ -256,7 +267,8 @@ def main(argv=None) -> int:
     if a.cmd == "x":
         return _extra(paths, a.args)
     if a.cmd == "secret":
-        import getpass, os
+        import getpass
+        import os
         paths.ensure()
         val = getpass.getpass(f"Cole a chave {a.name} e aperte Enter (não aparece na tela): ").strip()
         if not val:

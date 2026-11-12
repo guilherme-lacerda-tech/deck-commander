@@ -140,6 +140,7 @@ def test_mod_dir_azahar(tmp_path):
 def test_translate_3ds_end_to_end(tmp_path, monkeypatch):
     """Jogo de 3DS com MSBT (little-endian) -> mod no Azahar; o jogo original não muda."""
     from test_traducao import FakeAI, make_msbt
+
     from dc.paths import get_paths
     from dc.traducao import ia, run
     paths = get_paths(tmp_path / "dc").ensure()

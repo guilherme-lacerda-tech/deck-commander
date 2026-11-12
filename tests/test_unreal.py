@@ -2,11 +2,10 @@
 import struct
 
 import pytest
+from test_traducao import FakeAI
 
 from dc.paths import get_paths
 from dc.traducao import ia, unreal
-
-from test_traducao import FakeAI
 
 
 def _loc():

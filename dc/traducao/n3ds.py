@@ -8,8 +8,8 @@ Referência dos formatos: 3dbrew (NCSD, NCCH, RomFS/IVFC). Tudo little-endian; m
 from __future__ import annotations
 
 import struct
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 MU = 0x200
 NONE = 0xFFFFFFFF

@@ -13,11 +13,12 @@ import json
 import re
 import shutil
 import struct
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Optional
 
 from ..paths import Paths
-from . import ia, trinity, trinity_msg as tm
+from . import ia, trinity
+from . import trinity_msg as tm
 
 TRPFD = "arc/data.trpfd"
 TRPFS = "arc/data.trpfs"
@@ -61,7 +62,7 @@ def resolve_paths(pack_name: str, lang_dir: str, hashes: set[int]) -> dict[int, 
 
 
 # ============================================================================ extração (com cache)
-def ryujinx_update(tid: str) -> Optional[Path]:
+def ryujinx_update(tid: str) -> Path | None:
     """Atualização que o Ryujinx REALMENTE carrega (games/<tid>/updates.json, campo "selected").
     Sem ela o jogo roda a versão base. O data.trpfd do mod precisa ser o dessa mesma versão: o de outra
     versão aponta para pacotes errados e o jogo trava ao abrir."""
@@ -84,7 +85,8 @@ def extract(paths: Paths, rom: Path, tid: str, roots: list[Path], source: str = 
             log: Callable[[str], None] = lambda s: None) -> tuple[Path, dict]:
     """Copia data.trpfd + mensagens do idioma de origem + diagnóstico da fonte para o cache.
     Devolve (pasta, info). Reaproveita se base/atualização/idioma não mudaram."""
-    from . import converter, extract as ex, nca, switch
+    from . import converter, nca, switch
+    from . import extract as ex
     kp = switch.keys_path()
     if not kp:
         raise nca.NcaError("o Ryujinx ainda não tem prod.keys (abra um jogo nele uma vez)")
@@ -456,7 +458,7 @@ def write_mod(paths: Paths, rep, src_dir: Path, dats: dict[str, tm.MsgDat], cfg:
 MARKER = "deck-commander-trinity.json"
 
 
-def guard_version(tid: str, parking: Path) -> Optional[str]:
+def guard_version(tid: str, parking: Path) -> str | None:
     """Antes de abrir o jogo: se o mod Trinity foi feito para outra versão do que o Ryujinx vai carregar agora
     (ex.: a atualização foi ligada depois), tira o mod do caminho (para `parking`) — com o índice de outra
     versão o jogo trava na tela de carregamento. Devolve a mensagem ou None."""
@@ -478,9 +480,10 @@ def guard_version(tid: str, parking: Path) -> Optional[str]:
             f"{now or 'a versão base'}. O jogo abre em inglês; rode /traduzir <jogo> --forcar para refazer.")
 
 
-def find_rom_files(rom: Path, tid: str, roots: list[Path]) -> Optional[dict]:
+def find_rom_files(rom: Path, tid: str, roots: list[Path]) -> dict | None:
     """Lista o RomFS só para saber se é Trinity (barato: só as tabelas do RomFS)."""
-    from . import converter, extract as ex, nca, switch
+    from . import converter, nca, switch
+    from . import extract as ex
     kp = switch.keys_path()
     if not kp:
         return None

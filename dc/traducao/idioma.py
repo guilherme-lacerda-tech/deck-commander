@@ -12,7 +12,6 @@ from __future__ import annotations
 import re
 from collections import Counter
 from pathlib import Path
-from typing import Optional
 
 COMMON = {
     "en": """the and you to of a in is it that for on your with this are be can not have will what here there
@@ -32,12 +31,11 @@ COMMON = {
         premi gioco partita salva carica nuova esci menu continua opzioni livello tempo vite""",
 }
 COMMON = {k: set(v.split()) for k, v in COMMON.items()}
-LANG_IA = {"en": "en", "ru": "ru", "ja": "ja", "es": "es", "fr": "fr", "de": "de", "it": "it"}
 
 _CYR = re.compile(r"[Ѐ-ӿ]")
 _KANA = re.compile(r"[぀-ヿ一-鿿]")
-_BAD = re.compile(r"[_\\/|{}=<>@#$^~`%*]|\.(bin|dat|tim|str|xa|exe|ovl|bmp|vab|elf|irx)\b", re.I)
-SYSTEM_TEXT = re.compile(r"Sony Computer Entertainment|Licensed by|PS-X EXE|Nintendo of America|SEGA ENTERPRISES", re.I)
+_BAD = re.compile(r"[_\\/|{}=<>@#$^~`%*]|\.(bin|dat|tim|str|xa|exe|ovl|bmp|vab|elf|irx)\b", re.IGNORECASE)
+SYSTEM_TEXT = re.compile(r"Sony Computer Entertainment|Licensed by|PS-X EXE|Nintendo of America|SEGA ENTERPRISES", re.IGNORECASE)
 
 
 def script(text: str) -> str:
@@ -51,7 +49,7 @@ def script(text: str) -> str:
     return "latin"
 
 
-def language(text: str) -> Optional[str]:
+def language(text: str) -> str | None:
     s = script(text)
     if s == "cyrillic":
         return "ru"
@@ -76,7 +74,7 @@ def _word_ok(w: str, vowels: str) -> bool:
     return True
 
 
-def is_sentence(text: str, lang: Optional[str] = None) -> bool:
+def is_sentence(text: str, lang: str | None = None) -> bool:
     """Frase que alguém lê no jogo, em qualquer língua. Rígido de propósito: dado que parece letra,
     se for traduzido e gravado, quebra o jogo."""
     t = text.strip()
@@ -112,12 +110,12 @@ def is_sentence(text: str, lang: Optional[str] = None) -> bool:
     return all(w.isupper() for w in long_) and sum(len(w) >= 3 for w in long_) >= 2
 
 
-def dominant_language(texts: list[str]) -> Optional[str]:
+def dominant_language(texts: list[str]) -> str | None:
     c = Counter(l for l in (language(t) for t in texts if is_sentence(t)) if l)
     return c.most_common(1)[0][0] if c else None
 
 
-def extraction_is_clean(texts: list[str], expected: Optional[str] = None,
+def extraction_is_clean(texts: list[str], expected: str | None = None,
                         min_share: float = 0.7) -> tuple[bool, str]:
     """Trava de segurança antes de gravar tradução num jogo: o texto extraído precisa ser de UMA língua
     predominante (>= 70%). Quando a extração pega dados internos, sai uma mistura (inglês de programador +
@@ -137,11 +135,11 @@ def extraction_is_clean(texts: list[str], expected: Optional[str] = None,
     return True, resumo
 
 
-_NAME_LANG = [(re.compile(r"\b(rus|russian|russkiy)\b|\[ru\]|\(ru\)", re.I), "ru"),
-              (re.compile(r"\b(jpn|japan|japanese)\b|\(j\)|\[j\]", re.I), "ja")]
+_NAME_LANG = [(re.compile(r"\b(rus|russian|russkiy)\b|\[ru\]|\(ru\)", re.IGNORECASE), "ru"),
+              (re.compile(r"\b(jpn|japan|japanese)\b|\(j\)|\[j\]", re.IGNORECASE), "ja")]
 
 
-def language_from_name(name: str) -> Optional[str]:
+def language_from_name(name: str) -> str | None:
     for rx, lang in _NAME_LANG:
         if rx.search(name):
             return lang

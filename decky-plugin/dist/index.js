@@ -89,6 +89,7 @@ async function processQueue() {
             seenThisSession.add(appid);
             await call("report", it.game_id, appid, "");
             await remember(it);
+            retroPendente = 12;  // jogo retrô novo ganha os botões de trás nos próximos ~2 min
             note("adicionado: " + it.name);
             toaster.toast({ title: "Deck Commander", body: it.name + " adicionado à biblioteca" });
         } catch (e) {
@@ -145,6 +146,7 @@ async function reconcile() {
             addedThisSession.set(gid, appid);
             seenThisSession.add(appid);
             await call("report", gid, appid, "");
+            retroPendente = 12;
             note("recriado: " + v.item.name);
         } catch (e) {
             note("falha ao recriar " + gid + ": " + e);
@@ -218,18 +220,20 @@ async function syncCollections() {
 }
 
 // Falha real 11/11/2026: a cópia PT-BR do Castlevania virou atalho novo e ficou sem L4/R4/L5/R5 (turbo e salvar
-// "pararam"). Depois de ligado uma vez, todo jogo retrô novo ganha o modelo sozinho (a cada ~1 min).
-const retroFeitos = new Set();
+// "pararam"). Depois de ligado uma vez, todo jogo retrô novo ganha o modelo sozinho.
+// O backend só devolve jogo que NUNCA recebeu o modelo (layout que você trocar depois é respeitado).
+// Bateria (revisão 12/11/2026): antes abria um Python a cada minuto, até jogando. Agora só quando entra atalho
+// novo, ao ligar, e uma checagem de segurança a cada 30 min.
+// retroPendente = quantos ciclos ainda tentar (o Steam grava o shortcuts.vdf no disco com atraso)
+let retroPendente = 1;
 let retroConta = 0;
 async function retroBotoes() {
-    if (retroConta++ % 6 !== 0) return;
+    if (retroPendente <= 0 && ++retroConta % 180 !== 0) return;
+    if (retroPendente > 0) retroPendente--;
     const r = await call("painel", "retro_jogos", {});
-    if (!r || !r.ok || !r.modelo) return;
-    const novos = (r.appids || []).filter((a) => !retroFeitos.has(a));
-    if (!novos.length) return;
-    escolherModelo(novos, r.modelo);
-    novos.forEach((a) => retroFeitos.add(a));
-    note("botões de trás aplicados em " + novos.length + " jogo(s)");
+    if (!r || !r.ok || !r.modelo || !(r.appids || []).length) return;
+    escolherModelo(r.appids, r.modelo);
+    note("botões de trás aplicados em " + r.appids.length + " jogo(s)");
 }
 
 async function cycle(force) {

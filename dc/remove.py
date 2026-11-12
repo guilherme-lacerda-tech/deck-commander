@@ -9,13 +9,13 @@ O que acontece em `apply`:
 """
 from __future__ import annotations
 
-import json
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 from . import plugin_bridge
+from .arquivo_json import gravar as _save
+from .arquivo_json import ler as _load
 from .paths import Paths
 from .quarantine import quarantine
 from .store import Store
@@ -26,7 +26,7 @@ class RemovePlan:
     game_id: str
     title: str
     console: str
-    move: Optional[Path]           # arquivo/pasta que vai para a quarentena
+    move: Path | None           # arquivo/pasta que vai para a quarentena
     size: int = 0
     torrents: list[str] = field(default_factory=list)
     appids: list[int] = field(default_factory=list)
@@ -41,18 +41,6 @@ class RemovePlan:
         return "\n".join(lines)
 
 
-def _load(p: Path, default):
-    try:
-        return json.loads(p.read_text("utf-8"))
-    except (OSError, ValueError):
-        return default
-
-
-def _save(p: Path, data) -> None:
-    tmp = p.with_name(p.name + ".tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), "utf-8")
-    os.replace(tmp, p)
-
 
 def _size(p: Path) -> int:
     if p.is_file():
@@ -60,7 +48,7 @@ def _size(p: Path) -> int:
     return sum(f.stat().st_size for f in p.rglob("*") if f.is_file())
 
 
-def _what_to_move(rom: Path, roots: list[Path], launch_map: dict, game_id: str) -> Optional[Path]:
+def _what_to_move(rom: Path, roots: list[Path], launch_map: dict, game_id: str) -> Path | None:
     """A pasta do jogo dentro de roms/<console>/ (se só ele mora lá); senão só o arquivo."""
     if not rom.exists():
         return None
@@ -110,21 +98,7 @@ def _quarantine_root(item: Path, default: Path) -> Path:
 def apply(paths: Paths, store: Store, rp: RemovePlan, qbt=None) -> list[str]:
     out = []
     # 1) registro do plugin: marcado como removido => a autocorreção não recria
-    done = _load(plugin_bridge.done_path(paths), {})
-    done[rp.game_id] = {"appid": 0, "error": "", "removed": True}
-    _save(plugin_bridge.done_path(paths), done)
-    items_p = paths.data / "plugin-items.json"
-    items = _load(items_p, {})
-    if items.pop(rp.game_id, None) is not None:
-        _save(items_p, items)
-    q = _load(plugin_bridge.queue_path(paths), [])
-    if any(x.get("game_id") == rp.game_id for x in q):
-        _save(plugin_bridge.queue_path(paths), [x for x in q if x.get("game_id") != rp.game_id])
-    if rp.appids and plugin_bridge.installed():
-        rq_p = paths.data / "plugin-remove.json"
-        rq = _load(rq_p, [])
-        rq += [{"game_id": rp.game_id, "appid": a} for a in rp.appids]
-        _save(rq_p, rq)
+    if plugin_bridge.marcar_removido(paths, rp.game_id, rp.appids):
         out.append("atalho: o plugin remove do Steam em ~10 s" if plugin_bridge.loader_running() else
                    "atalho: o Decky não está rodando; o plugin remove assim que ele voltar")
     else:
@@ -172,22 +146,13 @@ def effective_map(paths: Paths) -> dict:
 def hide(paths: Paths, game_id: str, reason: str) -> str:
     """Tira SÓ o atalho da biblioteca (os arquivos ficam). Usado quando a versão traduzida substitui a
     original, para a biblioteca não ficar duplicada. Volta com /devolver."""
-    done = _load(plugin_bridge.done_path(paths), {})
-    appid = int(done.get(game_id, {}).get("appid") or 0) & 0xFFFFFFFF
-    if appid and plugin_bridge.installed():
-        rq_p = paths.data / "plugin-remove.json"
-        _save(rq_p, _load(rq_p, []) + [{"game_id": game_id, "appid": appid}])
-    done[game_id] = {"appid": 0, "error": "", "removed": True, "motivo": reason}
-    _save(plugin_bridge.done_path(paths), done)
+    appid = int(_load(plugin_bridge.done_path(paths), {}).get(game_id, {}).get("appid") or 0)
+    plugin_bridge.marcar_removido(paths, game_id, [appid], motivo=reason)
     try:  # o atalho sai do Steam: o registro "criado pelo DC" sai junto (senão o diagnóstico acusa atalho sumido)
         with Store(paths.db).tx() as c:
             c.execute("DELETE FROM provenance WHERE operation_id=?", (f"plugin:{game_id}",))
     except Exception:  # noqa: BLE001 - banco ainda não criado (Deck novo): nada a limpar
         pass
-    items_p = paths.data / "plugin-items.json"
-    items = _load(items_p, {})
-    if items.pop(game_id, None) is not None:
-        _save(items_p, items)
     lm_p = paths.data / "launch-map.json"
     lm = _load(lm_p, {})
     if game_id in lm:
@@ -209,9 +174,7 @@ def bring_back(paths: Paths, game_id: str) -> str:
         return "Os arquivos desse jogo não estão mais no lugar (se foi pelo /remover, estão na quarentena)."
     lm[game_id].pop("removed", None)
     _save(lm_p, lm)
-    done = _load(plugin_bridge.done_path(paths), {})
-    if done.pop(game_id, None) is not None:
-        _save(plugin_bridge.done_path(paths), done)
+    plugin_bridge.atualizar(plugin_bridge.done_path(paths), {}, lambda d: d.pop(game_id, None))
     return lm[game_id].get("title", game_id)
 
 

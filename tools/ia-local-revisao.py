@@ -46,7 +46,7 @@ def revisar(arquivo: Path, foco: str, descricao: str):
         except Exception as e:  # noqa: BLE001
             yield {"arquivo": arquivo.as_posix(), "foco": foco, "erro": str(e)}
             continue
-        m = re.search(r"\[.*\]", txt, re.S)
+        m = re.search(r"\[.*\]", txt, re.DOTALL)
         try:
             achados = json.loads(m.group(0)) if m else []
         except ValueError:

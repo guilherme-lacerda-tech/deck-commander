@@ -2,12 +2,11 @@
 
 Usa o SteamOS Manager pelo D-Bus de sessão (sem root). Escrito pela IA local (qwen3-coder) e revisado.
 """
-import subprocess
 import json
+import subprocess
 from pathlib import Path
-from typing import Dict, Optional
 
-TDP_POR_CONSOLE: Dict[str, int] = {
+TDP_POR_CONSOLE: dict[str, int] = {
     "nes": 5, "snes": 5, "gb": 5, "gbc": 5, "gba": 5, "sms": 5, "gg": 5, "genesis": 5, "pce": 5,
     "arcade": 5, "pc": 5,
     "psx": 7, "n64": 7, "nds": 7, "segacd": 7, "saturn": 7,
@@ -21,7 +20,7 @@ class Tdp:
         self.estado = estado
         self.run = run
 
-    def ler(self) -> Optional[int]:
+    def ler(self) -> int | None:
         try:
             result = self.run(
                 ["busctl", "--user", "get-property", "com.steampowered.SteamOSManager1",
@@ -35,7 +34,7 @@ class Tdp:
             pass
         return None
 
-    def maximo(self) -> Optional[int]:
+    def maximo(self) -> int | None:
         try:
             result = self.run(
                 ["busctl", "--user", "get-property", "com.steampowered.SteamOSManager1",

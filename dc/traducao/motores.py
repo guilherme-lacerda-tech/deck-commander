@@ -19,9 +19,9 @@ from __future__ import annotations
 import hashlib
 import importlib
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Optional
 
 
 class MotorError(ValueError):
@@ -32,7 +32,7 @@ class MotorError(ValueError):
 class Texto:
     id: str                               # único dentro da coleta (o adaptador escolhe)
     text: str
-    codes: Optional[re.Pattern] = None    # códigos que a IA não pode mexer; None = CODES_PADRAO
+    codes: re.Pattern | None = None    # códigos que a IA não pode mexer; None = CODES_PADRAO
 
 
 @dataclass

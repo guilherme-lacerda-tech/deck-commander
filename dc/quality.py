@@ -15,9 +15,10 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Optional
 
 from .adapters.ini import IniDoc
+from .arquivo_json import gravar as _save
+from .arquivo_json import ler as _load
 from .paths import Paths
 
 H = Path.home()
@@ -52,25 +53,12 @@ def _restore_path(paths: Paths) -> Path:
     return paths.state / "quality-restore.json"
 
 
-def _load(p: Path, default):
-    try:
-        return json.loads(p.read_text("utf-8"))
-    except (OSError, ValueError):
-        return default
 
-
-def _save(p: Path, data) -> None:
-    p.parent.mkdir(parents=True, exist_ok=True)
-    tmp = p.with_name(p.name + ".tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), "utf-8")
-    os.replace(tmp, p)
-
-
-def get_override(paths: Paths, game_id: str) -> Optional[int]:
+def get_override(paths: Paths, game_id: str) -> int | None:
     return _load(_overrides_path(paths), {}).get(game_id, {}).get("res")
 
 
-def set_override(paths: Paths, game_id: str, console: str, level: Optional[str]) -> str:
+def set_override(paths: Paths, game_id: str, console: str, level: str | None) -> str:
     """level: nativo/2x/3x/4x ou None/'padrão' para voltar ao valor do console."""
     if not supported(console):
         return "Esse console não tem ajuste de resolução por jogo (roda sempre na resolução original)."
@@ -92,7 +80,7 @@ def set_override(paths: Paths, game_id: str, console: str, level: Optional[str])
     return f"{LABEL[n]} só para este jogo (vale a partir do próximo lançamento)"
 
 
-def _target(console: str) -> Optional[tuple]:
+def _target(console: str) -> tuple | None:
     fmt, files, sec, key = TARGETS[console]
     for f in files:
         if f.exists():
@@ -107,7 +95,7 @@ def _read(fmt: str, f: Path, sec, key):
     return None if v is None else str(v)
 
 
-def _write(fmt: str, f: Path, sec, key, value: Optional[str]) -> None:
+def _write(fmt: str, f: Path, sec, key, value: str | None) -> None:
     if fmt == "ini":
         doc = IniDoc.load(f)
         if value is None:
@@ -143,11 +131,11 @@ def _write(fmt: str, f: Path, sec, key, value: Optional[str]) -> None:
 LANG_TARGET = {"switch": ("json", TARGETS["switch"][1], None, "system_language")}
 
 
-def get_language(paths: Paths, game_id: str) -> Optional[str]:
+def get_language(paths: Paths, game_id: str) -> str | None:
     return _load(_overrides_path(paths), {}).get(game_id, {}).get("idioma")
 
 
-def set_language(paths: Paths, game_id: str, lang: Optional[str], why: str = "") -> None:
+def set_language(paths: Paths, game_id: str, lang: str | None, why: str = "") -> None:
     """Idioma do console só para este jogo (ex.: BrazilianPortuguese para quem tem PT-BR oficial)."""
     ov = _load(_overrides_path(paths), {})
     e = ov.setdefault(game_id, {})
@@ -178,7 +166,7 @@ def _plan(paths: Paths, game_id: str, console: str) -> list[tuple]:
     return out
 
 
-def apply_for_launch(paths: Paths, game_id: str, console: str) -> Optional[dict]:
+def apply_for_launch(paths: Paths, game_id: str, console: str) -> dict | None:
     """Aplica os ajustes do jogo (resolução, idioma). Devolve o registro de devolução (já em disco) ou None."""
     recs = []
     for fmt, f, sec, key, new in _plan(paths, game_id, console):
@@ -195,7 +183,7 @@ def apply_for_launch(paths: Paths, game_id: str, console: str) -> Optional[dict]
             "new": ", ".join(r["new"] for r in recs), "records": recs}
 
 
-def restore(paths: Paths) -> Optional[str]:
+def restore(paths: Paths) -> str | None:
     """Devolve os valores originais se houver devolução pendente. Seguro de chamar a qualquer momento
     em que nenhum jogo esteja aberto."""
     rp = _restore_path(paths)

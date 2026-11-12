@@ -22,8 +22,8 @@ import json
 import lzma
 import re
 import struct
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable
 from xml.sax.saxutils import escape as _xml_escape
 
 from . import lz4blk

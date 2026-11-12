@@ -81,6 +81,7 @@ def traduzir(bot, args: list[str]) -> str:
         return "Switch 2 ainda não tem tradução (os jogos são dumps extraídos, sem MSBT padrão conferido)."
     else:
         from pathlib import Path as _P
+
         from .rts import supported
         okc, why = supported(g["console"], _P(g["rom"]))
         if not okc:
@@ -99,9 +100,9 @@ def traduzir(bot, args: list[str]) -> str:
 
 
 def converter(bot, args: list[str]) -> str:
-    from . import converter as cv
     from .. import syncer
     from ..dedup import base_title_id
+    from . import converter as cv
     if not args:
         return HELP
     action = args[-1].lower() if args[-1].lower() in ("organizar", "descompactar") else None
@@ -189,6 +190,7 @@ def _lista(bot) -> str:
             can.append(f"• {label}")
         else:
             from pathlib import Path as _P
+
             from .rts import supported
             okc, why = supported(g["console"], _P(g.get("rom", "")))
             (can if okc else cant).append(f"• {label}" + ("" if okc else f" — {why}"))
@@ -320,8 +322,8 @@ def _undo(bot, query: str) -> str:
     if err:
         return err
     if g["console"] == "switch":
-        from .switch import uninstall_mod
         from ..dedup import base_title_id
+        from .switch import uninstall_mod
         tid = base_title_id(Path(g["rom"]).name) or ""
         return ("✅ Mod de tradução removido; o jogo volta ao idioma original." if uninstall_mod(tid)
                 else "Esse jogo não tem mod de tradução do Deck Commander.")

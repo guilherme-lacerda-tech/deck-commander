@@ -94,27 +94,85 @@ def _configset_com(texto: str, nome: str) -> str:
     return vdf.dump_text(d)
 
 
-def steam_input(home: Path, jogos: list[str]) -> list[str]:
-    """Põe os botões de trás no layout de cada jogo (nome do atalho, como o Steam guarda: minúsculas)."""
+def _registro_path(home: Path) -> Path:
+    """Jogos em que o Deck Commander já pôs os botões de trás (uma vez só: depois o layout é do usuário)."""
+    return home / ".local/share/deck-commander/retro-steam-input.json"
+
+
+def registro(home: Path) -> dict:
+    try:
+        d = json.loads(_registro_path(home).read_text("utf-8"))
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _salvar_registro(home: Path, reg: dict) -> None:
+    p = _registro_path(home)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_name(p.name + ".tmp")
+    tmp.write_text(_json(reg), "utf-8")
+    tmp.replace(p)
+
+
+def _base_controle(home: Path, conta: str) -> Path:
+    return home / ".local/share/Steam/steamapps/common/Steam Controller Configs" / conta / "config"
+
+
+def steam_input(home: Path, jogos: list[str], forcar: bool = False) -> list[str]:
+    """Põe os botões de trás no layout de cada jogo (nome do atalho, como o Steam guarda: minúsculas).
+    Cada jogo é mexido UMA vez (registro): se depois o usuário trocar o layout, isso é respeitado. `forcar` só
+    quando o próprio usuário pede (botão Ligar do painel / `/retro`)."""
     feitos = []
+    reg = registro(home)
     for conta in _contas(home):
-        base = home / ".local/share/Steam/steamapps/common/Steam Controller Configs" / conta / "config"
+        base = _base_controle(home, conta)
         cs = base / "configset_controller_neptune.vdf"
         texto_cs = cs.read_text("utf-8") if cs.exists() else ""
         novo_cs = texto_cs
         for jogo in jogos:
             nome = jogo.lower()
+            chave = f"{conta}/{nome}"
+            if chave in reg and not forcar:
+                continue
             arq = base / nome / "controller_neptune.vdf"
-            atual = arq.read_text("utf-8", "replace") if arq.exists() else _modelo(home)
+            existia = arq.exists()
+            atual = arq.read_text("utf-8", "replace") if existia else _modelo(home)
             if not R.tem_botoes_de_tras(atual):
                 _gravar(arq, R.layout_com_botoes_de_tras(atual))
                 feitos.append(jogo)
-            elif not arq.exists():
+            elif not existia:
                 _gravar(arq, atual)
             novo_cs = _configset_com(novo_cs, nome)
+            reg.setdefault(chave, {"criado": not existia})
         if novo_cs != texto_cs:
             _gravar(cs, novo_cs)
+    _salvar_registro(home, reg)
     return feitos
+
+
+def _desfazer_steam_input(home: Path) -> int:
+    """Volta os layouts que o Deck Commander mexeu (cópia .antes-dc ou apaga o que ele criou) e tira o modelo."""
+    reg = registro(home)
+    n = 0
+    for chave, info in reg.items():
+        conta, _, nome = chave.partition("/")
+        arq = _base_controle(home, conta) / nome / "controller_neptune.vdf"
+        antes = arq.with_name(arq.name + ".antes-dc")
+        if antes.exists():
+            antes.replace(arq)
+            n += 1
+        elif (info or {}).get("criado") and arq.exists():
+            arq.unlink()
+            n += 1
+    for conta in _contas(home):
+        cs = _base_controle(home, conta) / "configset_controller_neptune.vdf"
+        antes = cs.with_name(cs.name + ".antes-dc")
+        if antes.exists():
+            antes.replace(cs)
+    (home / ".local/share/Steam/controller_base/templates" / MODELO).unlink(missing_ok=True)
+    _registro_path(home).unlink(missing_ok=True)
+    return n
 
 
 MODELO = "controller_neptune_dc_retro.vdf"
@@ -152,7 +210,7 @@ def preparar(home: Path | None = None, mapa: dict | None = None, turbo: float = 
         mapa = transferir.carregar_mapa()
     emus = emuladores(home, turbo)
     jogos = jogos_dos_emuladores(home, mapa)
-    steam_input(home, [n for n, _ in jogos])
+    steam_input(home, [n for n, _ in jogos], forcar=True)  # o usuário pediu: vale para todos
     modelo = gravar_modelo(home) if (home / ".local/share/Steam/controller_base/templates").exists() else None
     texto = (f"🕹️ Botões de trás em {len(jogos)} jogo(s)"
              + (f"; emuladores ajustados: {', '.join(emus)}" if emus else "; emuladores já estavam prontos")
@@ -166,7 +224,7 @@ def aplicar(home: Path | None = None, mapa: dict | None = None, turbo: float = 2
 
 
 def desfazer(home: Path | None = None) -> str:
-    """Volta os arquivos dos emuladores para a cópia de antes (os layouts do Steam ficam: são só os botões de trás)."""
+    """Volta os emuladores e os layouts do Steam para como estavam antes do Deck Commander."""
     home = home or Path.home()
     voltou = []
     for nome, rel in ARQUIVOS.items():
@@ -175,7 +233,9 @@ def desfazer(home: Path | None = None) -> str:
         if orig.exists():
             shutil.copy2(orig, p)
             voltou.append(nome)
-    return "Voltei a configuração de: " + (", ".join(voltou) or "nada (não havia cópia)")
+    n = _desfazer_steam_input(home)
+    return ("Voltei a configuração de: " + (", ".join(voltou) or "nada (não havia cópia)")
+            + (f"; layouts de controle devolvidos em {n} jogo(s)" if n else ""))
 
 
 # ------------------------------------------------------------------------------------------- RetroArch ao vivo
@@ -199,9 +259,15 @@ def jogos_para_o_painel(home: Path | None = None, mapa: dict | None = None) -> d
     if mapa is None:
         from . import transferir
         mapa = transferir.carregar_mapa()
-    jogos = jogos_dos_emuladores(home, mapa)
-    steam_input(home, [n for n, _ in jogos])  # layout salvo (vale quando o Steam reiniciar); so grava o que mudou
-    return {"appids": [a for _, a in jogos if a], "modelo": "template://" + MODELO}
+    # Só jogo que ainda não passou por aqui. Antes: TODO reinício do Decky reaplicava o modelo em todos e apagava o
+    # layout que o usuário tivesse escolhido (revisão de lançamento 12/11/2026).
+    reg = registro(home)
+    contas = _contas(home)
+    novos = [(n, a) for n, a in jogos_dos_emuladores(home, mapa)
+             if any(f"{c}/{n.lower()}" not in reg for c in contas)]
+    if novos:
+        steam_input(home, [n for n, _ in novos])  # layout salvo (vale quando o Steam reiniciar)
+    return {"appids": [a for _, a in novos if a], "modelo": "template://" + MODELO}
 
 
 def estado(home: Path | None = None) -> dict:

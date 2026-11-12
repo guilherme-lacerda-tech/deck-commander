@@ -2,9 +2,8 @@ import json
 import re
 import shutil
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
 
-FRANQUIAS: Dict[str, Tuple[str, ...]] = {
+FRANQUIAS: dict[str, tuple[str, ...]] = {
     "pokemon": ("pokemon",),
     "zelda": ("zelda",),
     "mario": ("mario",),
@@ -33,7 +32,7 @@ PARADAS = {
     "Lv", "HP", "MP", "PP", "Exp", "A/B/X/Y"
 }
 
-def franquia(titulo: str, extras: Optional[Dict[str, Tuple[str, ...]]] = None) -> Optional[str]:
+def franquia(titulo: str, extras: dict[str, tuple[str, ...]] | None = None) -> str | None:
     """Retorna a franquia correspondente ao título ou None."""
     import unicodedata
     # sem acento ANTES de limpar (senão "Pokémon" vira "pokmon"); extras do usuário têm prioridade
@@ -45,7 +44,7 @@ def franquia(titulo: str, extras: Optional[Dict[str, Tuple[str, ...]]] = None) -
                 return nome
     return None
 
-def candidatos(textos: List[str], min_vezes: int = 3, limite: int = 150) -> List[str]:
+def candidatos(textos: list[str], min_vezes: int = 3, limite: int = 150) -> list[str]:
     """Nomes próprios que se repetem: 1 a 4 palavras com maiúscula, fora do começo da frase, >= min_vezes."""
     from collections import Counter
     palavra = r"[A-ZÀ-Ý][\w'À-ÿ]*"
@@ -68,7 +67,7 @@ def candidatos(textos: List[str], min_vezes: int = 3, limite: int = 150) -> List
     return [t for t, n in cont.most_common() if n >= min_vezes][:limite]
 
 
-def carregar(path: Path) -> Dict[str, Dict[str, str]]:
+def carregar(path: Path) -> dict[str, dict[str, str]]:
     """Carrega glossário de um arquivo JSON."""
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -76,7 +75,7 @@ def carregar(path: Path) -> Dict[str, Dict[str, str]]:
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
 
-def salvar(path: Path, dados: Dict[str, Dict[str, str]]) -> None:
+def salvar(path: Path, dados: dict[str, dict[str, str]]) -> None:
     """Salva glossário em arquivo JSON de forma atômica."""
     tmp_path = path.with_suffix(path.suffix + ".tmp")
     try:
@@ -87,16 +86,16 @@ def salvar(path: Path, dados: Dict[str, Dict[str, str]]) -> None:
         if tmp_path.exists():
             tmp_path.unlink()
 
-def do_jogo(dados: Dict[str, Dict[str, str]], chave: Optional[str]) -> Dict[str, str]:
+def do_jogo(dados: dict[str, dict[str, str]], chave: str | None) -> dict[str, str]:
     """Retorna o glossário da franquia ou vazio."""
     return dados.get(chave, {}) if chave else {}
 
-def faltando(dados: Dict[str, Dict[str, str]], chave: str, termos: List[str]) -> List[str]:
+def faltando(dados: dict[str, dict[str, str]], chave: str, termos: list[str]) -> list[str]:
     """Retorna lista de termos que ainda não estão no glossário."""
     glossario = do_jogo(dados, chave)
     return [t for t in termos if t not in glossario]
 
-def pedido_ia(termos: List[str], franquia: str) -> Tuple[str, str]:
+def pedido_ia(termos: list[str], franquia: str) -> tuple[str, str]:
     """Retorna instrução de sistema e texto do usuário para IA traduzir nomes."""
     instrucao = (
         "Você é um tradutor especializado em jogos eletrônicos. "
@@ -111,7 +110,7 @@ def pedido_ia(termos: List[str], franquia: str) -> Tuple[str, str]:
     )
     return instrucao, texto
 
-def ler_resposta(texto: str, termos: List[str]) -> Dict[str, str]:
+def ler_resposta(texto: str, termos: list[str]) -> dict[str, str]:
     """Pega o primeiro objeto JSON da resposta da IA (mesmo cercado de crases) e fica só com os termos pedidos.
     "=" quer dizer: o nome fica igual."""
     ini = texto.find("{")
@@ -122,7 +121,7 @@ def ler_resposta(texto: str, termos: List[str]) -> Dict[str, str]:
         bruto = json.loads(texto[ini:fim + 1])
     except ValueError:
         return {}
-    out: Dict[str, str] = {}
+    out: dict[str, str] = {}
     for termo in termos:
         v = bruto.get(termo) if isinstance(bruto, dict) else None
         if isinstance(v, str) and v.strip():
@@ -130,7 +129,7 @@ def ler_resposta(texto: str, termos: List[str]) -> Dict[str, str]:
     return out
 
 
-def juntar(dados: Dict[str, Dict[str, str]], chave: str, novos: Dict[str, str]) -> Dict[str, Dict[str, str]]:
+def juntar(dados: dict[str, dict[str, str]], chave: str, novos: dict[str, str]) -> dict[str, dict[str, str]]:
     """Cópia com os termos novos da franquia, sem sobrescrever os que já existem (correção à mão vale)."""
     out = {k: dict(v) for k, v in dados.items()}
     atual = out.setdefault(chave, {})

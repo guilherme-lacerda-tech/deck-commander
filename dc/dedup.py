@@ -12,14 +12,13 @@ import re
 import unicodedata
 from collections import defaultdict
 from pathlib import Path
-from typing import Optional
 
 _TID = re.compile(r"\[?([0-9A-Fa-f]{16})\]?")
 _BRACKETS = re.compile(r"\([^)]*\)|\[[^\]]*\]|\{[^}]*\}")
 _ROMAN = {"ii": "2", "iii": "3", "iv": "4", "v": "5", "vi": "6", "vii": "7", "viii": "8", "ix": "9", "x": "10"}
 _JUNK = re.compile(r"\b(nsp|xci|nsz|xcz|iso|chd|rvz|wbfs|cso|pbp|multi\d*|repack|update|dlc|eshop|"
                    r"switch|ps2|psx|ps1|psp|gamecube|wii|gba|snes|n64|ntsc|pal|usa|eur|europe|japan|"
-                   r"dublado|legendado|ptbr|pt-br)\b", re.I)
+                   r"dublado|legendado|ptbr|pt-br)\b", re.IGNORECASE)
 
 
 def _norm(s: str) -> str:
@@ -28,7 +27,7 @@ def _norm(s: str) -> str:
     return s
 
 
-def base_title_id(name: str) -> Optional[str]:
+def base_title_id(name: str) -> str | None:
     """Title ID do jogo-base (update ...800 e DLC apontam para o mesmo jogo)."""
     m = _TID.search(name or "")
     if not m:
@@ -37,7 +36,7 @@ def base_title_id(name: str) -> Optional[str]:
     return f"{int(m.group(1), 16) & ~0x1FFF:016X}"
 
 
-def match_key(title: str, console: Optional[str] = None, path: str = "") -> str:
+def match_key(title: str, console: str | None = None, path: str = "") -> str:
     from .content import is_translation
     if console == "switch":
         tid = base_title_id(Path(path).name) or base_title_id(title)
@@ -70,10 +69,10 @@ def library_dups(launch_map: dict) -> list[list[str]]:
     return [v for v in groups.values() if len(v) > 1]
 
 
-def find_existing(name: str, console: Optional[str], launch_map: dict, torrents: list[dict] = ()) -> Optional[str]:
+def find_existing(name: str, console: str | None, launch_map: dict, torrents: list[dict] = ()) -> str | None:
     """Antes de baixar: devolve uma descrição do que já existe com o mesmo jogo, ou None."""
     from .library import clean_title
-    stem = re.sub(r"\.(torrent|zip|7z|rar)$", "", name or "", flags=re.I)
+    stem = re.sub(r"\.(torrent|zip|7z|rar)$", "", name or "", flags=re.IGNORECASE)
     key = match_key(clean_title(stem), console, stem)
     for gid, e in launch_map.items():
         if e.get("removed"):
@@ -81,7 +80,7 @@ def find_existing(name: str, console: Optional[str], launch_map: dict, torrents:
         if same_game(key, match_key(e.get("title", gid), e.get("console"), e.get("rom", ""))):
             return f"«{e.get('title', gid)}» já está na biblioteca"
     for t in torrents:
-        tk = match_key(clean_title(re.sub(r"\.(zip|7z|rar)$", "", t.get("name", ""), flags=re.I)),
+        tk = match_key(clean_title(re.sub(r"\.(zip|7z|rar)$", "", t.get("name", ""), flags=re.IGNORECASE)),
                        t.get("category") if t.get("category") not in (None, "", "auto") else console, t.get("name", ""))
         if same_game(key, tk):
             pct = round((t.get("progress") or 0) * 100)
@@ -113,7 +112,7 @@ def _bdecode(data: bytes, i: int = 0):
     return data[j + 1:j + 1 + n], j + 1 + n
 
 
-def torrent_name(data: bytes) -> Optional[str]:
+def torrent_name(data: bytes) -> str | None:
     try:
         d, _ = _bdecode(data)
         n = d[b"info"].get(b"name.utf-8") or d[b"info"][b"name"]
@@ -122,7 +121,7 @@ def torrent_name(data: bytes) -> Optional[str]:
         return None
 
 
-def magnet_name(magnet: str) -> Optional[str]:
+def magnet_name(magnet: str) -> str | None:
     from urllib.parse import parse_qs, urlparse
     q = parse_qs(urlparse(magnet).query)
     return (q.get("dn") or [None])[0]

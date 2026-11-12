@@ -131,7 +131,9 @@ def test_cabe():
 def test_patch_da_rotina_de_letras_das_falas():
     """Laço de 1 para 25 letras e tabela nova na área livre (SsUtKeyOn) — só se o disco for o esperado."""
     import struct
+
     import pytest
+
     from dc.traducao import sotn_falas_fonte as F
     dra = bytearray(0x70000)
     for end, ins in F.PATCH_DRA.items():

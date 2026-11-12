@@ -12,8 +12,8 @@ import os
 import re
 import urllib.parse
 import urllib.request
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Optional
 
 API = "https://www.steamgriddb.com/api/v2"
 KINDS = [  # (endpoint, parâmetros, sufixo do arquivo)
@@ -22,7 +22,7 @@ KINDS = [  # (endpoint, parâmetros, sufixo do arquivo)
     ("heroes", {}, "_hero"),
     ("logos", {}, "_logo"),
 ]
-_STRIP = [re.compile(p, re.I) for p in (r"\([^)]*\)", r"\[[^\]]*\]", r"\bvers[aã]o\s+i\.?a\.?", r"\bdublado\b")]
+_STRIP = [re.compile(p, re.IGNORECASE) for p in (r"\([^)]*\)", r"\[[^\]]*\]", r"\bvers[aã]o\s+i\.?a\.?", r"\bdublado\b")]
 
 Fetch = Callable[[str, dict], bytes]
 
@@ -41,7 +41,7 @@ def best_match(results: list[dict], term: str) -> dict:
     return (exact or results)[0]
 
 
-def read_key(secrets_dir: Path) -> Optional[str]:
+def read_key(secrets_dir: Path) -> str | None:
     p = Path(secrets_dir) / "steamgriddb"
     try:
         k = p.read_text("utf-8").strip()
@@ -60,7 +60,7 @@ def make_fetch(key: str) -> Fetch:
     return fetch
 
 
-def _api(fetch: Fetch, path: str, params: Optional[dict] = None):
+def _api(fetch: Fetch, path: str, params: dict | None = None):
     url = f"{API}/{path}" + (("?" + urllib.parse.urlencode(params)) if params else "")
     data = json.loads(fetch(url, {}))
     if not data.get("success", False):

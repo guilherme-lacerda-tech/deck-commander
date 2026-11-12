@@ -7,9 +7,9 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import List, Dict, Optional
 
-def run(args: List[str], **kwargs) -> subprocess.CompletedProcess:
+
+def run(args: list[str], **kwargs) -> subprocess.CompletedProcess:
     """Executa comando com timeout e captura de saída."""
     kwargs.setdefault("capture_output", True)
     kwargs.setdefault("text", True)
@@ -19,7 +19,7 @@ def run(args: List[str], **kwargs) -> subprocess.CompletedProcess:
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return subprocess.CompletedProcess(args, 1, "", "")
 
-def fluxos(run=run) -> List[Dict]:
+def fluxos(run=run) -> list[dict]:
     """Retorna lista de fluxos com tipo, nome, volume e mudo."""
     result = run(["pactl", "-f", "json", "list", "sink-inputs"])
     if result.returncode != 0:
@@ -73,7 +73,7 @@ def definir_volume(tipo: str, pct: int, run=run) -> int:
     
     return count
 
-def achar_player_spotify(run=run) -> Optional[str]:
+def achar_player_spotify(run=run) -> str | None:
     """Acha o nome do player MPRIS do Spotify."""
     result = run(["busctl", "--user", "list", "--no-pager"])
     if result.returncode != 0:
@@ -88,7 +88,7 @@ def achar_player_spotify(run=run) -> Optional[str]:
     
     return players[0] if players else None
 
-def tocando(run=run) -> Optional[Dict]:
+def tocando(run=run) -> dict | None:
     """Retorna informações do player MPRIS atual."""
     player = achar_player_spotify(run)
     if not player:
@@ -172,7 +172,7 @@ def abrir(uri: str, run=run) -> bool:
     ])
     return result.returncode == 0
 
-def playlists(cfg_path: Path) -> List[Dict]:
+def playlists(cfg_path: Path) -> list[dict]:
     """Lê lista de playlists do arquivo JSON."""
     if not cfg_path.exists():
         return []
@@ -184,7 +184,7 @@ def playlists(cfg_path: Path) -> List[Dict]:
     except (json.JSONDecodeError, OSError):
         return []
 
-def salvar_playlists(cfg_path: Path, lista: List[Dict]) -> None:
+def salvar_playlists(cfg_path: Path, lista: list[dict]) -> None:
     """Salva lista de playlists no arquivo JSON."""
     try:
         with open(cfg_path, "w") as f:
@@ -237,15 +237,3 @@ if __name__ == "__main__":
         sys.exit(1)
 
 
-def atalho_spotify(paths) -> str:
-    """Põe o Spotify na biblioteca do Steam (para entrar na conta e abrir no modo de jogo, sem o modo Desktop)."""
-    from . import plugin_bridge
-    bin_dir = paths.data / "bin"
-    bin_dir.mkdir(parents=True, exist_ok=True)
-    sh = bin_dir / "spotify.sh"
-    sh.write_text("#!/bin/sh\n# aberto pelo atalho \"Spotify\" do Deck Commander (o argumento é o id do atalho)\n"
-                  "exec /usr/bin/flatpak run com.spotify.Client\n", "utf-8")
-    sh.chmod(0o755)
-    n = plugin_bridge.enqueue(paths, [{"LaunchOptions": "app-spotify", "AppName": "Spotify", "exe": str(sh),
-                                       "StartDir": str(bin_dir)}])
-    return "Spotify vai aparecer na biblioteca em ~10 s." if n else "O Spotify já está na biblioteca."

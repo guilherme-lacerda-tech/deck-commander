@@ -11,10 +11,9 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Optional
 
 PT_RX = re.compile(r"(?<![a-z])(pt-?br|br|dublado|dub(?:-ia)?|dub-e-leg|legendado|portugu[eê]s|traduzido|"
-                   r"vers[aã]o\s*i\.?\s*a\.?)(?![a-z])|romsportugues", re.I)
+                   r"vers[aã]o\s*i\.?\s*a\.?)(?![a-z])|romsportugues", re.IGNORECASE)
 OFFICIAL = "BrazilianPortuguese"
 
 
@@ -40,7 +39,7 @@ def has_dc_mod(rom: str) -> bool:
     return bool(tid) and (mod_target(tid) / "romfs").is_dir()
 
 
-def status(gid: str, entry: dict, idiomas: dict) -> Optional[str]:
+def status(gid: str, entry: dict, idiomas: dict) -> str | None:
     """'oficial' | 'mod' | 'traduzido' | None"""
     if entry.get("console") == "switch":
         if idiomas.get(gid, {}).get("ptbr") == "oficial":

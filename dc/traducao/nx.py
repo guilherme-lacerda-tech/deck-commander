@@ -10,7 +10,6 @@ from __future__ import annotations
 import re
 import struct
 from dataclasses import dataclass, field
-from typing import Optional
 
 
 class FormatError(ValueError):
@@ -342,7 +341,7 @@ def _zstd():
         return None
 
 
-def unpack_layer(name: str, data: bytes) -> tuple[bytes, Optional[str]]:
+def unpack_layer(name: str, data: bytes) -> tuple[bytes, str | None]:
     """Tira a compressão externa. Devolve (dados, 'yaz0'|'zstd'|None)."""
     if data[:4] == b"Yaz0":
         return yaz0_decompress(data), "yaz0"
@@ -386,7 +385,7 @@ def registrar_dicionarios(pacote_zsdic: bytes) -> list[str]:
     return sorted(DICIONARIOS_ZSTD)
 
 
-def pack_layer(data: bytes, kind: Optional[str]) -> bytes:
+def pack_layer(data: bytes, kind: str | None) -> bytes:
     if kind == "yaz0":
         return yaz0_compress(data)
     if kind and kind.startswith("zstd:"):  # mesmo dicionário na volta: o jogo só abre assim
@@ -401,7 +400,7 @@ def pack_layer(data: bytes, kind: Optional[str]) -> bytes:
 LATIN_PTBR = "áàâãéêíóôõúçÁÀÂÃÉÊÍÓÔÕÚÇ"
 
 
-def bffnt_chars(data: bytes) -> Optional[set[int]]:
+def bffnt_chars(data: bytes) -> set[int] | None:
     """Códigos de caractere que a fonte tem, ou None se não conseguir ler com segurança."""
     if data[:4] not in (b"FFNT", b"CFNT", b"RFNT"):
         return None

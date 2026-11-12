@@ -127,6 +127,7 @@ def test_texturas_zip_com_pastas_e_caminho_perigoso(tmp_path):
     """Revisão de lançamento 11/11/2026: zip com entrada de pasta ("pack/") quebrava a instalação; nome com ".."
     ou letra de unidade não pode sair da pasta."""
     import zipfile
+
     from dc import texturas
     z = tmp_path / "pack.zip"
     with zipfile.ZipFile(z, "w") as zf:
@@ -142,8 +143,10 @@ def test_texturas_zip_com_pastas_e_caminho_perigoso(tmp_path):
 
 
 def test_texturas_7z_com_caminho_perigoso_recusa(tmp_path):
-    import pytest
     from types import SimpleNamespace
+
+    import pytest
+
     from dc import texturas
     chamadas = []
 

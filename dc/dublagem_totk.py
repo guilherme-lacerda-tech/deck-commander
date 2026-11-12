@@ -38,6 +38,7 @@ def _ler(caminho: str) -> bytes:
 def _textos() -> dict[str, str]:
     """rótulo -> texto em inglês de todas as falas de cena (EventFlowMsg)."""
     from compression import zstd  # Python 3.14+
+
     from .traducao import nx
     rfs, _tid = _romfs()
     dic = zstd.ZstdDict(nx.read_sarc(zstd.decompress(_ler("Pack/ZsDic.pack.zs"))).files["zs.zsdic"])

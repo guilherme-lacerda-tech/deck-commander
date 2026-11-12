@@ -12,10 +12,10 @@ import os
 import random
 import shutil
 import uuid
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, Iterable, Optional
 
 from .quarantine import quarantine
 
@@ -34,9 +34,9 @@ class AllBackupsCorrupt(BackupError):
 @dataclass
 class SnapshotResult:
     ok: bool
-    path: Optional[Path]
+    path: Path | None
     warnings: list[str] = field(default_factory=list)
-    error: Optional[str] = None
+    error: str | None = None
 
 
 def sha256_file(p: Path, bufsize: int = 1 << 20) -> str:
@@ -75,7 +75,7 @@ def _hash_tree(data_dir: Path) -> dict[str, dict]:
             for f in _iter_files(data_dir)}
 
 
-def verify_snapshot(snap: Path, sample: Optional[int] = None) -> list[str]:
+def verify_snapshot(snap: Path, sample: int | None = None) -> list[str]:
     """Lista de problemas ([] = válido). `sample` verifica só N arquivos aleatórios."""
     problems: list[str] = []
     try:
@@ -109,7 +109,7 @@ def _hash_tree_names(data: Path) -> list[str]:
 def create_snapshot(sources: dict[str, Path], dest_root: Path, quarantine_root: Path,
                     kind: str = "config", keep: int = 5,
                     now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
-                    _corrupt_hook: Optional[Callable[[Path], None]] = None) -> SnapshotResult:
+                    _corrupt_hook: Callable[[Path], None] | None = None) -> SnapshotResult:
     dest_root = Path(dest_root)
     dest_root.mkdir(parents=True, exist_ok=True)
     warnings: list[str] = []
@@ -186,7 +186,7 @@ def _sandbox_restore(snap: Path, full: bool) -> list[str]:
         shutil.rmtree(sandbox, ignore_errors=True)
 
 
-def list_snapshots(dest_root: Path, kind: Optional[str] = None) -> list[Path]:
+def list_snapshots(dest_root: Path, kind: str | None = None) -> list[Path]:
     """Mais novo primeiro. Ignora .tmp-/.sandbox- e quarentena."""
     if not Path(dest_root).exists():
         return []
@@ -207,7 +207,7 @@ def apply_retention(dest_root: Path, kind: str, keep: int) -> list[str]:
     return msgs
 
 
-def latest_valid(dest_root: Path, quarantine_root: Path, kind: Optional[str] = None,
+def latest_valid(dest_root: Path, quarantine_root: Path, kind: str | None = None,
                  now: Callable[[], datetime] = lambda: datetime.now(timezone.utc)) -> tuple[Path, list[str]]:
     """Percorre do mais novo ao mais velho; inválidos vão para quarentena com aviso."""
     warnings = []
@@ -225,7 +225,7 @@ def touches_steam(snap: Path) -> bool:
     return any(Path(rel).name in STEAM_SENSITIVE for rel in man["files"])
 
 
-def restore_snapshot(snap: Path, dry_run: bool = True, target_root: Optional[Path] = None,
+def restore_snapshot(snap: Path, dry_run: bool = True, target_root: Path | None = None,
                      steam_guard=None) -> list[tuple[str, str]]:
     """Restaura cada fonte ao caminho original (ou sob `target_root`, para testes).
 

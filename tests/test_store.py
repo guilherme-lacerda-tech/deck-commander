@@ -2,7 +2,13 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from dc.store import ApprovalExpired, ApprovalReplay, DatabaseCorrupt, Store, SCHEMA_VERSION
+from dc.store import (
+    SCHEMA_VERSION,
+    ApprovalExpired,
+    ApprovalReplay,
+    DatabaseCorrupt,
+    Store,
+)
 
 
 class Clock:

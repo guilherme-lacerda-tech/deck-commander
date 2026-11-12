@@ -12,8 +12,8 @@ from __future__ import annotations
 import hashlib
 import io
 import struct
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 PAK_MAGIC = 0x5A6F12E1
 LOCRES_MAGIC = bytes.fromhex("0E147475674A03FC4A15909DC3377F1B")

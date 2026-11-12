@@ -108,6 +108,7 @@ def power_loop(paths: Paths, interval: float = 30) -> None:
             try:
                 if json.loads((paths.config / "shaders-noite.json").read_text("utf-8")).get("ligado"):
                     from datetime import datetime as _dt
+
                     from . import bench, espaco, remove, shaders_noite
                     feitos = shaders_noite.rodada(
                         remove.effective_map(paths), shaders_noite.Estado(paths.state / "shaders-noite.json"),

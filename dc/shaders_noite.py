@@ -1,7 +1,6 @@
+import json
 from datetime import datetime
 from pathlib import Path
-import json
-
 
 CONSOLES_COM_SHADER = {"switch", "switch2", "wiiu", "ps3", "gc", "wii", "ps2", "x360", "n3ds"}
 

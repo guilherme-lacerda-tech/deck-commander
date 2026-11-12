@@ -17,9 +17,9 @@ import re
 import shutil
 import subprocess
 import unicodedata
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Optional
 
 from ..paths import Paths
 from . import ia
@@ -43,7 +43,7 @@ class RtsReport:
     translated: int = 0
     flagged: int = 0
     skipped_multiline: int = 0
-    audit_left: Optional[int] = None
+    audit_left: int | None = None
     provider: str = ""
     output: str = ""
     patch: str = ""
@@ -67,7 +67,7 @@ class RtsReport:
         return "\n".join(L)
 
 
-def bin_path() -> Optional[str]:
+def bin_path() -> str | None:
     for c in BIN_CANDIDATES:
         if c.exists():
             return str(c)
@@ -111,7 +111,7 @@ def _run(args: list[str], timeout: int = 7200) -> dict:
 
 
 def output_name(rom: Path) -> Path:
-    stem = re.sub(r"\s*\((pt-?br|br)\)\s*$", "", rom.stem, flags=re.I)
+    stem = re.sub(r"\s*\((pt-?br|br)\)\s*$", "", rom.stem, flags=re.IGNORECASE)
     return rom.with_name(f"{stem} (PT-BR){rom.suffix}")
 
 

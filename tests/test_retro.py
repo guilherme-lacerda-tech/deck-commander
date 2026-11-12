@@ -68,8 +68,35 @@ def test_jogo_novo_depois_de_ligado_ganha_os_botoes(tmp_path):
              "1": {"appid": 3, "AppName": "Castlevania SOTN (PT-BR)", "LaunchOptions": "psx-cv-pt"}}
     cfg.write_bytes(vdf.dump_binary({"shortcuts": novos}))
     r = retro.jogos_para_o_painel(h, dict(MAPA, **{"psx-cv-pt": {"console": "psx"}}))
-    assert r["appids"] == [1, 3] and r["modelo"] == "template://controller_neptune_dc_retro.vdf"
+    assert r["appids"] == [3] and r["modelo"] == "template://controller_neptune_dc_retro.vdf"  # só o novo
     assert "key_press F9" in (base / "castlevania sotn (pt-br)/controller_neptune.vdf").read_text()
+
+
+def test_layout_que_o_usuario_trocou_nao_e_sobrescrito(tmp_path):
+    """Revisão de lançamento 12/11/2026: a cada reinício do Decky o painel reaplicava o modelo em TODOS os jogos e
+    regravava o layout de quem tinha tirado os botões de trás. Cada jogo é mexido uma vez; depois é do usuário."""
+    h, base = _deck(tmp_path)
+    retro.aplicar(h, MAPA)
+    lay = base / "castlevania sotn/controller_neptune.vdf"
+    lay.write_text(LAYOUT)  # usuário montou o layout dele, sem os botões de trás
+    for _ in range(3):  # vários "reinícios" do Decky
+        assert retro.jogos_para_o_painel(h, MAPA)["appids"] == []
+    assert lay.read_text() == LAYOUT
+    retro.preparar(h, MAPA)  # mas se ELE apertar "Ligar" de novo, vale para todos
+    assert "key_press F9" in lay.read_text()
+
+
+def test_desfazer_devolve_os_layouts_do_steam(tmp_path):
+    """Desinstalar/desfazer deixava os layouts de controle e o modelo "Deck Commander Retro" para trás."""
+    h, base = _deck(tmp_path)
+    retro.aplicar(h, MAPA)
+    tpl = h / ".local/share/Steam/controller_base/templates" / retro.MODELO
+    assert tpl.exists() and (base / "castlevania sotn/controller_neptune.vdf").exists()
+    msg = retro.desfazer(h)
+    assert "1 jogo" in msg and not tpl.exists()
+    assert not (base / "castlevania sotn/controller_neptune.vdf").exists()  # foi ele que criou: some
+    cs = vdf.load_text((base / "configset_controller_neptune.vdf").read_text())["controller_config"]
+    assert cs["castlevania sotn"] == {"template": "controller_neptune_gamepad+mouse.vdf"}  # o que o usuário tinha
 
 
 def test_painel_aplica_botoes_em_jogo_novo_sozinho():
@@ -79,3 +106,12 @@ def test_painel_aplica_botoes_em_jogo_novo_sozinho():
     assert '["botões de trás", retroBotoes]' in js and 'call("painel", "retro_jogos"' in js
     from dc import painel
     assert "retro_jogos" in painel.ACOES
+
+
+def test_painel_nao_abre_python_a_cada_minuto():
+    """Revisão de lançamento 12/11/2026 (bateria): o ciclo abria um Python a cada ~1 min, até durante o jogo.
+    Agora: ao ligar, quando entra atalho novo (algumas tentativas) e uma checagem a cada 30 min."""
+    from pathlib import Path
+    js = (Path(__file__).resolve().parents[1] / "decky-plugin/dist/index.js").read_text("utf-8")
+    assert "retroConta++ % 6" not in js and "% 180 !== 0" in js
+    assert js.count("retroPendente = 12") == 2  # fila (atalho novo) e autocorreção (atalho recriado)

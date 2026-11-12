@@ -122,7 +122,7 @@ def flatpak_info(app_id: str) -> str | None:
         return None
     if r.returncode != 0:
         return None
-    mm = re.search(r"^\s*(?:Version|Versão):\s*(\S+)", r.stdout, re.M)
+    mm = re.search(r"^\s*(?:Version|Versão):\s*(\S+)", r.stdout, re.MULTILINE)
     return mm.group(1) if mm else ""
 
 
@@ -324,7 +324,7 @@ def reescrever(txt: str, regras: list[dict], roms: Path, base: Path, sub: dict[s
         partes = [x for x in re.split(r"[\\/]+", r["de"]) if x]
         if not partes:
             continue
-        pat = re.compile(_SEP.join(re.escape(x) for x in partes) + r"((?:" + _SEP + r"[^\"'\r\n;,=]*)?)", re.I)
+        pat = re.compile(_SEP.join(re.escape(x) for x in partes) + r"((?:" + _SEP + r"[^\"'\r\n;,=]*)?)", re.IGNORECASE)
 
         def troca(mm, para=r["para"]):
             cauda = re.sub(r"[\\/]+", "/", mm.group(1)).rstrip("/")

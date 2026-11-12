@@ -16,7 +16,6 @@ import uuid
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Optional
 
 
 class UnsafeArchive(ValueError):
@@ -101,7 +100,7 @@ def inspect(archive: Path, limits: Limits = Limits()) -> list[zipfile.ZipInfo]:
 
 
 def extract(archive: Path, dest: Path, limits: Limits = Limits(),
-            cancel: Optional[threading.Event] = None, chunk: int = 1 << 20) -> list[Path]:
+            cancel: threading.Event | None = None, chunk: int = 1 << 20) -> list[Path]:
     archive, dest = Path(archive), Path(dest)
     if dest.exists():
         raise FileExistsError(f"destino já existe: {dest}")

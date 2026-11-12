@@ -5,7 +5,6 @@ Ordem: conta marcada "MostRecent" em config/loginusers.vdf -> pasta userdata mod
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
 from .vdf import load_text
 
@@ -25,7 +24,7 @@ def userdata_dir(root: Path = STEAM_ROOT) -> Path:
                if (d / "config/localconfig.vdf").exists() else d.stat().st_mtime)
 
 
-def most_recent_account(root: Path = STEAM_ROOT) -> Optional[str]:
+def most_recent_account(root: Path = STEAM_ROOT) -> str | None:
     try:
         users = load_text((root / "config/loginusers.vdf").read_text("utf-8", "replace")).get("users", {})
     except OSError:

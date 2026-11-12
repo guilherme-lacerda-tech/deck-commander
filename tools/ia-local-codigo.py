@@ -24,7 +24,7 @@ def gerar(spec: str, modelo: str) -> str:
     req = urllib.request.Request(URL, corpo, {"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=3600) as r:
         txt = json.loads(r.read())["response"]
-    m = re.search(r"```(?:python|py|powershell|javascript|js)?\s*\n(.*?)```", txt, re.S)
+    m = re.search(r"```(?:python|py|powershell|javascript|js)?\s*\n(.*?)```", txt, re.DOTALL)
     return (m.group(1) if m else txt).rstrip() + "\n"
 
 

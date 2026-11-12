@@ -10,7 +10,6 @@ import json
 import re
 import shutil
 from pathlib import Path
-from typing import Optional
 
 from . import converter, nca, switch
 
@@ -18,7 +17,7 @@ H = Path.home()
 TEXT_DIRS = re.compile(r"(^|/)(mals?|msg|message|messages|text|texts|lms|font|fonts|localize|localization|"
                        r"language|languages)(/|$)|\.msbt(\.zs)?$|\.bffnt(\.zs)?$|(^|/)(mal|msg)[^/]*\.(sarc|szs|zs|pack)|"
                        r"(^|/)Bootup_[A-Z]{2}[a-z]{2}\.pack$|(^|/)ZsDic\.pack\.zs$",  # ZsDic: dicionário zstd (Zelda TotK)
-                       re.I)
+                       re.IGNORECASE)
 MAX_FILE = 64 << 20
 
 
@@ -33,7 +32,7 @@ def _version(p: Path) -> int:
     return int(m.group(1)) if m else 0
 
 
-def latest_update(tf: converter.TitleFiles) -> Optional[Path]:
+def latest_update(tf: converter.TitleFiles) -> Path | None:
     ups = [p for p in tf.updates if p.suffix.lower() == ".nsp"]
     return max(ups, key=_version) if ups else None
 

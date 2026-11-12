@@ -22,7 +22,7 @@ class Paths:
     logs: Path
     lock: Path
 
-    def ensure(self) -> "Paths":
+    def ensure(self) -> Paths:
         for d in (self.config, self.secrets, self.data, self.backups,
                   self.quarantine, self.state, self.logs):
             d.mkdir(parents=True, exist_ok=True)

@@ -128,6 +128,3 @@ def aplicar(dra: bytes, exe: bytes, bios: bytes) -> tuple[bytes, bytes]:
     return bytes(d), bytes(e)
 
 
-def codificar_acentos(texto: str) -> list[bytes]:
-    """Pedaços de bytes de cada caractere da fala: acentuado -> código Shift-JIS de 2 bytes (0x85 0x40+k)."""
-    return [struct.pack(">H", CODIGO[c]) if c in CODIGO else c.encode("latin-1", "replace") for c in texto]

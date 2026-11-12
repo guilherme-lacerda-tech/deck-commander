@@ -48,5 +48,6 @@ for nome in sorted(painel.ACOES):
             print(f"QUEBROU  painel {nome} ({campo}): {pr.stderr.strip()[-160:]}")
         break
 import os  # noqa: E402
+
 print("INJEÇÃO FUNCIONOU!" if os.path.exists("/tmp/dc-pwned") else "nenhuma injeção de comando funcionou")
 print(f"FUZZ: {quebrou} quebra(s) em {len(cmds) * len(RUINS)} comandos do bot + {len(painel.ACOES)} ações do painel")

@@ -5,7 +5,9 @@ import struct
 
 import pytest
 
-from dc.traducao import ia, oodle, trinity, trinity_game as tg, trinity_msg as tm
+from dc.traducao import ia, oodle, trinity
+from dc.traducao import trinity_game as tg
+from dc.traducao import trinity_msg as tm
 
 
 # ----------------------------------------------------------------------------- FlatBuffers mínimos (só p/ teste)

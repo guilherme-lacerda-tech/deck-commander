@@ -1,8 +1,6 @@
-from typing import Dict, List, Optional, Set, Tuple, Union
 
-TECLAS = {"salvar": "F9", "carregar": "F10", "voltar": "F11", "turbo": "F12"}
 
-def definir(texto: str, valores: Dict[str, str]) -> str:
+def definir(texto: str, valores: dict[str, str]) -> str:
     """Substitui ou adiciona linhas no formato 'chave = "valor"'."""
     linhas = texto.splitlines(keepends=True)
     if not linhas or not linhas[-1].endswith('\n'):
@@ -46,7 +44,7 @@ def cfg_retroarch(texto: str, turbo: float = 2.0) -> str:
             linhas[i] = chave + ' = "nul"' + ("\n" if linha.endswith("\n") else "")
     return "".join(linhas)
 
-def override_nucleo(texto: Optional[str], runahead: bool, rewind: bool, shader: Optional[str]) -> str:
+def override_nucleo(texto: str | None, runahead: bool, rewind: bool, shader: str | None) -> str:
     """Cria ou atualiza arquivo de exceção por núcleo."""
     if texto is None:
         texto = ""
@@ -81,7 +79,7 @@ def preset_shader(tipo: str) -> str:
         raise KeyError(f"Shader '{tipo}' não encontrado")
     return f'#reference "{SHADERS[tipo]}"\n'
 
-def ini_definir(texto: str, secao: str, valores: Dict[str, str]) -> str:
+def ini_definir(texto: str, secao: str, valores: dict[str, str]) -> str:
     """Define chaves em uma seção do arquivo .ini."""
     linhas = texto.splitlines(keepends=True)
     if linhas and not linhas[-1].endswith("\n"):
@@ -114,7 +112,7 @@ def ini_definir(texto: str, secao: str, valores: Dict[str, str]) -> str:
     
     return ''.join(linhas)
 
-def ini_remover_tecla(texto: str, secao: str, tecla: str, manter: Set[str]) -> str:
+def ini_remover_tecla(texto: str, secao: str, tecla: str, manter: set[str]) -> str:
     """Remove linhas com valor igual a `tecla` exceto se chave está em `manter`."""
     linhas = texto.splitlines(keepends=True)
     if not linhas or not linhas[-1].endswith('\n'):
@@ -205,7 +203,7 @@ def ini_pcsx2(texto: str, turbo: float = 2.0) -> str:
     
     return texto
 
-def hotkeys_dolphin(texto: Optional[str]) -> str:
+def hotkeys_dolphin(texto: str | None) -> str:
     """Configura Hotkeys.ini do Dolphin com teclas de trás."""
     if texto is None or "[Hotkeys]" not in texto:
         texto = "[Hotkeys]\nDevice = XInput2/0/Virtual core pointer\n\n"

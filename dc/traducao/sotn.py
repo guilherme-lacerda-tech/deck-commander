@@ -17,7 +17,7 @@ from .psx_disco import Disco, gravar_cue
 from .rts import RtsReport
 
 SERIAIS = ("SLES_005.24", "SLUS_000.67", "SLES_005.25", "SLES_005.26", "SLES_005.27")  # SOTN EUR/EUA
-_PULA = re.compile(r"(^|/)(F_|SD_)|\.(STR|XA|VB|VH|TIM|CCS|DA)$", re.I)
+_PULA = re.compile(r"(^|/)(F_|SD_)|\.(STR|XA|VB|VH|TIM|CCS|DA)$", re.IGNORECASE)
 
 
 def _bin_da_cue(cue: Path) -> Path:
@@ -259,7 +259,7 @@ def _so_nome(texto: str) -> bool:
         return True
     if texto.isupper() and len(palavras) >= 2:  # nomes da equipe nos créditos (SHIGERU FUKUTAKE…)
         return True
-    return bool(re.search(r"\b(load|set ok|dummy|debug|test)\b", texto, re.I) and len(palavras) <= 3)
+    return bool(re.search(r"\b(load|set ok|dummy|debug|test)\b", texto, re.IGNORECASE) and len(palavras) <= 3)
 
 
 def retoque(paths: Paths, rom_original: Path, rom_pt: Path, chain=None, progress=lambda d, t: None) -> dict:
@@ -380,9 +380,13 @@ def translate_rom(paths: Paths, rom: Path, title: str = "", chain=None, progress
     novos = {nome: S.aplicar(dados[nome], ts) for nome, ts in trocas.items()}
     from . import sotn_fonte  # nomes e menus com acento: letras novas na fonte 8x8
     novos["BIN/F_GAME.BIN"] = sotn_fonte.com_acentos(disco.ler("BIN/F_GAME.BIN"))
-    from . import sotn_imagens  # botões desenhados da tela de arquivos (File select…) remontados em português
+    from . import (
+        sotn_imagens,  # botões desenhados da tela de arquivos (File select…) remontados em português
+    )
     novos["ST/SEL/F_SEL.BIN"] = sotn_imagens.botoes_em_portugues(disco.ler("ST/SEL/F_SEL.BIN"))
-    from . import sotn_falas_fonte  # falas com acento: tabela de letras novas + rotina de letras com 25 voltas
+    from . import (
+        sotn_falas_fonte,  # falas com acento: tabela de letras novas + rotina de letras com 25 voltas
+    )
     bios = _bios()
     if bios:
         dra = novos.get("DRA.BIN") or disco.ler("DRA.BIN")

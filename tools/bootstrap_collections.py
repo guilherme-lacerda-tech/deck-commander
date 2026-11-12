@@ -6,12 +6,14 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from cef_eval import ws_eval  # noqa: E402
+
 from dc import tabs, vdf  # noqa: E402
 from dc.paths import get_paths  # noqa: E402
-from cef_eval import ws_eval  # noqa: E402
 
 paths = get_paths()
 from dc.steam import shortcuts_path  # noqa: E402
+
 sc = shortcuts_path()
 lm = json.loads((paths.data / "launch-map.json").read_text("utf-8"))
 spec = tabs.write_collections(paths.data, vdf.read_shortcuts(sc), lm)

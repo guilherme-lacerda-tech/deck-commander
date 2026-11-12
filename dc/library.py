@@ -14,9 +14,9 @@ import json
 import os
 import re
 import unicodedata
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable
 
 from . import vdf
 
@@ -27,7 +27,7 @@ from .emulators import CONSOLES  # fonte única dos consoles (M2.2)
 DEFAULT_EMULATORS = {k: v["cmd"] for k, v in CONSOLES.items()}
 
 _TITLE_ID = re.compile(r"\[([0-9A-Fa-f]{16})\]")
-_NOISE = [re.compile(p, re.I) for p in (
+_NOISE = [re.compile(p, re.IGNORECASE) for p in (
     r"\(www\.[^)]*\)", r"\[[^\]]*\]", r"\(T\s?\d+(\.\d+)*\)", r"\(\d+(\.\d+)?\s*GB\)", r"\(v\d+(\.\d+)*\)", r"\((god|games on demand)\)")]
 
 

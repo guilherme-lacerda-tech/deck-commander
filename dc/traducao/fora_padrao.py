@@ -13,9 +13,9 @@ from __future__ import annotations
 
 import shutil
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Optional
 
 from . import generico, ia, idioma
 
@@ -66,7 +66,7 @@ def candidates(root: Path) -> list[Path]:
                   and p.stat().st_size <= MAX_FILE)
 
 
-def translate_dir(paths, src: Path, stage: Path, title: str = "", expected_lang: Optional[str] = None,
+def translate_dir(paths, src: Path, stage: Path, title: str = "", expected_lang: str | None = None,
                   chain=None, progress=lambda d, t: None, should_pause=lambda: False,
                   log: Callable[[str], None] = lambda s: None) -> Report:
     """Traduz os arquivos de `src` e grava SÓ os que mudaram em `stage` (mesmo caminho relativo)."""
@@ -174,7 +174,7 @@ def hardlink_copy(src: Path, dst: Path) -> None:
             shutil.copy2(p, q)
 
 
-def folder_game_root(console: str, rom: Path) -> Optional[Path]:
+def folder_game_root(console: str, rom: Path) -> Path | None:
     """Pasta do jogo para consoles de jogo em pasta (PS3: PS3_GAME/USRDIR/EBOOT.BIN; Wii U: code/*.rpx)."""
     if console == "ps3" and rom.name == "EBOOT.BIN":
         return rom.parent.parent.parent

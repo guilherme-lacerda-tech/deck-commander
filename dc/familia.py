@@ -2,9 +2,9 @@ import json
 import os
 import shutil
 import subprocess
-from pathlib import Path
-from typing import List, Tuple, Dict, Any
 from datetime import datetime
+from pathlib import Path
+from typing import Any
 
 EXT_JOGO = (
     ".nsp", ".xci", ".nsz", ".xcz", ".iso", ".chd", ".cso", ".rvz",
@@ -14,7 +14,7 @@ EXT_JOGO = (
     ".rar", ".pkg", ".xex", ".god"
 )
 
-def montar_catalogo(launch_map: Dict[str, Dict], ingeridos: Dict[str, Dict], magnets: Dict[str, str], pacotes: Dict[str, List[str]]) -> List[Dict]:
+def montar_catalogo(launch_map: dict[str, dict], ingeridos: dict[str, dict], magnets: dict[str, str], pacotes: dict[str, list[str]]) -> list[dict]:
     """Monta catálogo de jogos com base em dados de launch map, ingeridos, magnets e pacotes."""
     resultado = []
     
@@ -54,7 +54,7 @@ def montar_catalogo(launch_map: Dict[str, Dict], ingeridos: Dict[str, Dict], mag
     
     return sorted(resultado, key=lambda x: x["titulo"].casefold())
 
-def filtrar_pacote(arquivos: List[str]) -> Tuple[List[str], List[str]]:
+def filtrar_pacote(arquivos: list[str]) -> tuple[list[str], list[str]]:
     """Filtra arquivos de pacote, separando permitidos e recusados."""
     permitidos = []
     recusados = []
@@ -79,7 +79,7 @@ def filtrar_pacote(arquivos: List[str]) -> Tuple[List[str], List[str]]:
     
     return permitidos, recusados
 
-def ssh_base(alvo: str, chave: str) -> List[str]:
+def ssh_base(alvo: str, chave: str) -> list[str]:
     """Monta comando base SSH."""
     return ["ssh", "-i", chave, "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", alvo]
 
@@ -92,7 +92,7 @@ def par_online(alvo: str, chave: str, run: Any = subprocess.run) -> bool:
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return False
 
-def rsync_cmd(arquivos: List[str], alvo: str, chave: str, destino: str) -> List[str]:
+def rsync_cmd(arquivos: list[str], alvo: str, chave: str, destino: str) -> list[str]:
     """Monta comando rsync para enviar arquivos."""
     permitidos, _ = filtrar_pacote(arquivos)
     
@@ -110,7 +110,7 @@ def rsync_cmd(arquivos: List[str], alvo: str, chave: str, destino: str) -> List[
     cmd.append(alvo + ":" + destino)
     return cmd
 
-def registrar_pedido(estado: Path, item: Dict[str, Any], de: str) -> Dict[str, Any]:
+def registrar_pedido(estado: Path, item: dict[str, Any], de: str) -> dict[str, Any]:
     """Registra um novo pedido no arquivo de estado."""
     try:
         with open(estado, "r") as f:
@@ -141,7 +141,7 @@ def registrar_pedido(estado: Path, item: Dict[str, Any], de: str) -> Dict[str, A
         
     return novo_pedido
 
-def pedidos(estado: Path) -> List[Dict[str, Any]]:
+def pedidos(estado: Path) -> list[dict[str, Any]]:
     """Retorna todos os pedidos do arquivo de estado."""
     try:
         with open(estado, "r") as f:
@@ -167,7 +167,7 @@ def marcar(estado: Path, gid: str, status: str, nota: str = "") -> None:
     with open(estado, "w") as f:
         json.dump(pedidos, f, indent=2)
 
-def aplicar_pacote(pasta_pacote: Path, home: Path) -> List[str]:
+def aplicar_pacote(pasta_pacote: Path, home: Path) -> list[str]:
     """Aplica pacote de tradução copiando arquivos para o destino."""
     gravados = []
     
@@ -196,7 +196,7 @@ def aplicar_pacote(pasta_pacote: Path, home: Path) -> List[str]:
                     if not filecmp.cmp(arquivo_origem, destino, shallow=False):
                         backup = destino.with_suffix(destino.suffix + ".antes-familia")
                         shutil.copy2(destino, backup)
-                except (OSError, IOError):
+                except OSError:
                     pass  # Ignora erro de comparação
             else:
                 # Se não for arquivo, não faz nada

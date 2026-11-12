@@ -11,10 +11,10 @@ confere tocando de volta e manda para o Deck instalar como mod do Ryujinx.
 from __future__ import annotations
 
 import argparse
-import re
 import asyncio
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -46,7 +46,7 @@ def scp(o: str, d: str) -> None:
 
 
 ESPANHOL = re.compile(r"\b(recuerdos?|también|usted(es)?|ahora|entonces|mientras|nosotros|muy|ella|hasta|siempre|"
-                      r"porque|pero|aquí|allí|cuando|donde|tiempo atrás|señor|señora|gracias|bueno)\b|[¿¡ñ]", re.I)
+                      r"porque|pero|aquí|allí|cuando|donde|tiempo atrás|señor|señora|gracias|bueno)\b|[¿¡ñ]", re.IGNORECASE)
 
 
 def traduzir(textos: list[str], modelo: str = "qwen2.5:7b") -> list[str]:
@@ -117,8 +117,9 @@ def duracao(ff: str, arq: Path) -> float:
 
 
 def voz_bwav(ff: str, texto: str, voz: str, amostras: int, canais: int, t: Path) -> bytes:
-    import edge_tts
     import time
+
+    import edge_tts
     mp3 = t / "v.mp3"
     for tentativa in range(3):  # o serviço de voz às vezes não responde ("No audio was received"): tenta de novo
         try:

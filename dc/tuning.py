@@ -11,7 +11,6 @@ conferidos com a medição real (dc.perf): onde um jogo travar no "equilibrado",
 """
 from __future__ import annotations
 
-from typing import Optional
 
 from . import quality
 from .paths import Paths
@@ -39,14 +38,14 @@ def level_for(console: str, preset: str) -> int:
     return PRESETS[console][NAMES.index(preset)]
 
 
-def preset_of(console: str, level: Optional[int]) -> Optional[str]:
+def preset_of(console: str, level: int | None) -> str | None:
     """Nome do preset que corresponde a um nível (o mais econômico, se dois coincidirem)."""
     if console not in PRESETS or level is None:
         return None
     return next((n for n, v in zip(NAMES, PRESETS[console]) if v == level), None)
 
 
-def console_level(console: str) -> Optional[int]:
+def console_level(console: str) -> int | None:
     """Resolução global atual do emulador (o padrão do console)."""
     t = quality._target(console) if quality.supported(console) else None
     if not t:
@@ -73,7 +72,7 @@ def apply_console(console: str, preset: str) -> str:
     return f"{LABEL[preset]} para todo o console: {quality.LABEL.get(n, str(n) + 'x')}"
 
 
-def apply_game(paths: Paths, game_id: str, console: str, preset: Optional[str]) -> str:
+def apply_game(paths: Paths, game_id: str, console: str, preset: str | None) -> str:
     """Preset só para um jogo (None = volta ao padrão do console)."""
     if preset is None:
         return quality.set_override(paths, game_id, console, None)

@@ -1,7 +1,6 @@
 """Protetor de tela com a arte dos jogos (o do Steam ficou preto com atalhos de emulador)."""
 import json
 import random
-from pathlib import Path
 
 from dc import protetor, vdf
 

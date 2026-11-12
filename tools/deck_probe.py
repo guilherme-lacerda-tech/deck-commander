@@ -16,9 +16,9 @@ from pathlib import Path
 
 H = Path.home()
 OUT = H / "deck-commander-probe"
-SECRET = re.compile(r"pass|token|user|key|secret|cheevos_username", re.I)
+SECRET = re.compile(r"pass|token|user|key|secret|cheevos_username", re.IGNORECASE)
 QUALITY = re.compile(r"upscal|resolution|internal|scale|efb|renderer|backend|video_driver|"
-                     r"aspect|widescreen|shader|vsync|fps|framelimit|graphics", re.I)
+                     r"aspect|widescreen|shader|vsync|fps|framelimit|graphics", re.IGNORECASE)
 
 EMU_CONFIGS = {
     "duckstation": ["~/.config/duckstation/settings.ini",

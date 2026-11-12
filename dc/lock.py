@@ -11,9 +11,9 @@ from __future__ import annotations
 import json
 import os
 import time
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, Optional
 
 ENV_OP_ID = "DC_OPERATION_ID"
 
@@ -49,7 +49,7 @@ class LockTimeout(TimeoutError):
     pass
 
 
-def read_holder(lock_path: Path) -> Optional[dict]:
+def read_holder(lock_path: Path) -> dict | None:
     try:
         return json.loads(Path(str(lock_path) + ".holder").read_text("utf-8"))
     except (OSError, ValueError):
@@ -72,7 +72,7 @@ def lock_is_held(lock_path: Path) -> bool:
 class OperationLock:
     def __init__(self, lock_path: Path, operation_id: str, op_type: str,
                  timeout: float = 300.0,
-                 is_running: Optional[Callable[[str], bool]] = None,
+                 is_running: Callable[[str], bool] | None = None,
                  poll: float = 0.05):
         self.lock_path = Path(lock_path)
         self.operation_id = operation_id
@@ -81,7 +81,7 @@ class OperationLock:
         self.is_running = is_running
         self.poll = poll
         self.reentrant = False
-        self._fd: Optional[int] = None
+        self._fd: int | None = None
 
     # -- reentrância ---------------------------------------------------------
     def _legit_reentry(self) -> bool:
@@ -97,7 +97,7 @@ class OperationLock:
             return False
         return True
 
-    def acquire(self) -> "OperationLock":
+    def acquire(self) -> OperationLock:
         if self._legit_reentry():
             self.reentrant = True
             return self
@@ -130,7 +130,7 @@ class OperationLock:
             os.close(self._fd)
             self._fd = None
 
-    def child_env(self, base: Optional[dict] = None) -> dict:
+    def child_env(self, base: dict | None = None) -> dict:
         """Ambiente para scripts internos desta operação."""
         env = dict(os.environ if base is None else base)
         env[ENV_OP_ID] = self.operation_id

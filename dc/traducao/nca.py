@@ -12,9 +12,10 @@ from __future__ import annotations
 
 import bisect
 import struct
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import BinaryIO, Callable, Optional
+from typing import BinaryIO
 
 
 class NcaError(ValueError):
@@ -221,7 +222,7 @@ class Section:
 
 
 class Nca:
-    def __init__(self, f: BinaryIO, offset: int, size: int, keys: dict, title_key: Optional[bytes] = None):
+    def __init__(self, f: BinaryIO, offset: int, size: int, keys: dict, title_key: bytes | None = None):
         self.f, self.offset, self.size = f, offset, size
         hk = keys.get("header_key")
         if not hk or len(hk) != 32:
@@ -307,7 +308,7 @@ class Nca:
                 return s
         raise NcaError("NCA sem RomFS")
 
-    def read_plain(self, sec: Section, off: int, size: int, upper: Optional[bytes] = None) -> bytes:
+    def read_plain(self, sec: Section, off: int, size: int, upper: bytes | None = None) -> bytes:
         """Lê `size` bytes do trecho (relativo à seção), decifrando com CTR."""
         a = off & ~0xF
         raw = self._raw(sec, a, (off + size - a + 15) & ~0xF)
@@ -348,7 +349,7 @@ def _bucket_entries(read: Callable[[int, int], bytes], base: int, size: int, hdr
 class PatchedRomFs:
     """Armazenamento virtual base+atualização (Indirect + AesCtrEx)."""
 
-    def __init__(self, base: Optional[Nca], patch: Nca):
+    def __init__(self, base: Nca | None, patch: Nca):
         self.base, self.patch = base, patch
         self.bsec = base.romfs_section() if base else None
         ps = patch.romfs_section()
@@ -455,7 +456,7 @@ class RomFs:
 
 
 # ============================================================================ alto nível
-def _ticket_key(f: BinaryIO, ents: list[PfsEntry]) -> Optional[bytes]:
+def _ticket_key(f: BinaryIO, ents: list[PfsEntry]) -> bytes | None:
     for e in ents:
         if e.name.endswith(".tik"):
             f.seek(e.offset)
@@ -512,7 +513,7 @@ def _open_control(path: Path, keys: dict):
     return None, None
 
 
-def game_languages(base_nsp: Path, keys: dict, update_nsp: Optional[Path] = None) -> list[str]:
+def game_languages(base_nsp: Path, keys: dict, update_nsp: Path | None = None) -> list[str]:
     """Idiomas que o jogo declara (control.nacp). A atualização pode acrescentar idiomas: ela tem prioridade."""
     for p in [x for x in (update_nsp, base_nsp) if x]:
         f, n = _open_control(p, keys)
@@ -536,7 +537,7 @@ def game_languages(base_nsp: Path, keys: dict, update_nsp: Optional[Path] = None
     raise NcaError("não achei o arquivo de controle (control.nacp)")
 
 
-def open_romfs(base_nsp: Path, keys: dict, update_nsp: Optional[Path] = None) -> tuple[RomFs, list]:
+def open_romfs(base_nsp: Path, keys: dict, update_nsp: Path | None = None) -> tuple[RomFs, list]:
     """RomFS do jogo (com a atualização aplicada, se houver). Devolve (romfs, arquivos abertos)."""
     fb, base = open_program(base_nsp, keys)
     handles = [fb]

@@ -7,3 +7,7 @@ def _no_retry_wait(monkeypatch):
     from dc.traducao import ia
     monkeypatch.setattr(ia, "RETRY_WAIT", 0)
     monkeypatch.setattr(ia, "_ollama_up", lambda spec: True)  # sem rede nos testes
+
+
+# fixture "b" (bot de tradução) usada também por test_motores e test_parar_tarefa
+from tests.test_traducao_bot import b  # noqa: E402,F401

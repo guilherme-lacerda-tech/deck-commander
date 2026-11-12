@@ -1,12 +1,9 @@
 import json
 import os
-import shutil
 import subprocess
 import tarfile
 import time
-from collections import defaultdict
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple, Union
 
 EMULADORES = {
     "RetroArch": {"tipo": "flatpak", "id": "org.libretro.RetroArch", "config": ".var/app/org.libretro.RetroArch/config/retroarch", "marca": "retroarch.cfg"},
@@ -21,7 +18,7 @@ EMULADORES = {
     "Ryujinx": {"tipo": "appimage", "id": "Downloads/publish/Ryujinx", "config": ".config/Ryujinx", "marca": "Config.json"}
 }
 
-def versao(nome: str, home: Path, run=subprocess.run) -> Optional[str]:
+def versao(nome: str, home: Path, run=subprocess.run) -> str | None:
     emul = EMULADORES[nome]
     if emul["tipo"] == "flatpak":
         res = run(["flatpak", "info", "--show-commit", emul["id"]], capture_output=True, text=True, timeout=30)
@@ -43,7 +40,7 @@ class Guardiao:
         self.estado_path = dados / "estado.json"
         self.estado = self._carregar_estado()
 
-    def _carregar_estado(self) -> Dict[str, Dict]:
+    def _carregar_estado(self) -> dict[str, dict]:
         if not self.estado_path.exists():
             return {}
         with open(self.estado_path, "r") as f:
@@ -53,7 +50,7 @@ class Guardiao:
         with open(self.estado_path, "w") as f:
             json.dump(self.estado, f, indent=2)
 
-    def copiar(self, nome: str) -> Optional[Path]:
+    def copiar(self, nome: str) -> Path | None:
         emul = EMULADORES[nome]
         config_path = self.home / emul["config"]
         if not config_path.exists():
@@ -91,7 +88,7 @@ class Guardiao:
         self._salvar_estado()
         return destino
 
-    def testar(self, nome: str) -> Tuple[bool, str]:
+    def testar(self, nome: str) -> tuple[bool, str]:
         emul = EMULADORES[nome]
         marca_path = self.home / emul["config"] / emul["marca"]
         if not marca_path.exists() or marca_path.stat().st_size == 0:
@@ -123,7 +120,10 @@ class Guardiao:
                 if (member.name.startswith("/") or ".." in partes or not partes or partes[0] != config_path.name
                         or not (member.isfile() or member.isdir())):
                     continue
-                tar.extract(member, path=config_path.parent)
+                if hasattr(tarfile, "data_filter"):  # Python 3.14 (o do Deck) muda o padrão: deixa explícito
+                    tar.extract(member, path=config_path.parent, filter="data")
+                else:  # pragma: no cover - python antigo
+                    tar.extract(member, path=config_path.parent)
         return f"🛡️ {nome}: configuração restaurada de {copia_path.name}"
 
     def estado_retro(self) -> dict:
@@ -156,7 +156,7 @@ class Guardiao:
                 pass
         return res.returncode == 0
 
-    def rodada(self) -> List[str]:
+    def rodada(self) -> list[str]:
         avisos = []
         for nome in EMULADORES:
             versao_atual = versao(nome, self.home, self.run)

@@ -22,8 +22,6 @@ from pathlib import Path
 
 from .. import ops
 from ..paths import Paths, get_paths
-from typing import Optional
-
 from ..store import Store
 from . import ia
 
@@ -674,6 +672,7 @@ def answer_motor(paths: Paths, op: str, yes: bool) -> str:
 def _translate_n3ds(paths, job, g, rom: Path, cfg, progress, should_pause) -> tuple[dict, str, bool]:
     """3DS: mesmo tradutor de MSBT do Switch; o mod vai para o Azahar (load/mods/<TitleID>/romfs)."""
     import shutil
+
     from . import n3ds, switch
     try:
         game = n3ds.open_game(rom)
@@ -707,7 +706,7 @@ def _translate_n3ds(paths, job, g, rom: Path, cfg, progress, should_pause) -> tu
     return result, rep.text(), rep.translated > 0 and not (rep.errors and not rep.applied)
 
 
-def offer_generic(paths: Paths, store: Store, game_id: str, title: str, motivo: str) -> Optional[dict]:
+def offer_generic(paths: Paths, store: Store, game_id: str, title: str, motivo: str) -> dict | None:
     """Deixa a pergunta "tradução fora do padrão — deseja traduzir?" para o bot fazer (botões Sim/Não)."""
     from . import fora_padrao
     g = _game(paths, game_id)
@@ -739,6 +738,7 @@ def answer_generic(paths: Paths, op: str, yes: bool) -> str:
 
 def _translate_generic(paths, job, g, rom: Path, cfg, progress, should_pause) -> tuple[dict, str, bool]:
     import shutil
+
     from .. import syncer
     from . import fora_padrao, n3ds, switch
     console = g["console"]
@@ -793,8 +793,8 @@ def _dispatch(paths, store, job, cfg, progress, should_pause) -> tuple[dict, str
     g = _game(paths, job["game_id"])
     rom = Path(g["rom"])
     if job["type"] == "translate_switch":
-        from . import switch
         from ..dedup import base_title_id
+        from . import switch
         tid = base_title_id(rom.name)
         if not tid:
             return {}, "não achei o Title ID no nome do arquivo ([0100…])", False
@@ -900,8 +900,8 @@ def _dispatch(paths, store, job, cfg, progress, should_pause) -> tuple[dict, str
                   if rep.patch else "", "rom": rep.output, "data": datetime.now(timezone.utc).isoformat()}
         return result, rep.text(), bool(rep.output)
     if job["type"] == "convert_switch":
-        from . import converter
         from ..dedup import base_title_id
+        from . import converter
         tid = base_title_id(rom.name)
         tf = converter.collect(syncer.rom_roots(), tid)
         action = job["args"].get("acao")

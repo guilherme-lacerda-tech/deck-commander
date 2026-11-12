@@ -1,9 +1,9 @@
 """Painel do Deck (dc/painel.py): ações em JSON que reaproveitam os comandos do bot."""
 import base64
 import json
-import tomllib
 
 import pytest
+import tomllib
 
 from dc import painel, qr
 from dc.paths import get_paths
@@ -287,6 +287,7 @@ def test_cli_reads_json_from_stdin(P, monkeypatch, capsys):
 
 def test_traducao_mostra_so_a_tarefa_mais_nova_de_cada_jogo(tmp_path):
     import json
+
     from dc import painel
     from dc.paths import get_paths
     from dc.traducao import run
@@ -302,7 +303,7 @@ def test_traducao_mostra_so_a_tarefa_mais_nova_de_cada_jogo(tmp_path):
 
     class P:
         pass
-    p = P(); p.paths = paths; p.store = None; p._map = lambda: {}
+    p = P(); p.paths = paths; p.store = None; p._map = dict
     import dc.traducao.run as r
     orig = r.library_plan
     r.library_plan = lambda *a, **k: {"ok": []}
@@ -316,6 +317,7 @@ def test_traducao_mostra_so_a_tarefa_mais_nova_de_cada_jogo(tmp_path):
 
 def test_falha_de_formato_nao_oferece_retomar(tmp_path):
     import json
+
     from dc import painel
     from dc.paths import get_paths
     from dc.traducao import run
@@ -327,7 +329,7 @@ def test_falha_de_formato_nao_oferece_retomar(tmp_path):
 
     class P:
         pass
-    p = P(); p.paths = paths; p.store = None; p._map = lambda: {}
+    p = P(); p.paths = paths; p.store = None; p._map = dict
     import dc.traducao.run as r
     orig = r.library_plan
     r.library_plan = lambda *a, **k: {"ok": []}
@@ -340,6 +342,7 @@ def test_falha_de_formato_nao_oferece_retomar(tmp_path):
 
 def test_limpar_historicos(tmp_path):
     import json
+
     from dc import painel
     from dc.paths import get_paths
     from dc.traducao import run
@@ -373,6 +376,7 @@ def test_limpar_historicos(tmp_path):
 
 def test_desinstalar_lista_e_aviso_do_steam(tmp_path, monkeypatch):
     import json
+
     from dc import bot, painel, plugin_bridge
     from dc.paths import get_paths
     paths = get_paths(tmp_path / "dc").ensure()
@@ -405,6 +409,7 @@ def test_desinstalar_lista_e_aviso_do_steam(tmp_path, monkeypatch):
 
 def test_perguntado_na_tela_nao_pergunta_no_telegram(tmp_path):
     import json
+
     from dc import bot, painel, plugin_bridge
     from dc.paths import get_paths
     paths = get_paths(tmp_path / "dc").ensure()

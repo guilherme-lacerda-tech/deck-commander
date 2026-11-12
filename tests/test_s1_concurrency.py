@@ -7,10 +7,10 @@ from pathlib import Path
 
 import pytest
 
+from dc import worker
 from dc.lock import ENV_OP_ID, OperationLock, lock_is_held
 from dc.paths import get_paths
 from dc.store import Store
-from dc import worker
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -150,6 +150,7 @@ def test_worker_runs_fifo_and_logs(paths):
         pass
     assert seen == [(1, True), (3, True)]  # aguardando aprovação não segura a fila
     assert s.get(gated).state == "awaiting_approval"
+    assert s.get(a).state == s.get(c).state == "done"
     log = (paths.logs / "operations.log").read_text("utf-8")
     assert log.count('"event": "done"') == 2
 

@@ -73,7 +73,7 @@ def test_todo_comando_da_ajuda_e_atendido(tmp_path):
     """Falha antiga (risco): comando anunciado no /help que o bot responde "Comando desconhecido"."""
     from dc import bot
     from dc.paths import get_paths
-    cmds = sorted(set(re.findall(r"^(/[a-z_]+)", bot.HELP, re.M)))
+    cmds = sorted(set(re.findall(r"^(/[a-z_]+)", bot.HELP, re.MULTILINE)))
     x = bot.Bot(get_paths(tmp_path).ensure(), "T")
     x.cfg["allowed"] = [1]
     x.send = lambda *a, **k: None
@@ -122,7 +122,7 @@ def test_familia_nunca_envia_arquivo_de_jogo():
 
 def test_sem_caractere_de_controle_invisivel():
     """Falha antiga (2x): "\b" e "\a" escritos por script viraram caracteres de controle invisíveis — regex que nunca
-    casa e caminho "C:\AutomacaoCasa\agente" virando lixo. Tab e quebra de linha são permitidos."""
+    casa e caminho "C:\\AutomacaoCasa\agente" virando lixo. Tab e quebra de linha são permitidos."""
     ruins = []
     for p in _arquivos("dc/**/*.py", "tools/**/*.py", "tests/*.py", "decky-plugin/**/*.js", "decky-plugin/*.py",
                        "tools/**/*.ps1", "tools/**/*.psm1"):

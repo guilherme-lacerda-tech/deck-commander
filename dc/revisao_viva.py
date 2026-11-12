@@ -12,8 +12,8 @@ import json
 import shutil
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 H = Path.home()
 CHECAGENS: list[tuple[str, Callable[[], tuple[bool, str]]]] = []
@@ -83,20 +83,27 @@ def emuladores():
 @item("todo jogo retrô com os botões de trás")
 def botoes():
     """Falha real 11/11/2026: a cópia PT-BR do Castlevania (atalho novo) ficou sem L4/R4/L5/R5."""
-    from . import retro as RT, retro_hacks as R, transferir, vdf
+    from . import retro as RT
+    from . import retro_hacks as R
+    from . import transferir, vdf
     if not RT.estado(H)["aplicado"]:
         return True, "retrô ainda não ligado no painel"
     faltam = []
     jogos = RT.jogos_dos_emuladores(H, transferir.carregar_mapa())
+    reg = RT.registro(H)
     for conta in RT._contas(H):
         base = H / ".local/share/Steam/steamapps/common/Steam Controller Configs" / conta / "config"
         cs_arq = base / "configset_controller_neptune.vdf"
         cs = vdf.load_text(cs_arq.read_text("utf-8"))["controller_config"] if cs_arq.exists() else {}
         for nome, _a in jogos:
+            if f"{conta}/{nome.lower()}" not in reg:
+                faltam.append(nome)  # nunca recebeu os botões (a falha de 11/11)
+                continue
+            # já recebeu: se o layout não tem mais os botões, foi o usuário que trocou — é escolha dele
             arq = base / nome.lower() / "controller_neptune.vdf"
-            if not (arq.exists() and R.tem_botoes_de_tras(arq.read_text("utf-8", "replace"))) or \
+            if arq.exists() and R.tem_botoes_de_tras(arq.read_text("utf-8", "replace")) and \
                     cs.get(nome.lower()) != {"autosave": "1"}:
-                faltam.append(nome)
+                faltam.append(nome)  # layout pronto mas o Steam não está usando
     if not (H / ".local/share/Steam/controller_base/templates" / RT.MODELO).exists():
         faltam.append("(modelo Deck Commander Retro sumiu)")
     return not faltam, ("sem botões: " + ", ".join(faltam[:5])) if faltam else f"{len(jogos)} jogo(s) ok"
@@ -138,6 +145,7 @@ def zelda():
 @item("Castlevania PT-BR com acentos e menus")
 def castlevania():
     import struct
+
     from . import transferir
     from .traducao import sotn
     from .traducao import sotn_falas_fonte as F

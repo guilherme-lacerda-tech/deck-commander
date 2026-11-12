@@ -4,9 +4,8 @@ Escrito pela IA local (qwen3-coder) e revisado.
 """
 import shutil
 from pathlib import Path
-from typing import Dict, List
 
-OPCOES: Dict[str, Dict] = {
+OPCOES: dict[str, dict] = {
     "pcsx2": {
         "nome": "PCSX2 (PS2)",
         "arquivo": ".var/app/net.pcsx2.PCSX2/config/PCSX2/inis/PCSX2.ini",
@@ -85,7 +84,7 @@ def trocar_ini_valor(texto: str, secao: str, chave: str, valor: str) -> str:
 
     return ''.join(linhas)
 
-def estado(home: Path) -> List[Dict]:
+def estado(home: Path) -> list[dict]:
     """Retorna o estado atual das opções para emuladores existentes."""
     resultado = []
     for emulador, dados in OPCOES.items():

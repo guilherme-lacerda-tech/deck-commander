@@ -12,7 +12,6 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Optional
 
 from . import quality, tuning
 from .paths import Paths
@@ -48,7 +47,7 @@ def max_level(console: str) -> int:
     return min(quality.MAX.get(console, 4), tuning.level_for(console, "qualidade") + 1)
 
 
-def ensure(paths: Paths, game_id: str, console: str) -> Optional[dict]:
+def ensure(paths: Paths, game_id: str, console: str) -> dict | None:
     """Estado do jogo; cria no nível inicial (e grava a exceção de qualidade) se ainda não existe."""
     if not tuning.supported(console):
         return None
@@ -62,7 +61,7 @@ def ensure(paths: Paths, game_id: str, console: str) -> Optional[dict]:
     return st
 
 
-def record(paths: Paths, game_id: str, console: str, verdict: Optional[str]) -> Optional[str]:
+def record(paths: Paths, game_id: str, console: str, verdict: str | None) -> str | None:
     """Aplica uma medição. Devolve o que mudou (texto) ou None."""
     st = ensure(paths, game_id, console)
     if st is None or verdict is None or st["fase"] == "manual":

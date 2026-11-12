@@ -1,7 +1,6 @@
-from typing import Dict, List
 
 
-def decidir(deck: Dict[str, Dict], pc: Dict[str, Dict], ultimo: Dict[str, str]) -> List[Dict]:
+def decidir(deck: dict[str, dict], pc: dict[str, dict], ultimo: dict[str, str]) -> list[dict]:
     """
     Decide a sincronização de saves entre Steam Deck e PC com base em SHA256 e mtime.
     
@@ -75,7 +74,7 @@ def decidir(deck: Dict[str, Dict], pc: Dict[str, Dict], ultimo: Dict[str, str]) 
     return acoes
 
 
-def novo_ultimo(deck_final: Dict[str, Dict], pc_final: Dict[str, Dict]) -> Dict[str, str]:
+def novo_ultimo(deck_final: dict[str, dict], pc_final: dict[str, dict]) -> dict[str, str]:
     """
     Gera o dicionário de SHA256 para destinos onde ambos os lados têm o mesmo valor após cópias.
     
@@ -97,7 +96,7 @@ def novo_ultimo(deck_final: Dict[str, Dict], pc_final: Dict[str, Dict]) -> Dict[
     return ultimo
 
 
-def resumo(acoes: List[Dict]) -> str:
+def resumo(acoes: list[dict]) -> str:
     """
     Gera um resumo em português das ações a serem tomadas.
     

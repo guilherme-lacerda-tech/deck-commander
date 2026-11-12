@@ -77,6 +77,7 @@ def test_plugin_backend_removal_and_launch_error(tmp_path, monkeypatch):
 
 def test_launch_failure_leaves_message_for_plugin(tmp_path, monkeypatch):
     import pytest
+
     from dc import launch
     monkeypatch.setenv("DC_ROOT", str(tmp_path))
     from dc.paths import get_paths
@@ -105,3 +106,32 @@ def test_plugin_backend_appid_always_unsigned(tmp_path, monkeypatch):
     (base / "r.json").write_text(json.dumps([{"game_id": "a", "appid": 2562624763}]))
     run(p.removal_done("a", -1732342533))  # o JS pode responder com sinal
     assert run(p.get_removals()) == []
+
+
+def test_plugin_e_deck_commander_usam_a_mesma_trava(tmp_path):
+    """Revisão de lançamento 12/11/2026: o plugin e o Deck Commander gravavam plugin-done.json ao mesmo tempo sem trava
+    (um apagava a mudança do outro). Os dois precisam usar o MESMO arquivo de trava e nunca gravar direto."""
+    import re
+    raiz = Path(__file__).resolve().parents[1]
+    main = (raiz / "decky-plugin/main.py").read_text("utf-8")
+    assert 'path + ".lock"' in main
+    assert not re.search(r"_save\((DONE|QUEUE|ITEMS|REMOVE),", main)  # só via _atualizar
+    for arq in ("dc/pc_remoto.py", "dc/remove.py"):
+        src = (raiz / arq).read_text("utf-8")
+        assert not re.search(r"_save\(plugin_bridge\.(done_path|queue_path)", src), arq
+        assert '_save(paths.data / "plugin-items.json"' not in src and '"plugin-remove.json", rq' not in src, arq
+
+
+def test_sincronizar_pc_nao_apaga_a_marca_de_outro_jogo(tmp_path):
+    """Mesma revisão: /pc sincronizar lia plugin-done.json no começo e, mais adiante, gravava aquela cópia velha
+    por cima do que _tirar_atalho tinha acabado de marcar."""
+    from dc import plugin_bridge as pb
+    from dc.paths import get_paths
+    p = get_paths(tmp_path)
+    p.ensure()
+    pb._save(pb.done_path(p), {"pc-a": {"appid": 5, "error": ""}, "pc-b": {"appid": 0, "removed": True}})
+    pb.marcar_removido(p, "pc-a", [5], so_com_plugin=False)
+    pb.atualizar(pb.done_path(p), {}, lambda d: d.pop("pc-b", None))  # o que o laço faz agora
+    done = json.loads(pb.done_path(p).read_text("utf-8"))
+    assert done == {"pc-a": {"appid": 0, "error": "", "removed": True}}
+    assert json.loads((p.data / "plugin-remove.json").read_text("utf-8")) == [{"game_id": "pc-a", "appid": 5}]

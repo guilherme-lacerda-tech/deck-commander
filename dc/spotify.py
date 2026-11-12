@@ -185,5 +185,6 @@ def estado(paths: Paths, chamar=api, run=subprocess.run) -> dict:
 def qr_svg(texto: str) -> str:
     """QR do link de login como SVG (data URI) — o mesmo gerador do QR do Telegram, que o painel já mostra."""
     import base64
+
     from . import qr
     return "data:image/svg+xml;base64," + base64.b64encode(qr.svg(texto).encode()).decode()

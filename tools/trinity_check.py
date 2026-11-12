@@ -20,7 +20,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from dc import syncer  # noqa: E402
 from dc.dedup import base_title_id  # noqa: E402
 from dc.paths import get_paths  # noqa: E402
-from dc.traducao import ia, trinity, trinity_game as tg, trinity_msg as tm  # noqa: E402
+from dc.traducao import ia, trinity
+from dc.traducao import trinity_game as tg
+from dc.traducao import trinity_msg as tm
 
 
 def main() -> int:

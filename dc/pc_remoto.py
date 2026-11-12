@@ -27,9 +27,11 @@ import subprocess
 import time
 import urllib.parse
 import urllib.request
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Optional
 
+from .arquivo_json import gravar as _save
+from .arquivo_json import ler as _load
 from .paths import Paths, get_paths
 
 CONSOLE = "pc"
@@ -92,7 +94,7 @@ def porta_aberta(host: str, porta: int = PORTA_SUNSHINE, timeout: float = 2.0) -
         return False
 
 
-def online(cfg: dict, timeout: float = 2.0) -> Optional[str]:
+def online(cfg: dict, timeout: float = 2.0) -> str | None:
     """Host (Tailscale primeiro, depois rede de casa) em que o Sunshine responde; None = PC dormindo/fora."""
     for h in (cfg.get("host_tailscale"), cfg.get("host_casa")):
         if h and porta_aberta(h, PORTA_SUNSHINE, timeout):
@@ -161,8 +163,8 @@ def acordar(cfg: dict, http_get: Callable = _http_get, wol: Callable = enviar_wo
     return False, "não consegui pedir para acordar: " + "; ".join(erros)
 
 
-def esperar_pronto(cfg: dict, limite: Optional[float] = None, intervalo: float = 3.0,
-                   sleep: Callable = time.sleep, relogio: Callable = time.monotonic) -> Optional[str]:
+def esperar_pronto(cfg: dict, limite: float | None = None, intervalo: float = 3.0,
+                   sleep: Callable = time.sleep, relogio: Callable = time.monotonic) -> str | None:
     """Testa a porta 47989 do Sunshine até `limite` segundos (padrão da config, ~90 s). Devolve o host."""
     limite = cfg.get("espera_pronto_s", 90) if limite is None else limite
     fim = relogio() + limite
@@ -239,7 +241,7 @@ def lista_do_pc(paths: Paths) -> list[str]:
     return [a for a in (d.get("apps") or []) if isinstance(a, str) and a.strip()]
 
 
-def listar_apps(cfg: dict, host: str, run: Optional[Callable] = None) -> list[str]:
+def listar_apps(cfg: dict, host: str, run: Callable | None = None) -> list[str]:
     # Obs.: sem tela (bot/ssh), o "moonlight list" TRAVA quando precisa baixar a capa de um app novo (defeito do
     # Moonlight: QEventLoop sem QCoreApplication). Por isso a fonte principal é a lista que o PC manda.
     r = (run or _run_grupo)(_moonlight("list", "--csv", host), capture_output=True, text=True, timeout=40)
@@ -252,7 +254,7 @@ def listar_apps(cfg: dict, host: str, run: Optional[Callable] = None) -> list[st
     return apps
 
 
-def jogar(app: str, paths: Optional[Paths] = None, cfg: Optional[dict] = None, say: Callable = print,
+def jogar(app: str, paths: Paths | None = None, cfg: dict | None = None, say: Callable = print,
           popen: Callable = subprocess.Popen, run: Callable = subprocess.run,
           acordar_fn: Callable = None, esperar_fn: Callable = None) -> tuple[int, str]:
     """Acorda o PC, espera o Sunshine e transmite `app`. Devolve (código, mensagem para a tela se falhou)."""
@@ -331,19 +333,6 @@ def game_id(app: str) -> str:
     return f"{CONSOLE}-{slug(app) or 'app'}"
 
 
-def _load(p: Path, default):
-    try:
-        return json.loads(p.read_text("utf-8"))
-    except (OSError, ValueError):
-        return default
-
-
-def _save(p: Path, data) -> None:
-    p.parent.mkdir(parents=True, exist_ok=True)
-    tmp = p.with_name(p.name + ".tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), "utf-8")
-    os.replace(tmp, p)
-
 
 def entradas(apps: list[str], cfg: dict) -> dict:
     nomes = cfg.get("nomes") or {}
@@ -355,9 +344,9 @@ def entradas(apps: list[str], cfg: dict) -> dict:
     return out
 
 
-def sincronizar(paths: Paths, cfg: Optional[dict] = None, apps: Optional[list[str]] = None,
-                run: Callable = subprocess.run, shortcuts: Optional[list[dict]] = None,
-                plugin_ativo: Optional[bool] = None) -> dict:
+def sincronizar(paths: Paths, cfg: dict | None = None, apps: list[str] | None = None,
+                run: Callable = subprocess.run, shortcuts: list[dict] | None = None,
+                plugin_ativo: bool | None = None) -> dict:
     """Lista do PC -> launch-map (console "pc") -> atalhos (plugin ao vivo) -> abas/coleção "Computador".
     Jogos que sumiram do PC saem do mapa e o atalho é removido. Retorna o resumo."""
     from . import library, plugin_bridge
@@ -392,8 +381,9 @@ def sincronizar(paths: Paths, cfg: Optional[dict] = None, apps: Optional[list[st
             entram.append(gid)
         if gid in tirados:  # voltou ao PC: libera o atalho que nós (não você) tiramos
             if done.get(gid, {}).get("removed"):
-                done.pop(gid)
-                _save(plugin_bridge.done_path(paths), done)
+                # antes: gravava a cópia de `done` lida no começo, apagando o que _tirar_atalho tinha acabado de
+                # marcar para outros jogos (revisão de lançamento 12/11/2026)
+                plugin_bridge.atualizar(plugin_bridge.done_path(paths), {}, lambda d, g=gid: d.pop(g, None))
             tirados.discard(gid)
     _save(lm_p, lm)
     _save(estado_p, {"tirados": sorted(tirados)})
@@ -442,23 +432,11 @@ def sincronizar(paths: Paths, cfg: Optional[dict] = None, apps: Optional[list[st
 
 def _tirar_atalho(paths: Paths, gid: str, appid) -> None:
     from . import plugin_bridge
-    done = _load(plugin_bridge.done_path(paths), {})
-    done[gid] = {"appid": 0, "error": "", "removed": True}
-    _save(plugin_bridge.done_path(paths), done)
-    items = _load(paths.data / "plugin-items.json", {})
-    if items.pop(gid, None) is not None:
-        _save(paths.data / "plugin-items.json", items)
-    q = _load(plugin_bridge.queue_path(paths), [])
-    if any(x.get("game_id") == gid for x in q):
-        _save(plugin_bridge.queue_path(paths), [x for x in q if x.get("game_id") != gid])
-    if appid:
-        rq = _load(paths.data / "plugin-remove.json", [])
-        rq.append({"game_id": gid, "appid": int(appid) & 0xFFFFFFFF})
-        _save(paths.data / "plugin-remove.json", rq)
+    plugin_bridge.marcar_removido(paths, gid, [appid] if appid else [], so_com_plugin=False)  # atalho do PC: só via plugin
 
 
 # ------------------------------------------------------------------------------------------- controle
-def configset_path(home: Optional[Path] = None) -> Optional[Path]:
+def configset_path(home: Path | None = None) -> Path | None:
     """configset_controller_neptune.vdf do usuário Steam ativo (layout do controle por jogo)."""
     home = home or Path.home()
     try:
@@ -470,7 +448,7 @@ def configset_path(home: Optional[Path] = None) -> Optional[Path]:
     return p if p.exists() else None
 
 
-def garantir_controle(titulos: list[str], path: Optional[Path] = None) -> list[str]:
+def garantir_controle(titulos: list[str], path: Path | None = None) -> list[str]:
     """Atalhos do PC usam o layout "Gamepad com trackpad como mouse" (o Moonlight passa ao PC como controle Xbox).
     Só ACRESCENTA entradas que faltam (chave = nome do atalho em minúsculas; nunca muda o que você escolheu).
     Sem entrada o Steam já usa um layout de gamepad; isto só evita herdar outro por engano."""
@@ -484,7 +462,7 @@ def garantir_controle(titulos: list[str], path: Optional[Path] = None) -> list[s
     faltam = []
     for t in titulos:
         k = t.lower().replace('"', "")
-        if not re.search(r'^\s*"' + re.escape(k) + r'"\s*$', txt, re.M) and k not in faltam:
+        if not re.search(r'^\s*"' + re.escape(k) + r'"\s*$', txt, re.MULTILINE) and k not in faltam:
             faltam.append(k)
     fim = txt.rstrip().rfind("}")
     if not faltam or fim < 0:
@@ -500,7 +478,7 @@ def garantir_controle(titulos: list[str], path: Optional[Path] = None) -> list[s
 
 
 # ------------------------------------------------------------------------------------------- bot / cli
-def status(paths: Paths, cfg: Optional[dict] = None) -> str:
+def status(paths: Paths, cfg: dict | None = None) -> str:
     cfg = cfg or carregar_config(paths)
     host = online(cfg)
     lm = _load(paths.data / "launch-map.json", {})

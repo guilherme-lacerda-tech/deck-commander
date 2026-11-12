@@ -1,9 +1,8 @@
-import subprocess
 import shutil
+import subprocess
 import zipfile
-import os
+from collections.abc import Callable
 from pathlib import Path
-from typing import Optional, Callable
 
 PASTAS = {
     "ps2": ".var/app/net.pcsx2.PCSX2/config/PCSX2/textures/{id}/replacements",
@@ -32,7 +31,7 @@ def serial_ps2(iso: Path) -> str | None:
                 if nome.upper() == "SYSTEM.CNF;1":
                     f.seek(int.from_bytes(d[i + 2:i + 6], "little") * 2048)
                     cnf = f.read(int.from_bytes(d[i + 10:i + 14], "little")).decode("ascii", "replace")
-                    m = re.search(r"BOOT2\s*=\s*cdrom0:\\+([A-Z]{4})_(\d{3})\.(\d{2})", cnf, re.I)
+                    m = re.search(r"BOOT2\s*=\s*cdrom0:\\+([A-Z]{4})_(\d{3})\.(\d{2})", cnf, re.IGNORECASE)
                     return f"{m.group(1).upper()}-{m.group(2)}{m.group(3)}" if m else None
                 i += n
     except OSError:
@@ -73,6 +72,7 @@ def ligar_opcao(home: Path, console: str) -> None:
 
     # (corrigido: a 1ª versão RENOMEAVA o arquivo como cópia — sumia com a configuração do emulador)
     import shutil
+
     from .retro_hacks import ini_definir
     ini_path.parent.mkdir(parents=True, exist_ok=True)
     texto = ini_path.read_text(encoding="utf-8", errors="replace") if ini_path.exists() else ""

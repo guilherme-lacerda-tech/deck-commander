@@ -8,14 +8,14 @@ import json
 import subprocess
 import time
 import zipfile
+from collections.abc import Callable
 from pathlib import Path
-from typing import List, Tuple, Callable
 
 RCLONE_VERSAO = "v1.76.0"
 RCLONE_URL = f"https://downloads.rclone.org/{RCLONE_VERSAO}/rclone-{RCLONE_VERSAO}-linux-amd64.zip"
 RCLONE_SHA256 = "b00f00b3266c3764413afe599d3ec316f6f43b3e0ea8a0bc1d186d2133e46df7"  # SHA256SUMS oficial
 
-PASTAS: List[Tuple[str, str]] = [
+PASTAS: list[tuple[str, str]] = [
     ("RetroArch/saves", ".var/app/org.libretro.RetroArch/config/retroarch/saves"),
     ("RetroArch/states", ".var/app/org.libretro.RetroArch/config/retroarch/states"),
     ("DuckStation/memcards", ".local/share/duckstation/memcards"),
@@ -80,7 +80,7 @@ class Nuvem:
         """Verifica se o arquivo de configuração existe e contém [gdrive]."""
         return self.conf.exists() and "[gdrive]" in self.conf.read_text()
 
-    def comando(self, local: Path, nome: str, primeira: bool) -> List[str]:
+    def comando(self, local: Path, nome: str, primeira: bool) -> list[str]:
         """Monta o comando rclone bisync para sincronizar uma pasta."""
         cmd = [
             str(self.rclone), "bisync", str(local), f"gdrive:DeckCommander/{nome}",
@@ -94,7 +94,7 @@ class Nuvem:
             cmd.append("--resync")
         return cmd
 
-    def sincronizar(self) -> List[str]:
+    def sincronizar(self) -> list[str]:
         """Sincroniza todas as pastas configuradas."""
         try:
             estado_atual = json.loads(self.estado.read_text()) if self.estado.exists() else {}

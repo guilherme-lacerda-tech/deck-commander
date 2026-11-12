@@ -80,7 +80,7 @@ def parece_texto(s: str) -> bool:
     return len(grandes) >= 2  # nome de item com 2 palavras ("Iron cuirass")
 
 
-_ANTES_DEPOIS_OK = set(range(0x00, 0x20)) | {0xFF}
+_ANTES_DEPOIS_OK = set(range(0x20)) | {0xFF}
 
 
 def _apara(t: Trecho, espaco: int, d: bytes) -> Trecho | None:

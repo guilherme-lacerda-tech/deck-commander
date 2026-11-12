@@ -6,8 +6,8 @@ cores do RetroArch, overrides de Flatpak. `--production` (padrão) não instala 
 from __future__ import annotations
 
 import json
-import re
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -118,7 +118,6 @@ MODULE_UNITS = {  # o que cada módulo liga
     "M11": ["deck-commander-updates.timer"],
     "A1": ["deck-commander-ollama.service"],
 }
-EXTRA_MODULES = ["A1", "A2", "A3"]  # adições opcionais: ./setup-deck.sh --modules A1,A2,A3
 ALL_MODULES = ["M-1", "M0", "M18+M19", "M27", "M1", "M2", "M3", "M4", "M5", "M6", "M7", "M20", "M21",
                "M10", "M11", "M12", "M15", "M16", "M17"]
 

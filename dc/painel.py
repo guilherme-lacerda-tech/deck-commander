@@ -19,9 +19,10 @@ import os
 import re
 import shutil
 import sys
-import tomllib
 from datetime import datetime, timezone
 from pathlib import Path
+
+import tomllib
 
 from . import ops
 from .bot import Bot, pair_code, pairing_code_valid
@@ -308,7 +309,8 @@ def remover(p: Ponte, a: dict) -> dict:
 
 
 def familia(p: Ponte, a: dict) -> dict:
-    from . import familia as fm, familia_servico as fs
+    from . import familia as fm
+    from . import familia_servico as fs
     cfg = fs.config(p.paths)
     par = cfg.get("par") or {}
     return {"configurado": bool(par), "par": par.get("nome", ""), "alvo": par.get("alvo", ""),
@@ -459,6 +461,7 @@ def musica_volume(p: Ponte, a: dict) -> dict:
 
 def _com_player(acao) -> bool:
     import time
+
     from . import audio
     if acao():
         return True
@@ -647,6 +650,7 @@ def pc(p: Ponte, a: dict) -> dict:
 
 def pc_salvar(p: Ponte, a: dict) -> dict:
     import ipaddress
+
     from . import pc_remoto
     cfg = pc_remoto.carregar_config(p.paths)
     for k, nome in (("host_casa", "IP do PC em casa"), ("host_tailscale", "IP da Tailscale")):
@@ -809,6 +813,7 @@ RETRO = {"nes", "snes", "n64", "gb", "gbc", "gba", "genesis", "sms", "gg", "sega
 def _gid_do_atalho(appid: int, home: Path | None = None) -> str | None:
     """Atalho do Steam (appid) → id do jogo no Deck Commander (fica nas opções de abertura do atalho)."""
     import glob
+
     from . import vdf
     h = home or Path.home()
     for sc in glob.glob(str(h / ".local/share/Steam/userdata/*/config/shortcuts.vdf")):

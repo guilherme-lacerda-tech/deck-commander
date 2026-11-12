@@ -6,8 +6,9 @@ dependência e conflito de `owns` (dois módulos donos do mesmo recurso) e owns�
 """
 from __future__ import annotations
 
-import tomllib
 from pathlib import Path
+
+import tomllib
 
 REQUIRED = ("id", "name", "inputs", "outputs", "owns", "forbids", "depends_on",
             "optional_depends", "fail_mode", "reversibility")

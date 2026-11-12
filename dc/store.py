@@ -9,11 +9,11 @@ from __future__ import annotations
 import json
 import sqlite3
 import uuid
+from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Callable, Optional
 
 STATES = ("pending", "awaiting_approval", "running", "done", "failed", "interrupted", "cancelled")
 APPROVAL_TTL = timedelta(hours=1)
@@ -86,13 +86,13 @@ class Operation:
     params: dict
     state: str
     attempts: int
-    error: Optional[str]
-    result: Optional[str]
-    approval_expires_at: Optional[str]
-    approved_at: Optional[str]
+    error: str | None
+    result: str | None
+    approval_expires_at: str | None
+    approved_at: str | None
     created_at: str
-    started_at: Optional[str]
-    finished_at: Optional[str]
+    started_at: str | None
+    finished_at: str | None
 
 
 def _utcnow() -> datetime:
@@ -183,7 +183,7 @@ class Store:
         d.pop("requires_approval", None)
         return Operation(**d)
 
-    def get(self, op_id: str) -> Optional[Operation]:
+    def get(self, op_id: str) -> Operation | None:
         r = self.conn.execute("SELECT * FROM operations WHERE id=?", (op_id,)).fetchone()
         return self._row(r) if r else None
 
@@ -195,7 +195,7 @@ class Store:
         op = self.get(op_id)
         return bool(op and op.state == "running")
 
-    def enqueue(self, op_type: str, params: Optional[dict] = None, requires_approval: bool = False) -> str:
+    def enqueue(self, op_type: str, params: dict | None = None, requires_approval: bool = False) -> str:
         op_id = uuid.uuid4().hex[:12]
         now = self.now()
         state = "awaiting_approval" if requires_approval else "pending"
@@ -238,7 +238,7 @@ class Store:
                 (_iso(self.now()), _iso(self.now())))
             return cur.rowcount
 
-    def claim_next(self) -> Optional[Operation]:
+    def claim_next(self) -> Operation | None:
         """FIFO entre 'pending'. 'awaiting_approval' não segura a fila (correção F9)."""
         self.expire_approvals()
         with self.tx(critical=True) as c:
@@ -249,7 +249,7 @@ class Store:
                       (_iso(self.now()), r["id"]))
         return self.get(r["id"])
 
-    def claim(self, op_id: str) -> Optional[Operation]:
+    def claim(self, op_id: str) -> Operation | None:
         """Pega UMA operação específica (a que o chamador acabou de criar), nunca a de outro."""
         with self.tx(critical=True) as c:
             cur = c.execute("UPDATE operations SET state='running', started_at=?, attempts=attempts+1"
@@ -258,7 +258,7 @@ class Store:
                 return None
         return self.get(op_id)
 
-    def finish(self, op_id: str, ok: bool, result: Optional[dict] = None, error: Optional[str] = None) -> None:
+    def finish(self, op_id: str, ok: bool, result: dict | None = None, error: str | None = None) -> None:
         with self.tx(critical=True) as c:
             c.execute("UPDATE operations SET state=?, result=?, error=?, finished_at=? WHERE id=? AND state='running'",
                       ("done" if ok else "failed", json.dumps(result) if result is not None else None,

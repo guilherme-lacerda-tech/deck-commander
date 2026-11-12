@@ -84,6 +84,7 @@ def netplay(bot, args: list[str]) -> str:
 def _abrir(gid: str) -> None:
     """Abre o jogo pelo atalho do Steam (o lançador acrescenta --host/--connect)."""
     import glob
+
     from . import vdf
     for sc in glob.glob(str(Path.home() / ".local/share/Steam/userdata/*/config/shortcuts.vdf")):
         for s in vdf.read_shortcuts(Path(sc)):

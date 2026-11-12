@@ -10,17 +10,19 @@ Configuração em config/familia.json: {"meu_nome", "par": {"nome", "alvo": "dec
 """
 from __future__ import annotations
 
+import io
 import json
 import os
 import shlex
 import shutil
 import subprocess
 import tarfile
-import io
 from datetime import datetime, timezone
 from pathlib import Path
 
 from . import familia
+from .arquivo_json import gravar as _save
+from .arquivo_json import ler as _load
 from .paths import Paths
 
 CHAVE_PADRAO = str(Path.home() / ".ssh" / "deck_commander_familia")
@@ -31,19 +33,6 @@ def _dir(paths: Paths) -> Path:
     d.mkdir(parents=True, exist_ok=True)
     return d
 
-
-def _load(p: Path, default):
-    try:
-        return json.loads(p.read_text("utf-8"))
-    except (OSError, ValueError):
-        return default
-
-
-def _save(p: Path, data) -> None:
-    p.parent.mkdir(parents=True, exist_ok=True)
-    tmp = p.with_name(p.name + ".tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), "utf-8")
-    os.replace(tmp, p)
 
 
 def config(paths: Paths) -> dict:
@@ -206,7 +195,8 @@ def puxar(paths: Paths, qbt, gid: str, run=subprocess.run) -> str:
 def aplicar_prontos(paths: Paths) -> list[str]:
     """Pedido cujo jogo já entrou na biblioteca: aplica o pacote (mods/glossário; patch .bps na ROM). Devolve avisos."""
     from . import syncer
-    from .traducao import glossario_franquia as gf, ia
+    from .traducao import glossario_franquia as gf
+    from .traducao import ia
     est = _dir(paths) / "pedidos.json"
     ing = syncer._state(paths).get("ingested", {})
     avisos = []

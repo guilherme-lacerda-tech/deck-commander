@@ -70,8 +70,11 @@ def main(argv: list[str]) -> None:
         emu_cfg = paths.config / "emulators.json"
         emulators = json.loads(emu_cfg.read_text("utf-8")) if emu_cfg.exists() else {}
         cmd = sem_wsi_do_gamescope(build_command(game_id, launch_map, emulators))
-    except Exception as e:  # noqa: BLE001
+    except KeyError as e:
         fail(f"erro ao resolver {game_id}: {e}", "Esse jogo foi removido ou não está mais na biblioteca.")
+    except Exception as e:  # noqa: BLE001
+        fail(f"erro ao montar o comando de {game_id}: {e!r}",
+             f"Não deu para abrir: configuração do emulador com problema ({type(e).__name__}). Veja o Diagnóstico.")
     try:  # "Jogar com o irmão": pedido de abrir em rede (vale uma vez, 5 min) — nunca impede o jogo de abrir
         from . import netplay
         cmd = netplay.aplicar_no_comando(cmd, netplay.argumentos(paths.state, game_id))
@@ -167,6 +170,15 @@ def main(argv: list[str]) -> None:
     code = 1
     try:
         code = child.wait()
+        if code not in (0, None) and time.time() - t0 < 15:  # o emulador caiu logo ao abrir: o Steam não mostra nada
+            try:
+                (paths.data / "launch-error.json").write_text(json.dumps(
+                    {"at": datetime.now(timezone.utc).isoformat(),
+                     "message": f"{title}: o emulador fechou com erro logo ao abrir (código {code}). "
+                                "Veja o Diagnóstico no painel."}, ensure_ascii=False), "utf-8")
+            except OSError:
+                pass
+            say(f"emulador caiu ao abrir: código {code}")
     finally:
         if saves_auto:
             try:

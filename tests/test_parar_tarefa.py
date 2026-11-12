@@ -2,7 +2,6 @@
 import time
 
 from dc.traducao import comandos, run
-from tests.test_traducao_bot import b  # noqa: F401 — mesma fixture do bot de tradução
 
 
 def test_stalled_job_warns_once_and_stop_then_resume(b, monkeypatch):

@@ -7,7 +7,6 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from http.cookiejar import CookieJar
-from typing import Optional
 
 DEFAULT_URL = "http://127.0.0.1:8790"
 
@@ -21,9 +20,9 @@ class Qbt:
         self.url = url.rstrip("/")
         self.timeout = timeout
         self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(CookieJar()))
-        self._v5: Optional[bool] = None
+        self._v5: bool | None = None
 
-    def _req(self, path: str, data: Optional[dict] = None) -> bytes:
+    def _req(self, path: str, data: dict | None = None) -> bytes:
         body = urllib.parse.urlencode(data).encode() if data is not None else None
         req = urllib.request.Request(f"{self.url}/api/v2/{path}", data=body,
                                      headers={"Referer": self.url, "User-Agent": "deck-commander"})
@@ -86,7 +85,7 @@ class Qbt:
     def preferences(self) -> dict:
         return json.loads(self._req("app/preferences"))
 
-    def torrents(self, category: Optional[str] = None, tag: str = "deck-commander") -> list[dict]:
+    def torrents(self, category: str | None = None, tag: str = "deck-commander") -> list[dict]:
         q = {"tag": tag}
         if category:
             q["category"] = category

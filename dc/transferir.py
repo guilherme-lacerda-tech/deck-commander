@@ -39,7 +39,6 @@ VERSAO = 1
 CATEGORIAS = ("jogo", "update", "dlc", "save", "config-global", "config-jogo", "mods", "keys", "emulador-linux")
 TEXTO_EXTS = {".ini", ".json", ".cfg", ".opt", ".rmp", ".txt", ".pnach", ".cht", ".m3u"}
 CUE_LIKE = {".cue", ".m3u", ".gdi", ".ccd", ".mds"}
-COMANDO_PC = r"tools\pc\transferir-do-deck.bat -Jogo {gid}"
 
 # Emulador de cada console + o que o script do PC procura no Windows
 EMU_DO_CONSOLE = {"switch2": "lichii", "switch": "ryujinx", "psx": "duckstation", "ps2": "pcsx2", "psp": "ppsspp",
@@ -69,6 +68,11 @@ EMU_WINDOWS = {
 
 
 # ------------------------------------------------------------------ caminhos -----------
+
+
+
+# _home/_data_dir/gb existem iguais em receber.py DE PROPÓSITO: este arquivo também roda sozinho, mandado pelo PC
+# para um Deck sem o Deck Commander instalado (`python3 - ` em tools/pc/transferir-do-deck.ps1). Sem import do pacote.
 def _home(home=None) -> Path:
     return Path(home) if home else Path(os.environ.get("DC_ROOT") or Path.home())
 
@@ -77,6 +81,10 @@ def _data_dir(home: Path) -> Path:
     if os.environ.get("XDG_DATA_HOME") and not os.environ.get("DC_ROOT"):
         return Path(os.environ["XDG_DATA_HOME"]) / "deck-commander"
     return home / ".local/share/deck-commander"
+
+
+def gb(n: int) -> str:
+    return f"{n / 1e9:.2f} GB" if n >= 1e8 else f"{n / 1e6:.1f} MB"
 
 
 def carregar_mapa(home=None) -> dict:
@@ -200,7 +208,7 @@ def _destino_jogo(m: Manifesto, p: Path, console: str, base: Path) -> str:
     return f"{{JOGOS}}/{console}/{base.name}/{p.relative_to(base).as_posix()}"
 
 
-def _pasta_jogo(m: "Manifesto", base: Path, p: Path) -> str:
+def _pasta_jogo(m: Manifesto, base: Path, p: Path) -> str:
     nome = re.sub(r'[<>:"/\\|?*\t\n]', "_", m.e.get("title") or Path(m.e.get("rom", p)).stem).strip(" .")
     return nome or p.stem
 
@@ -213,7 +221,7 @@ def _refs_disco(rom: Path) -> list[Path]:
     except OSError:
         return out
     if ext == ".cue":
-        for mm in re.finditer(r'^\s*FILE\s+"?(.+?)"?\s+\S+\s*$', txt, re.M | re.I):
+        for mm in re.finditer(r'^\s*FILE\s+"?(.+?)"?\s+\S+\s*$', txt, re.MULTILINE | re.IGNORECASE):
             out.append(rom.parent / mm.group(1))
     elif ext == ".m3u":
         for ln in txt.splitlines():
@@ -339,7 +347,6 @@ def _jogo_generico(m: Manifesto, rom: Path, console: str) -> Path:
 
 
 # ------------------------------------------------------------------ serial PS1/PS2 -----
-SERIAL_RE = re.compile(r"([A-Z]{4})[_-]?(\d{3})\.?(\d{2})")
 
 
 def serial_disco(rom: Path, arquivos: list[Path]) -> str | None:
@@ -697,8 +704,6 @@ def preparar(game_id: str, home=None, launch_map: dict | None = None, com_hash: 
 
 
 # ------------------------------------------------------------------ saída --------------
-def gb(n: int) -> str:
-    return f"{n / 1e9:.2f} GB" if n >= 1e8 else f"{n / 1e6:.1f} MB"
 
 
 def texto_resumo(man: dict) -> str:

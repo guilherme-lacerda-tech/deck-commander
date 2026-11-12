@@ -17,8 +17,8 @@ import re
 import subprocess
 import time
 import urllib.request
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Optional
 
 from . import qr
 from .paths import Paths
@@ -36,7 +36,7 @@ def save_secret(paths: Paths, name: str, value: str) -> Path:
     return p
 
 
-def bot_username(token: str) -> Optional[str]:
+def bot_username(token: str) -> str | None:
     """Pergunta ao Telegram de quem é o token (getMe). None = token recusado ou sem internet."""
     try:
         with urllib.request.urlopen(f"https://api.telegram.org/bot{token}/getMe", timeout=15) as r:
@@ -66,7 +66,7 @@ def _show_qr(link: str, png_name: str, out: Callable[[str], None]) -> None:
 
 
 def run(paths: Paths, ask_token: Callable[[str], str] = getpass.getpass, out: Callable[[str], None] = print,
-        whoami: Callable[[str], Optional[str]] = bot_username, start_service: Callable[[], None] = _start_bot_service,
+        whoami: Callable[[str], str | None] = bot_username, start_service: Callable[[], None] = _start_bot_service,
         wait_s: int = 600, sleep: Callable[[float], None] = time.sleep) -> int:
     from .bot import pair_code
     tok_file = paths.secrets / "telegram"

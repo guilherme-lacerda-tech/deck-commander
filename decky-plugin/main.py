@@ -33,10 +33,39 @@ def _load(path, default):
 
 
 def _save(path, data):
-    tmp = path + ".tmp"
+    tmp = path + ".%d.tmp" % os.getpid()
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=1)
     os.replace(tmp, path)
+
+
+def _atualizar(path, default, fn):
+    """Lê, muda e grava sob a trava `<arquivo>.lock` — a mesma do Deck Commander (dc/plugin_bridge.trava).
+    Sem ela, o plugin e o /pc sincronizar ou o /remover gravavam juntos e um apagava a mudança do outro."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path + ".lock", "a") as lk:
+        try:
+            import fcntl
+            fcntl.flock(lk, fcntl.LOCK_EX)
+        except ImportError:  # Windows (testes no PC)
+            pass
+        data = _load(path, default)
+        r = fn(data)
+        _save(path, data)
+        return r
+
+
+def _versao_codigo(repo):
+    """Marca da versão do código em disco: a data mais nova dos .py de dc/ (muda a cada implantação)."""
+    mais_novo = 0.0
+    for raiz, _pastas, arquivos in os.walk(os.path.join(repo, "dc")):
+        for a in arquivos:
+            if a.endswith(".py"):
+                try:
+                    mais_novo = max(mais_novo, os.stat(os.path.join(raiz, a)).st_mtime)
+                except OSError:
+                    pass
+    return mais_novo
 
 
 class Plugin:
@@ -50,18 +79,15 @@ class Plugin:
 
     async def remember_item(self, game_id, item):
         """Guarda o item para a autocorreção poder recriar o atalho se ele sumir."""
-        items = _load(ITEMS, {})
-        items[game_id] = item
-        _save(ITEMS, items)
+        _atualizar(ITEMS, {}, lambda items: items.__setitem__(game_id, item))
         return True
 
     async def report(self, game_id, appid, error):
-        done = _load(DONE, {})
         # AppID sempre sem sinal (o JS do Steam às vezes entrega com sinal; a remoção compara pelo valor)
-        done[game_id] = {"appid": int(appid or 0) & 0xFFFFFFFF, "error": error or ""}
-        _save(DONE, done)
+        marca = {"appid": int(appid or 0) & 0xFFFFFFFF, "error": error or ""}
+        _atualizar(DONE, {}, lambda done: done.__setitem__(game_id, marca))
         if not error:
-            _save(QUEUE, [q for q in _load(QUEUE, []) if q.get("game_id") != game_id])
+            _atualizar(QUEUE, [], lambda q: q.__setitem__(slice(None), [x for x in q if x.get("game_id") != game_id]))
         return True
 
     async def get_removals(self):
@@ -69,18 +95,14 @@ class Plugin:
 
     async def removal_done(self, game_id, appid):
         want = int(appid or 0) & 0xFFFFFFFF
-        _save(REMOVE, [r for r in _load(REMOVE, []) if not (r.get("game_id") == game_id
-                                                            and int(r.get("appid") or 0) & 0xFFFFFFFF == want)])
+        _atualizar(REMOVE, [], lambda rq: rq.__setitem__(slice(None), [
+            r for r in rq if not (r.get("game_id") == game_id and int(r.get("appid") or 0) & 0xFFFFFFFF == want)]))
         return await self.mark_removed(game_id)
 
     async def mark_removed(self, game_id):
         """Atalho removido (pelo /remover ou pelo usuário no Steam): a autocorreção não recria."""
-        done = _load(DONE, {})
-        done[game_id] = {"appid": 0, "error": "", "removed": True}
-        _save(DONE, done)
-        items = _load(ITEMS, {})
-        if items.pop(game_id, None) is not None:
-            _save(ITEMS, items)
+        _atualizar(DONE, {}, lambda done: done.__setitem__(game_id, {"appid": 0, "error": "", "removed": True}))
+        _atualizar(ITEMS, {}, lambda items: items.pop(game_id, None))
         return True
 
     async def read_art(self, path):
@@ -129,6 +151,13 @@ class Plugin:
         repo = os.path.join(HOME, "deck-commander")
         if repo not in sys.path:
             sys.path.insert(0, repo)
+        # Código atualizado (implantação/git pull) vale na hora: sem isto o painel seguia com a versão carregada
+        # quando o Decky ligou até o próximo reinício (revisão de lançamento 12/11/2026).
+        versao = _versao_codigo(repo)
+        if versao != getattr(self, "_versao_dc", None):
+            for nome in [m for m in sys.modules if m == "dc" or m.startswith("dc.")]:
+                del sys.modules[nome]
+            self._versao_dc = versao
         from dc import autotune, perf, quality, tuning
         from dc.paths import get_paths
         self.autotune = autotune
