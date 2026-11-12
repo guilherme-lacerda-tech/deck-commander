@@ -17,7 +17,7 @@
 | 11 | /sync trava | timeout 5 min; 3 seguidos → safe-mode | `/sync` de novo; `/sos off` após revisar | teste unit |
 | 12 | Bot cai | systemd reinicia (30 s); /diagnostico reinicia até 3x | `systemctl --user status deck-commander-bot` | Deck |
 | 13 | Migração quebra | banco testado com `integrity_check` na abertura; backup consistente via VACUUM INTO | restaurar `deck.db` do snapshot | teste store |
-| 14 | Fork do Panel quebra | M9 não aplicado (ver FORK.md) | — | n/a |
+| 14 | Fork do Panel quebra | M9 não aplicado (ver docs/desenvolvimento/FORK-PANEL-DE-CONTROL.md) | — | n/a |
 | 15 | Decky sumiu (update SteamOS) | `x updates`/diagnóstico avisam; **não** reinstala sozinho | reinstalar o Decky manualmente | teste unit |
 | 16 | `localconfig.vdf`/`shortcuts.vdf` corrompido | snapshot "steam" antes de cada gravação | `dc restore <snap> --apply` (fecha/reabre o Steam) | teste S2 + Deck |
 | 17 | Banco divergente | `x db verify` mostra relatório; usuário decide | `dc x db index` | teste ops |

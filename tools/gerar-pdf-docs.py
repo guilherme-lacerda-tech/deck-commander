@@ -154,6 +154,6 @@ if __name__ == "__main__":
           "Deck Commander — Manual de uso", "Tudo o que dá para fazer no dia a dia, pelo Telegram e pelo Deck")
     build(root / "docs/VISAO-GERAL.md", out / "Deck Commander - Visao geral do projeto.pdf",
           "Deck Commander — Visão geral do projeto", "Tudo o que o sistema faz hoje, o que foi testado e ideias do que adicionar")
-    if (root / "docs/REVISAO-NOTURNA.md").exists():
-        build(root / "docs/REVISAO-NOTURNA.md", out / "Deck Commander - Revisao noturna.pdf",
+    if (root / "docs/desenvolvimento/REVISAO-NOTURNA.md").exists():
+        build(root / "docs/desenvolvimento/REVISAO-NOTURNA.md", out / "Deck Commander - Revisao noturna.pdf",
               "Deck Commander — Revisão noturna", "O que foi conferido, o que estava errado e foi corrigido, e o que falta")

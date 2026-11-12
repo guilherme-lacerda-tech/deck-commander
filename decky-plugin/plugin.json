@@ -1,10 +1,13 @@
 {
   "name": "Deck Commander",
-  "author": "Deck Commander",
+  "author": "guilherme-lacerda-tech",
   "flags": [],
   "api_version": 2,
   "publish": {
-    "tags": ["library", "emulation"],
+    "tags": [
+      "library",
+      "emulation"
+    ],
     "description": "Adiciona os jogos do Deck Commander à biblioteca ao vivo, sem reiniciar o Steam.",
     "image": ""
   }

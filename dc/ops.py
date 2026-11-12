@@ -183,25 +183,81 @@ def db_verify(store: Store, games, shortcuts: list[dict]) -> dict:
 
 
 # ---------------------------------------------------------------- M15 uninstall
-def uninstall(paths: Paths, code_dir: Path, purge: bool, purge_backups: bool, confirm: str = "") -> list[str]:
+def uninstall(paths: Paths, code_dir: Path, purge: bool, purge_backups: bool, confirm: str = "",
+              home: Path | None = None, esperar_plugin: float = 40, steam=None) -> list[str]:
     if purge and confirm != "APAGAR":
         raise PermissionError("--purge exige --confirm APAGAR")
     if purge_backups and confirm != "APAGAR" or purge_backups and not purge:
         raise PermissionError("--purge-backups exige --purge --confirm APAGAR")
     log = []
+    home = home or Path.home()
+    # Revisão de lançamento 12/11/2026: antes só saíam serviços e código. Ficavam os atalhos (quebrados: o
+    # lançador importa o código apagado), os layouts/teclas dos botões de trás, o protetor de tela, o .zip e o
+    # plugin do Decky rodando sem o Deck Commander. Cada passo é "melhor esforço": um que falhe não para os outros.
+    log += _tirar_atalhos(paths, esperar_plugin)
+    try:
+        from . import retro
+        log.append("retrô: " + retro.desfazer(home))
+    except Exception as e:  # noqa: BLE001 — segue desinstalando
+        log.append(f"retrô: não deu para desfazer ({e})")
+    from .protetor import NOME
+    prot = home / ".steam/root/config/uioverrides/screensavers" / NOME
+    if prot.exists():
+        shutil.rmtree(prot, ignore_errors=True); log.append("protetor de tela do Deck Commander removido")
     for u in dc_units(unit_dir()):
         _systemctl("disable", "--now", u)
         (unit_dir() / u).unlink(missing_ok=True)
         log.append(f"removido serviço {u}")
     _systemctl("daemon-reload")
+    (home / "Downloads/deck-commander-plugin.zip").unlink(missing_ok=True)
     if purge:
         for d in (paths.config, paths.data, paths.state):
             shutil.rmtree(d, ignore_errors=True); log.append(f"apagado {d}")
+        qbt = home / ".local/bin/qbittorrent-nox"  # baixado pelo Deck Commander (setup.install_qbittorrent)
+        if qbt.exists():
+            qbt.unlink(); log.append(f"apagado {qbt}")
     if purge_backups:
         shutil.rmtree(paths.backups, ignore_errors=True); log.append(f"apagado {paths.backups}")
     else:
         log.append(f"backups preservados em {paths.backups}")
-    log.append("ROMs, saves e atalhos do Steam NÃO foram tocados"
-               + (" (o lançador foi apagado: os atalhos 'Deck Commander' param de abrir)" if purge else ""))
+    log.append("ROMs e saves NÃO foram tocados. Ficam (podem ser úteis sem o Deck Commander): os emuladores "
+               "Flatpak, a Tailscale e as capas já aplicadas.")
+    log.append(_pedir_ao_decky_desinstalar(steam))
     shutil.rmtree(code_dir, ignore_errors=True); log.append(f"apagado código {code_dir}")
     return log
+
+
+def _tirar_atalhos(paths: Paths, esperar: float) -> list[str]:
+    """Atalhos do Deck Commander saem do Steam (pelo plugin, ao vivo) antes de o código sumir."""
+    from . import plugin_bridge
+    from .arquivo_json import ler
+    done = ler(plugin_bridge.done_path(paths), {})
+    com_atalho = {g: v["appid"] for g, v in done.items() if v.get("appid")}
+    if not com_atalho:
+        return []
+    if not plugin_bridge.active():
+        return [f"atalhos: {len(com_atalho)} jogo(s) ficaram no Steam (o Decky não está rodando) — remova pelo "
+                "Steam: Gerenciar → Remover atalho não-Steam"]
+    for g, a in com_atalho.items():
+        plugin_bridge.marcar_removido(paths, g, [a])
+    fim = time.time() + esperar
+    rq = paths.data / "plugin-remove.json"
+    while time.time() < fim and ler(rq, []):
+        time.sleep(1)
+    sobrou = len(ler(rq, []))
+    return [f"atalhos: {len(com_atalho) - sobrou} removido(s) do Steam"
+            + (f"; {sobrou} ficaram (remova pelo Steam)" if sobrou else "")]
+
+
+def _pedir_ao_decky_desinstalar(steam=None) -> str:
+    """O plugin fica numa pasta do Decky (dono root): quem tira é o próprio Decky. Abre a pergunta dele na tela."""
+    js = ('DeckyPluginLoader.uninstallPlugin("Deck Commander", "Desinstalar Deck Commander", "Desinstalar", '
+          '"O Deck Commander foi removido. Tirar também o plugin do Decky?"), "ok"')
+    try:
+        if steam is None:
+            from .steam_cdp import steam
+        if steam(js) == "ok":
+            return "plugin do Decky: confirme na tela do Deck para tirá-lo também"
+    except Exception:  # noqa: BLE001 — Steam fechado/modo Desktop
+        pass
+    return "plugin do Decky: tire em Decky → ⚙️ → Plugins → Deck Commander → Desinstalar"

@@ -16,7 +16,7 @@ especificações curtas; revisão, testes e integração feitos depois. Ordem: d
 | 9 | Saves Deck ↔ PC | Sincronizar com conflito perguntado (data) | ✅ no ar (/saves <jogo>; testado com o Donkey Kong: 4 saves iguais) |
 | 10 | Shaders à noite | Na tomada e parado, abre cada jogo 1 min para gerar o cache | ✅ no ar (opcional, painel → Qualidade) |
 | 11 | Fire Stick | Guia + PIN de pareamento do Sunshine no painel | ✅ no ar (docs/FIRE-STICK.md + painel → PC com QR) |
-| 12 | Texturas (OCR) | Estudo de viabilidade | ✅ estudo pronto (docs/ESTUDO-TEXTURAS.md) |
+| 12 | Texturas (OCR) | Estudo de viabilidade | ✅ estudo pronto (docs/desenvolvimento/ESTUDO-TEXTURAS.md) |
 
 **Família:** ✅ no ar — catálogo com magnet + tradução pronta pela Tailscale; o jogo baixa pelo link no Deck de cada um; arquivo de jogo nunca é copiado entre os Decks.
 compartilhar configurações, glossários e a lista de traduções — cada pessoa usa os próprios jogos.

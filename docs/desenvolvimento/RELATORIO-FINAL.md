@@ -19,7 +19,7 @@ pelo `deck-commander-tests.timer`). Instalado com `./setup-deck.sh --all --no-do
 | M20 Sensores | ✅ | estado por sensor, unknown ≠ zero; TDP/FPS indisponíveis (sem interface/MangoHud) |
 | M21 Diagnóstico | ✅ | 10 cenários, auto/ask/alert, máx. 3 tentativas |
 | M8 Proton Pulse | ⛔ bloqueado | plugin não instalado (opcional pela spec) |
-| M9 Fork do Panel | ⛔ bloqueado | sem upstream identificável (ver FORK.md) |
+| M9 Fork do Panel | ⛔ bloqueado | sem upstream identificável (ver docs/desenvolvimento/FORK-PANEL-DE-CONTROL.md) |
 | M10 Status/testes | ✅ parcial | /status, painel 127.0.0.1:8765, testes + relatório HTML + safe-mode após 2 falhas; **benchmark e LSFG por jogo: manuais** (exigem MangoHud/cenário fixo; LSFG é ativado pela interface do plugin) |
 | M11 Versão/updates | ✅ | VERSION, migrações do banco, `x updates` semanal (detecta Decky sumido, não atualiza) |
 | M12 Onboarding/aprovação | ✅ | `setup-deck.sh --all/--modules/--dev`, aprovação por ID com validade |

@@ -1,7 +1,7 @@
 # Índice do repositório
 
 - `README.md` — o que é, instalação, uso · `docs/STATUS.md` — estado de cada módulo · `CHANGELOG.md`
-- `ARCHITECTURE.md` · `TROUBLESHOOTING.md` · `PRIVACY.md` · `FORK.md` · `recovery/README.md` · `docs/COMANDOS.md`
+- `ARCHITECTURE.md` · `TROUBLESHOOTING.md` · `PRIVACY.md` · `docs/desenvolvimento/FORK-PANEL-DE-CONTROL.md` · `recovery/README.md` · `docs/COMANDOS.md`
 - `dc/` — núcleo Python (ver ARCHITECTURE.md) · `dc/adapters/` — adaptadores de emulador
 - `decky-plugin/` — plugin do Decky (JS puro + backend Python)
 - `modules/*/contract.toml` — contratos entre módulos (M27)

@@ -65,10 +65,55 @@ def test_uninstall_requires_confirmation_and_keeps_backups(env, tmp_path):
         ops.uninstall(paths, code, purge=True, purge_backups=False)
     with pytest.raises(PermissionError):
         ops.uninstall(paths, code, purge=False, purge_backups=True, confirm="APAGAR")
-    log = ops.uninstall(paths, code, purge=True, purge_backups=False, confirm="APAGAR")
+    log = ops.uninstall(paths, code, purge=True, purge_backups=False, confirm="APAGAR", home=tmp_path / "h",
+                        steam=lambda js: "ok")
     assert (paths.backups / "snap").exists() and not paths.config.exists() and not code.exists()
     assert not (units / "deck-commander-bot.service").exists() and (units / "outro.service").exists()
     assert any("preservados" in l for l in log)
+
+
+def test_desinstalar_nao_deixa_sujeira(env, tmp_path, monkeypatch):
+    """Revisão de lançamento 12/11/2026: desinstalar só tirava serviços e código. Ficavam atalhos quebrados, teclas e
+    layouts dos botões de trás, protetor de tela, o .zip, o qbittorrent baixado e o plugin rodando no Decky."""
+    from dc import plugin_bridge, retro
+    paths, _units, _calls = env
+    h = tmp_path / "h"
+    prot = h / ".steam/root/config/uioverrides/screensavers/deckcommander"
+    prot.mkdir(parents=True)
+    (h / "Downloads").mkdir()
+    (h / "Downloads/deck-commander-plugin.zip").write_bytes(b"zip")
+    (h / ".local/bin").mkdir(parents=True)
+    (h / ".local/bin/qbittorrent-nox").write_bytes(b"elf")
+    paths.ensure()
+    plugin_bridge._save(plugin_bridge.done_path(paths), {"psx-a": {"appid": 7, "error": ""}, "x": {"appid": 0}})
+    monkeypatch.setattr(plugin_bridge, "active", lambda *a: True)
+    monkeypatch.setattr(plugin_bridge, "installed", lambda *a: True)
+    desfeito = []
+    monkeypatch.setattr(retro, "desfazer", lambda home: desfeito.append(home) or "ok")
+    pediu = []
+    log = ops.uninstall(paths, tmp_path / "code", purge=True, purge_backups=False, confirm="APAGAR", home=h,
+                        esperar_plugin=0, steam=lambda js: pediu.append(js) or "ok")
+    assert desfeito == [h] and not prot.exists() and not (h / "Downloads/deck-commander-plugin.zip").exists()
+    assert not (h / ".local/bin/qbittorrent-nox").exists()
+    assert pediu and "uninstallPlugin" in pediu[0] and any("confirme na tela" in l for l in log)
+    assert any("atalhos:" in l and "1 ficaram" in l for l in log)  # o plugin não processou (espera 0)
+
+
+def test_desinstalar_pede_ao_plugin_tirar_os_atalhos(env, tmp_path, monkeypatch):
+    import json
+    from dc import plugin_bridge
+    paths, *_ = env
+    paths.ensure()
+    plugin_bridge._save(plugin_bridge.done_path(paths), {"psx-a": {"appid": 7, "error": ""}})
+    monkeypatch.setattr(plugin_bridge, "active", lambda *a: True)
+    monkeypatch.setattr(plugin_bridge, "installed", lambda *a: True)
+    linhas = ops._tirar_atalhos(paths, 0)
+    rq = json.loads((paths.data / "plugin-remove.json").read_text("utf-8"))
+    assert rq == [{"game_id": "psx-a", "appid": 7}] and "1 ficaram" in linhas[0]
+    assert ops._tirar_atalhos(paths, 0) == []  # já marcados: não pede de novo
+    plugin_bridge._save(plugin_bridge.done_path(paths), {"psx-b": {"appid": 8, "error": ""}})
+    monkeypatch.setattr(plugin_bridge, "active", lambda *a: False)
+    assert "Decky não está rodando" in ops._tirar_atalhos(paths, 0)[0]
 
 
 def test_index_and_verify(env, tmp_path):

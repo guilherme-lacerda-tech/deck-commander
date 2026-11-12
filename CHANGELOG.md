@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.8.0 — 2026-11-12 — retrô de verdade e revisão de lançamento
+- **Botões de trás** nos jogos retrô (RetroArch, DuckStation, PCSX2, Dolphin): L4 salva, R4 carrega, L5 (segurar)
+  volta no tempo, R5 liga/desliga o turbo. Aplicado **uma vez** por jogo: o layout que você escolher depois é
+  respeitado. `/retro desfazer` devolve emuladores e layouts como estavam.
+- RetroArch: rewind, run-ahead e filtros de tela por núcleo; DuckStation a 100% (sem a camada WSI do gamescope).
+- **Castlevania: Symphony of the Night em PT-BR**: engenharia reversa dos 2 formatos de texto, acentos de verdade
+  (fonte 8x8 e falas), menus com pontuação japonesa, botões da tela de arquivos redesenhados em português.
+- **Zelda: Tears of the Kingdom**: PT-BR oficial ao abrir e dublagem PT-BR das cenas (BWAV idêntico ao original).
+- Vídeos sem legenda ganham **legenda PT-BR** (padrão); dublagem com `--dublar`.
+- Texturas HD (PS2/GC/Wii), netplay com o par pela Tailscale, saves na nuvem (Google Drive), protetor de tela com a
+  arte dos seus jogos, guardião que desfaz atualização de emulador que quebrou.
+- **Revisão de lançamento**: downloads de programas conferidos pelo sha256 publicado; trava única nos arquivos
+  que o plugin e o Deck Commander dividem; plugin não abre mais um Python por minuto (bateria); painel usa o código
+  novo sem reiniciar o Decky; emulador que cai ao abrir vira aviso na tela; **desinstalar tira tudo** (atalhos,
+  layouts, teclas, protetor, .zip) e pede ao Decky para tirar o plugin; checagem ao vivo no Deck depois de toda
+  implantação (`python3 -m dc.revisao_viva`).
+
+## 0.7.0 — 2026-11-11 — o Deck conversa com a casa
+- Transferência de jogos nos dois sentidos (Deck ⇄ PC) com o emulador oficial do outro lado; aba **Computador**
+  (jogos do PC por streaming); botão **Jogar na TV**; **Liberar espaço**.
+- Saves Deck ↔ PC por jogo (`/saves`), automáticos ao fechar o jogo; `/voltar` versão de emulador.
+- Família: catálogo compartilhado pela Tailscale; `/corrigir` frase traduzida por foto (OCR no PC).
+- TDP automático por console; volume do jogo × música; Spotify (conta e playlists) pelo painel.
+- Painel completo no menu "…" do Decky (status, Telegram com QR, downloads, tradução, PC, transferências, qualidade,
+  desinstalar jogos com quarentena de 30 dias).
 ## 0.6.0 — 2026-11-09 — baixou, chega traduzido
 - **RomTranslate Studio** (compilado no Deck num contêiner) integrado: PS1, PS2, PSP, GBA, SNES, NES, N64, GC, DS.
   Só frases de verdade vão para a IA (a varredura genérica acha muito lixo), com o limite de espaço informado e

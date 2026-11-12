@@ -1,6 +1,6 @@
-# Estado do projeto (v0.6.0)
+# Estado do projeto (v0.8.0)
 
-Validado num Steam Deck LCD (SteamOS 3.9.5). 180+ testes automatizados (CI no GitHub + timer semanal no Deck) e teste de ponta a ponta no próprio aparelho (`tools/e2e_local.py`: download → biblioteca ao vivo → duplicata → remoção).
+Validado num Steam Deck LCD (SteamOS 3.9.5). 790 testes automatizados (CI no GitHub + timer semanal no Deck) e teste de ponta a ponta no próprio aparelho (`tools/e2e_local.py`: download → biblioteca ao vivo → duplicata → remoção).
 
 | Módulo (spec v5.1) | Estado | Observação |
 |---|---|---|

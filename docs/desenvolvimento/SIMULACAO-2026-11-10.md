@@ -77,7 +77,7 @@ Branches de outras sessões que continuam esperando seu OK (não mexi): `pronto/
 
 **Depende de você:**
 1. Criar o repositório no GitHub. Depois eu troco o `SEU-USUARIO` no `install.sh` e no README e faço o push.
-2. Reinstalar a tarefa do túnel da IA no PC (comando no `docs/REVISAO-2026-11-10.md`, item d.1).
+2. Reinstalar a tarefa do túnel da IA no PC (comando no `docs/desenvolvimento/REVISAO-2026-11-10.md`, item d.1).
 3. Jogar 10 minutos o BotW e o FF quando as traduções terminarem.
 4. Benchmark real: rodar `python3 -m dc x bench <jogo> 60` num momento sem tradução, ou me pedir para rodar.
 
