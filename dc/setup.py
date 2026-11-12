@@ -6,6 +6,7 @@ cores do RetroArch, overrides de Flatpak. `--production` (padrão) não instala 
 from __future__ import annotations
 
 import json
+import re
 import os
 import shutil
 import stat
@@ -127,12 +128,51 @@ def _sc(*a) -> str:
     return (r.stdout + r.stderr).strip()
 
 
-def download(url: str, dest: Path) -> None:
+def download(url: str, dest: Path, sha256: str | None = None) -> None:
+    """Baixa para `dest`. Com `sha256`, confere antes de pôr no lugar (diferente = apaga e falha)."""
+    import hashlib
     tmp = dest.with_name(dest.name + ".part")
     req = urllib.request.Request(url, headers={"User-Agent": "deck-commander"})
+    h = hashlib.sha256()
     with urllib.request.urlopen(req, timeout=120) as r, open(tmp, "wb") as f:
-        shutil.copyfileobj(r, f)
+        while bloco := r.read(1 << 20):
+            h.update(bloco)
+            f.write(bloco)
+    if sha256 and h.hexdigest() != sha256.lower():
+        tmp.unlink(missing_ok=True)
+        raise OSError(f"{Path(url).name} não confere com o sha256 publicado — não instalei")
     os.replace(tmp, dest)
+
+
+_GH = re.compile(r"https://github\.com/([^/]+/[^/]+)/releases/(?:latest/download|download/([^/]+))/([^/]+)$")
+
+
+def sha256_publicado(url: str, get_json=None) -> str | None:
+    """sha256 que o GitHub publica para o arquivo de um release (campo "digest" da API). Revisão de lançamento
+    11/11/2026: Ollama, Xenia e qBittorrent eram instalados sem conferir nada."""
+    m = _GH.match(url)
+    if not m:
+        return None
+    repo, tag, nome = m.groups()
+    api = f"https://api.github.com/repos/{repo}/releases/" + (f"tags/{tag}" if tag else "latest")
+    if get_json is None:
+        def get_json(u):
+            req = urllib.request.Request(u, headers={"User-Agent": "deck-commander",
+                                                     "Accept": "application/vnd.github+json"})
+            with urllib.request.urlopen(req, timeout=30) as r:
+                return json.load(r)
+    for a in get_json(api).get("assets", []):
+        if a.get("name") == nome and str(a.get("digest") or "").startswith("sha256:"):
+            return a["digest"].split(":", 1)[1]
+    return None
+
+
+def download_conferido(url: str, dest: Path, get_json=None) -> None:
+    """Só instala o que o GitHub publicou com sha256 — sem assinatura publicada, recusa."""
+    sha = sha256_publicado(url, get_json)
+    if not sha:
+        raise OSError(f"{Path(url).name}: o GitHub não publicou o sha256 — por segurança não instalei")
+    download(url, dest, sha)
 
 
 def _venv_pip(venv: Path, package: str, log: list[str]) -> None:
@@ -149,7 +189,7 @@ def install_ai(log: list[str]) -> None:
         for url in OLLAMA_URLS:
             arc = DCS / Path(url).name
             try:
-                download(url, arc)
+                download_conferido(url, arc)
                 flag = "--zstd" if url.endswith(".zst") else "-z"
                 subprocess.run(["tar", flag, "-xf", str(arc), "-C", str(OLLAMA_DIR)], check=True)
                 arc.unlink(missing_ok=True)
@@ -186,7 +226,7 @@ def install_xenia(log: list[str]) -> None:
     XENIA_DIR.mkdir(parents=True, exist_ok=True)
     arc = XENIA_DIR / "xenia.tar.xz"
     try:
-        download(XENIA_URL, arc)
+        download_conferido(XENIA_URL, arc)
         subprocess.run(["tar", "-xJf", str(arc), "-C", str(XENIA_DIR)], check=True)
         arc.unlink()
         found = next((f for f in XENIA_DIR.rglob("xenia_canary") if f.is_file()), None)
@@ -205,7 +245,7 @@ def install_nsz(log: list[str]) -> None:
 def install_qbittorrent(log: list[str]) -> None:
     if not QBT_BIN.exists():
         QBT_BIN.parent.mkdir(parents=True, exist_ok=True)
-        download(QBT_URL, QBT_BIN)
+        download_conferido(QBT_URL, QBT_BIN)
         QBT_BIN.chmod(QBT_BIN.stat().st_mode | stat.S_IXUSR)
         log.append(f"baixado qbittorrent-nox -> {QBT_BIN}")
     ver = subprocess.run([str(QBT_BIN), "--version"], capture_output=True, text=True).stdout.strip()

@@ -1,4 +1,5 @@
 import subprocess
+import shutil
 import zipfile
 import os
 from pathlib import Path
@@ -80,23 +81,33 @@ def ligar_opcao(home: Path, console: str) -> None:
         shutil.copy2(ini_path, backup)
     ini_path.write_text(ini_definir(texto, section.strip("[]"), {key1: value1, key2: value2}), encoding="utf-8")
 
+def _nome_seguro(nome: str) -> bool:
+    """Caminho relativo, sem subir pasta (".."), sem raiz nem letra de unidade."""
+    n = nome.replace("\\", "/")
+    return bool(n) and not n.startswith("/") and ":" not in n.split("/")[0] and ".." not in n.split("/")
+
+
 def extrair(pacote: Path, destino: Path, run=subprocess.run) -> int:
     """Extrai o pacote para a pasta destino."""
     if pacote.suffix.lower() == ".zip":
         with zipfile.ZipFile(pacote, "r") as zf:
             for member in zf.infolist():
-                name = member.filename
-                if name.startswith("/") or ".." in name:
+                name = member.filename.replace("\\", "/")
+                if member.is_dir() or not _nome_seguro(name):  # revisão 11/11/2026: "pack/" (pasta) quebrava
                     continue
                 target = destino / name
                 target.parent.mkdir(parents=True, exist_ok=True)
-                with open(target, "wb") as f:
-                    f.write(zf.read(member))
+                with zf.open(member) as src, open(target, "wb") as f:
+                    shutil.copyfileobj(src, f)
     elif pacote.suffix.lower() in (".7z", ".rar"):
-        try:
+        try:  # confere os nomes ANTES de extrair: pacote vindo de link não pode escrever fora da pasta
+            lista = run(["7z", "l", "-slt", "-ba", str(pacote)], capture_output=True, text=True, check=True).stdout
+            ruins = [l[7:] for l in lista.splitlines() if l.startswith("Path = ") and not _nome_seguro(l[7:])]
+            if ruins:
+                raise RuntimeError(f"pacote com caminho perigoso ({ruins[0]}) — não extraí")
             run(["7z", "x", "-y", f"-o{destino}", str(pacote)], capture_output=True, check=True)
         except FileNotFoundError:
-            raise RuntimeError("7z não instalado no Deck")
+            raise RuntimeError("7z não instalado no Deck") from None
     else:
         raise ValueError("Formato de pacote não suportado")
 

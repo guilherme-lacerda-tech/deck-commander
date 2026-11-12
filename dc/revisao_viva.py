@@ -138,13 +138,21 @@ def zelda():
 @item("Castlevania PT-BR com acentos e menus")
 def castlevania():
     import struct
-    pasta = H / "Emulation/roms/psx/Castlevania - Symphony of the Night PSX (PAL)/c-sotn_pal"
-    pt = pasta / "Castlevania - Symphony of the Night PSX (PAL) (PT-BR).bin"
-    if not pt.exists():
-        return True, "sem cópia PT-BR"
+    from . import transferir
+    from .traducao import sotn
     from .traducao import sotn_falas_fonte as F
     from .traducao.psx_disco import Disco
-    d, o = Disco(pt), Disco(pasta / "Castlevania - Symphony of the Night PSX (PAL).bin")
+    # qualquer cópia "(PT-BR)" do SOTN na biblioteca (antes: caminho fixo da pasta do autor)
+    copias = [Path(e["rom"]) for e in transferir.carregar_mapa().values()
+              if e.get("console") == "psx" and "(PT-BR)" in str(e.get("rom", "")) and Path(e["rom"]).exists()]
+    copias = [c for c in copias if sotn.reconhece(c)]
+    if not copias:
+        return True, "sem cópia PT-BR do Castlevania"
+    pt_cue = copias[0]
+    orig_cue = pt_cue.with_name(pt_cue.name.replace(" (PT-BR)", ""))
+    if not orig_cue.exists():
+        return True, "original não está ao lado da cópia"
+    d, o = Disco(sotn._bin_da_cue(pt_cue)), Disco(sotn._bin_da_cue(orig_cue))
     laco = struct.unpack_from("<I", d.ler("DRA.BIN"), 0x80106CDC - F.DRA_BASE)[0] == 0x2F220019
     fonte = d.ler("BIN/F_GAME.BIN") != o.ler("BIN/F_GAME.BIN")
     botoes = d.ler("ST/SEL/F_SEL.BIN") != o.ler("ST/SEL/F_SEL.BIN")

@@ -14,6 +14,7 @@ import argparse
 import re
 import asyncio
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -199,8 +200,13 @@ def main() -> int:
     ssh("mkdir -p /tmp/dc-dub")
     cenas = json.loads(ssh("cd ~/deck-commander && python3 -m dc.dublagem_totk cenas")) if a.todas else a.cenas
     total = 0
-    feitas = Path("D:/DeckCommander/logs/dublagem-totk-cenas-feitas.txt")
+    # progresso (continua de onde parou); antes era um caminho fixo do PC do autor (D:/…) — revisão de lançamento
+    feitas = Path(os.environ.get("DC_LOGS", Path.home() / ".deck-commander" / "logs")) / "dublagem-totk-cenas-feitas.txt"
+    feitas.parent.mkdir(parents=True, exist_ok=True)
     prontas = set(feitas.read_text("utf-8").split()) if feitas.exists() else set()
+    antigo = Path("D:/DeckCommander/logs/dublagem-totk-cenas-feitas.txt")  # versões antigas gravavam aqui
+    if antigo.exists():
+        prontas |= set(antigo.read_text("utf-8").split())
     for c in cenas:
         if c in prontas and a.todas:  # continua de onde parou
             continue

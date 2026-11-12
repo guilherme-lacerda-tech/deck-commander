@@ -121,3 +121,35 @@ def test_video_sem_audio_nao_dubla(tmp_path):
     assert r["falas"] == 0 and r["sem_audio"]
     cmd = dublagem.comando_mixar(Path("v.webm"), [(1.0, Path("a.mp3"))], Path("s.webm"), tem_audio=False)
     assert "libopus" in cmd and "[bg]" not in cmd[cmd.index("-filter_complex") + 1]
+
+
+def test_texturas_zip_com_pastas_e_caminho_perigoso(tmp_path):
+    """Revisão de lançamento 11/11/2026: zip com entrada de pasta ("pack/") quebrava a instalação; nome com ".."
+    ou letra de unidade não pode sair da pasta."""
+    import zipfile
+    from dc import texturas
+    z = tmp_path / "pack.zip"
+    with zipfile.ZipFile(z, "w") as zf:
+        zf.writestr("pack/", "")
+        zf.writestr("pack/sub/", "")
+        zf.writestr("pack/sub/a.png", b"png")
+        zf.writestr("../fora.png", b"mal")
+        zf.writestr("C:/fora2.png", b"mal")
+    dest = tmp_path / "d"
+    dest.mkdir()
+    assert texturas.extrair(z, dest) == 1
+    assert (dest / "sub/a.png").read_bytes() == b"png" and not (tmp_path / "fora.png").exists()
+
+
+def test_texturas_7z_com_caminho_perigoso_recusa(tmp_path):
+    import pytest
+    from types import SimpleNamespace
+    from dc import texturas
+    chamadas = []
+
+    def run(cmd, **k):
+        chamadas.append(cmd)
+        return SimpleNamespace(stdout="Path = ok.png\nPath = ../../.bashrc\n", returncode=0)
+    with pytest.raises(RuntimeError, match="perigoso"):
+        texturas.extrair(tmp_path / "p.7z", tmp_path, run=run)
+    assert not any(c[1] == "x" for c in chamadas)  # não extraiu nada
