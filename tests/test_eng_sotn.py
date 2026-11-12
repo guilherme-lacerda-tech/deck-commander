@@ -215,3 +215,35 @@ def test_glossario_antes_de_cortar(monkeypatch):
     ids = {"t1": "If those are your so be it."}
     ok = sotn._completar(None, {}, [], {"t1": "x" * 60}, {ids["t1"]: [linhas]}, ids, None, lambda *a: None)
     assert ok == {"t1": "Se esse é Que seja."}  # linha a linha pelo glossário
+
+
+# (texto, tamanho em bytes, tipo, pontuação japonesa) de cada linha — medido no disco SLES-00524 em 11/11/2026
+CORTADAS_2A = [
+    [("Open Hell's gate!", 17, "ascii", False), ("Come forth my", 13, "ascii", False)],
+    [("I'm certain that was", 20, "ascii", False), ("a Belmont.", 10, "ascii", False)],
+    [("and I'm", 7, "ascii", False), ("sure he's here.", 15, "ascii", False)],
+    [("if you", 6, "ascii", False), ("live that long.", 15, "ascii", False)],
+    [("but I", 5, "ascii", False), ("found a Belmont...", 18, "ascii", False)],
+    [("No Alucard!", 11, "ascii", False), ("Don't come here!", 16, "ascii", False)],
+    [("How?", 4, "ascii", False)], [("data found.", 12, "ascii", True)], [("Overwrite data?", 16, "ascii", True)],
+    [("Library card", 12, "menos20", False)], [("Castlevania pot roast [use]", 29, "ascii", True)],
+    [("Summons Dawn Warriors [1]", 28, "ascii", True)], [("Defeat Granfaloon", 17, "menos20", False)],
+    [("Fake Sypha", 10, "menos20", False)], [("Fake Trevor", 11, "menos20", False)],
+    [("Dark Priest of Dracula.", 24, "ascii", True)], [("Flame demon.", 13, "ascii", True)],
+    [("Giant vampire bat.", 19, "ascii", True)], [("Well armored axe knight.", 25, "ascii", True)],
+    [("Save error.", 12, "ascii", True)], [("to copy to?", 12, "ascii", True)],
+]
+
+
+def test_as_que_saiam_cortadas_cabem_inteiras(monkeypatch):
+    """2ª regeração (11/11/2026): 22 frases ainda saíam cortadas. Agora cada uma cabe inteira pelo glossário."""
+    from dc.traducao import sotn
+    monkeypatch.setattr(sotn.ia, "shorten", lambda *a, **k: {})
+    for linhas in CORTADAS_2A:
+        g = [S.Trecho("X", 100 * k, tam, txt, tipo, sj) for k, (txt, tam, tipo, sj) in enumerate(linhas)]
+        en = " ".join(t.texto for t in g)
+        sotn.CORTADAS.clear()
+        ok = sotn._completar(None, {}, [], {"t": "x" * 80}, {en: [g]}, {"t": en}, None, lambda *a: None)
+        assert not sotn.CORTADAS, en
+        assert all(len(S.codificar(l, 999, t.tipo, t.sjis).rstrip(b" " + bytes(1))) <= t.tam
+                   for l, t in zip(sotn.distribuir(ok["t"], g), g)), (en, ok["t"])

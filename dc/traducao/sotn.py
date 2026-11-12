@@ -234,6 +234,16 @@ GLOSSARIO = {
     "Killer Fish": "Peixe Mat.", "Fake Grant": "Grant Fal.", "Medusa Head": "Cab.Medusa",
     "Blade Soldier": "Sold.Lâmina", "Enemy list": "Inimigos", "Custom cloak settings": "Ajustar a capa",
     "Select file": "Escolha", "Copying data.": "Copiando...", "File erased.": "Apagado.",
+    # 2ª regeração (11/11/2026): as 21 que ainda saíam cortadas — medidas linha a linha no disco
+    "Come forth my": "Venham, meus", "I'm certain that was": "Tenho certeza: era", "a Belmont.": "Belmont.",
+    "and I'm": "e acho", "if you": "se", "live that long.": "viver até lá.", "How?": "Como",
+    "data found.": "dados.", "Overwrite data?": "Sobrescrever?", "Library card": "Cartão Bibl.",
+    "Castlevania pot roast [use]": "Assado do castelo [usar]", "Summons Dawn Warriors [1]": "Invoca Guerreiros [1]",
+    "Defeat Granfaloon": "Vença Granfaloon", "Fake Sypha": "Sypha Fal.", "Fake Trevor": "Trevor Fal.",
+    "but I": "mas", "found a Belmont...": "vi um Belmont...", "No Alucard!": "Alucard!",
+    "Don't come here!": "Não venha aqui!", "Dark Priest of Dracula.": "Sacerdote de Drácula.",
+    "Flame demon.": "Demônio.", "Giant vampire bat.": "Morcego gigante.",
+    "Well armored axe knight.": "Cavaleiro de machado.", "Save error.": "Não salvou", "to copy to?": "copiar?",
 }
 IGUAIS = {"CON", "INT", "EXP", "Exp", "STR", "LCK", "DEF", "ATT", "HP", "MP", "Def HP", "Mono", "Long"}  # iguais em PT
 
@@ -326,7 +336,10 @@ def translate_rom(paths: Paths, rom: Path, title: str = "", chain=None, progress
     # cada fala (grupo de linhas) vira UMA frase para a IA; frases iguais em vários lugares traduzem uma vez só
     por_texto: dict[str, list[list[S.Trecho]]] = {}
     for g in agrupar(trechos, dados):
-        por_texto.setdefault(" ".join(t.texto for t in g), []).append(g)
+        txt = " ".join(t.texto for t in g)
+        if _so_nome(txt):  # nomes, créditos da equipe e textos internos de depuração ficam como estão
+            continue
+        por_texto.setdefault(txt, []).append(g)
     itens = [ia.Item(f"t{n}", txt, max_len=min(sum(t.tam for t in g) for g in gs))
              for n, (txt, gs) in enumerate(por_texto.items())]
     ids = {f"t{n}": txt for n, txt in enumerate(por_texto)}
