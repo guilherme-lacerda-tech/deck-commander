@@ -374,9 +374,12 @@ const Bt = (label, onClick, opts, key) => Row(h(D.ButtonItem, Object.assign({ la
 const Toggle = (label, checked, onChange, description) => Row(h(D.ToggleField, { label, checked: !!checked, onChange, description }));
 const Campo = (label, value, onChange, opts) => Row(h(D.TextField, Object.assign({ label, value: value || "",
     onChange: (e) => onChange(e.target.value) }, opts || {})));
-// Lista embaixo do rótulo e com a largura toda: ao lado, o painel cortava o nome ("God of …", visto no Deck 14/11/2026)
-const Lista = (label, opcoes, sel, onChange) => Row(h(D.DropdownItem, { label, rgOptions: opcoes, selectedOption: sel,
-    strDefaultLabel: "Escolha…", onChange: (o) => onChange(o.data), childrenLayout: "below", childrenContainerWidth: "max" }));
+// Rótulo numa linha e a lista embaixo, com a largura toda: ao lado do rótulo o painel cortava o nome ("God of …",
+// visto no Deck 14/11/2026; "childrenLayout" não é aceito pela lista do Decky e espremia o rótulo).
+const Lista = (label, opcoes, sel, onChange) => Row(h("div", null,
+    h("div", { style: { fontSize: "14px", padding: "6px 0 2px" } }, label),
+    h(D.DropdownItem, { rgOptions: opcoes, selectedOption: sel, strDefaultLabel: "Escolha…",
+        onChange: (o) => onChange(o.data), childrenContainerWidth: "max" })));
 // Barra de progresso própria: o texto aparece inteiro (a do Steam corta com "…")
 const Barra = (pct, texto, resto, key) => {
     const tem = pct !== null && pct !== undefined;
