@@ -162,6 +162,12 @@ def power_loop(paths: Paths, interval: float = 30) -> None:
                     _log(paths, "worker", f"qualidade: {msg}")
             except Exception as e:  # noqa: BLE001
                 _log(paths, "worker", f"qualidade: {e}")
+        try:  # busca da comunidade que o PC não fez em 72 h: libera a tradução por IA
+            from .traducao import comunidade
+            for linha in comunidade.vencidos(paths, store):
+                _log(paths, "worker", "comunidade: " + linha.splitlines()[0])
+        except Exception as e:  # noqa: BLE001
+            _log(paths, "worker", f"comunidade: {e}")
         if not running and not ops.in_safe_mode(paths):
             from . import syncer
             for op in store.list(("pending",)):

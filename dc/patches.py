@@ -5,6 +5,8 @@
 - BPS/UPS conferem CRC32 de origem e destino; falha => nada é publicado e o patch vai para quarentena.
 - XDelta (VCDIFF): aplicado pelo leitor próprio (dc/vcdiff.py, 14/11/2026), em pedaços, sem carregar o jogo na memória;
   a soma de cada pedaço confere o resultado. Disco de outra versão: só com receita (dc/traducao/transplante.py).
+- PPF 1/2/3 (comum em tradução de PS1/PS2): aplicado em cópia do disco, sem carregar tudo na memória; o bloco de
+  conferência do PPF 2/3 recusa disco de outra versão (14/11/2026, regra "tradução da comunidade primeiro").
 - Instaladores .exe: detectados e recusados com motivo (precisam de execução no prefixo Proton).
 """
 from __future__ import annotations
@@ -27,6 +29,8 @@ def detect(data: bytes) -> str:
         return "ups"
     if data[:3] == b"\xd6\xc3\xc4":
         return "xdelta"
+    if data[:3] == b"PPF" and data[3:5] in (b"10", b"20", b"30"):
+        return "ppf"
     if data.startswith(b"MZ"):
         return "exe"
     return "unknown"
@@ -172,6 +176,60 @@ def apply_ups(src: bytes, patch: bytes) -> bytes:
 APPLY = {"ips": apply_ips, "bps": apply_bps, "ups": apply_ups}
 
 
+def _ppf_registros(data: bytes) -> tuple[int, list[tuple[int, bytes]], bytes | None, int]:
+    """(versão, [(posição, bytes)], bloco de conferência ou None, posição do bloco no disco)."""
+    ver = int(data[3:4])
+    fim = len(data)
+    diz = data.rfind(b"@BEGIN_FILE_ID.DIZ")
+    if diz > 0:
+        fim = diz
+    bloco, pos_bloco, desfazer, larg = None, 0x9320, False, 4
+    if ver == 1:
+        i = 56
+    elif ver == 2:
+        bloco, i = data[60:1084], 1084
+    else:
+        tipo, conf, desfazer = data[56], data[57], data[58]
+        pos_bloco = 0x80A0 if tipo == 1 else 0x9320
+        if conf:
+            bloco, i = data[60:1084], 1084
+        else:
+            i = 60
+        larg = 8
+    regs = []
+    while i < fim:
+        if i + larg + 1 > fim:
+            raise PatchError("PPF cortado no meio")
+        pos = int.from_bytes(data[i:i + larg], "little")
+        n = data[i + larg]
+        i += larg + 1
+        regs.append((pos, data[i:i + n]))
+        i += n * (2 if desfazer else 1)
+    return ver, regs, bloco, pos_bloco
+
+
+def _apply_ppf(rom: Path, patch: Path, out: Path | None) -> Path:
+    import shutil
+    data = Path(patch).read_bytes()
+    _ver, regs, bloco, pos_bloco = _ppf_registros(data)
+    if bloco:
+        with open(rom, "rb") as f:
+            f.seek(pos_bloco)
+            if f.read(1024) != bloco:
+                raise PatchError("o patch PPF é para outra versão deste disco (o bloco de conferência não bate)")
+    out = Path(out) if out else rom.with_name(f"{rom.stem} (patch){rom.suffix}")
+    if out.exists():
+        raise FileExistsError(out)
+    tmp = out.with_name(out.name + ".tmp")
+    shutil.copyfile(rom, tmp)
+    with open(tmp, "r+b") as f:
+        for pos, b in regs:
+            f.seek(pos)
+            f.write(b)
+    os.replace(tmp, out)
+    return out
+
+
 def _apply_xdelta(rom: Path, patch: Path, out: Path | None) -> Path:
     """Disco original: resultado exato. Outra versão do disco (ex.: ISO já modificada por outra tradução) com receita
     em dc/traducao/transplante.py: leva só os arquivos traduzidos para o disco do usuário. Senão: falha, nada gravado."""
@@ -198,6 +256,8 @@ def apply_file(rom: Path, patch: Path, out: Path | None = None) -> Path:
         data = f.read(8)
     if detect(data) == "xdelta":
         return _apply_xdelta(rom, patch, out)
+    if detect(data) == "ppf":
+        return _apply_ppf(rom, patch, out)
     data = patch.read_bytes()
     kind = detect(data)
     if kind == "exe":

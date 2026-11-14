@@ -62,8 +62,14 @@ def _setor(f, n: int, tam: int, desloc: int) -> bytes:
 
 
 def console_do_disco(arq: Path) -> str | None:
-    """PS1 ou PS2 pelo próprio disco: o SYSTEM.CNF do PS2 tem "BOOT2", o do PS1 tem "BOOT".
-    Lê imagem de 2048 bytes por setor (.iso) e de 2352 (.bin/.img de CD, modo 1 ou 2). None = não sei."""
+    """PS1 ou PS2 pelo próprio disco: o SYSTEM.CNF do PS2 tem "BOOT2", o do PS1 tem "BOOT". None = não sei."""
+    cnf = (system_cnf(arq) or b"").upper()
+    return "ps2" if b"BOOT2" in cnf else "psx" if b"BOOT" in cnf else None
+
+
+def system_cnf(arq: Path) -> bytes | None:
+    """Conteúdo do SYSTEM.CNF (diz o console e o código do disco, ex.: SLUS_005.94).
+    Lê imagem de 2048 bytes por setor (.iso) e de 2352 (.bin/.img de CD, modo 1 ou 2)."""
     try:
         with open(arq, "rb") as f:
             for tam, desloc in ((2048, 0), (2352, 24), (2352, 16)):
@@ -82,8 +88,7 @@ def console_do_disco(arq: Path) -> str | None:
                     nome = dados[pos + 33:pos + 33 + dados[pos + 32]].split(b";")[0].upper()
                     if nome == b"SYSTEM.CNF":
                         lba = int.from_bytes(dados[pos + 2:pos + 6], "little")
-                        cnf = _setor(f, lba, tam, desloc).upper()
-                        return "ps2" if b"BOOT2" in cnf else "psx" if b"BOOT" in cnf else None
+                        return _setor(f, lba, tam, desloc).split(b"\0")[0]
                     pos += n
                 return None
     except (OSError, IndexError):

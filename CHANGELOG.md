@@ -1,6 +1,12 @@
 # Changelog
 
 ## Depois da 0.9.0 (ainda não publicado)
+- **Tradução da comunidade primeiro** (regra do usuário, 14/11): todo jogo novo vai para a fila de busca
+  (`dc/traducao/comunidade.py`) antes da IA. Uma tarefa agendada no PC procura a tradução de fãs, baixa só o
+  patch, confere a versão do disco, aplica (`aplicar`, inclusive jogo de vários CDs) e avisa no Telegram. Sem
+  tradução de fã, ou 72 h sem o PC procurar, a IA traduz como antes.
+- **Patch `.ppf`** (PPF 1/2/3, comum em PS1/PS2): aplicado em cópia do disco; disco de outra versão é recusado
+  pelo bloco de conferência do próprio PPF.
 - Corrigido (achado no uso, 14/11): mandar o console **depois** de um download sem console ("Ps1") virava o console
   do **próximo** download, e um jogo de PS2 ("(PS2)DARKWATCH.7z") foi marcado como PS1. Agora:
   - o console respondido logo depois de um download sem console vale para ele;

@@ -104,7 +104,17 @@ tail -5 ~/.local/state/deck-commander/launch.log
 ```
 
 ## 6. Tradução para português
-- **Automática:** o jogo baixado que não está em português entra na fila sozinho.
+- **Primeiro a tradução feita por fãs (regra desde 14/11/2026):** todo jogo novo que não está em português vai
+  antes para a fila "procurar tradução da comunidade". Quem procura é uma **tarefa agendada no PC** (a cada 2 h,
+  enquanto o app do Claude estiver aberto; se o PC estava desligado, ela roda assim que ele ligar). Ela:
+  - procura em sites de tradução brasileiros (João13, romhacking.net.br, PO.B.R.E. e outros);
+  - baixa **só o patch** (nunca o jogo) e confere se ele é para a mesma versão do seu disco (ex.: SLUS-00594);
+  - aplica, coloca o jogo "(PT-BR)" na biblioteca no lugar do original e avisa no Telegram.
+  - Se o site só entrega o arquivo com clique no navegador, o bot avisa com o link: baixe pelo navegador do PC e
+    salve em `Downloads\deck-traducoes`. Na próxima rodada a tarefa aplica.
+  - Não existe tradução de fã? A IA traduz, como antes. Se o PC ficar 72 h sem procurar, a IA também começa.
+  - Fila no Deck: `python3 -m dc.traducao.comunidade listar`.
+- **Automática (IA):** o jogo que não tem tradução de fã entra na fila da IA sozinho.
 - **Manual:** `/traduzir <jogo>`. Para traduzir todos os jogos de uma vez: `/traduzir biblioteca` (ele pergunta antes).
 - **Motor diferente** (Unity, GameMaker, Godot, RE Engine, RPG Maker, CRI): o bot pergunta antes, com o número de
   frases e o tempo estimado. Responda Sim ou Não.
@@ -117,7 +127,7 @@ tail -5 ~/.local/state/deck-commander/launch.log
 - **Switch:** a tradução é um mod. O jogo precisa estar em inglês, que é o padrão do Ryujinx.
 - **Retrô:** sai uma cópia "(PT-BR)" no lugar do original, que fica guardado (`/devolver` traz de volta). Ao lado
   dela fica um patch `.bps`: quem tem o jogo original aplica com o Floating IPS.
-- **Tradução feita pela comunidade (patch `.ips`, `.bps`, `.ups` ou `.xdelta`):** no Deck (Konsole),
+- **Tradução feita pela comunidade à mão (patch `.ips`, `.bps`, `.ups`, `.ppf` ou `.xdelta`):** no Deck (Konsole),
   `cd ~/deck-commander && python3 -m dc x patch <jogo> <patch>`. Sai um jogo novo ao lado do original, que não é alterado.
   - O patch confere se o jogo é exatamente o que ele pede. Se não for, nada é gravado e ele explica.
   - **Disco de outra versão** (ex.: uma ISO já traduzida para outra língua): para jogos com receita, o Deck

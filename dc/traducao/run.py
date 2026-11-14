@@ -204,6 +204,12 @@ def auto_queue(paths: Paths, store: Store, game_ids: list[str], lote: bool = Fal
                 st = portugues.status(gid, g, idi)
                 out.append(f"🇧🇷 {g['title']}: já está em português ({'oficial' if st == 'oficial' else 'traduzido'}).")
             continue
+        if not lote and cfg.get("comunidade_primeiro", True) and sit in ("ok", "falhou", "generico", "sem"):
+            from . import comunidade  # regra do usuário 14/11/2026: tradução de fã primeiro, IA só se não existir
+            if comunidade.registrar(paths, gid, g) or comunidade.esperando(paths, gid):
+                out.append(f"🔎 {g['title']}: primeiro procuro uma tradução feita por fãs (o PC procura quando "
+                           "estiver ligado); se não existir, a IA traduz.")
+                continue
         if sit == "generico" and not lote:
             if offer_generic(paths, store, gid, g["title"], "não há tradutor padrão para este console"):
                 out.append(f"❓ {g['title']}: vou perguntar se quer a tradução fora do padrão.")

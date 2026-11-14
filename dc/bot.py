@@ -1138,6 +1138,13 @@ class Bot:
                 self.notify_finished()
             except Exception as e:  # noqa: BLE001
                 self.log(f"aviso de download: {e}")
+            try:  # tradução da comunidade: achou, não existe ou precisa de você
+                from .traducao import comunidade
+                if self.cfg.get("notify_chat"):
+                    for aviso in comunidade.avisos(self.paths):
+                        self.send(self.cfg["notify_chat"], aviso)
+            except Exception as e:  # noqa: BLE001
+                self.log(f"aviso da comunidade: {e}")
             try:
                 self.notify_stalled()
             except Exception as e:  # noqa: BLE001

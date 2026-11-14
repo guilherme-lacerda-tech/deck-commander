@@ -135,9 +135,12 @@ def test_auto_queue_translates_new_downloads_not_in_portuguese(b, monkeypatch, t
     lm["ps2-gow"] = {"title": "God of War (Dublado)", "console": "ps2", "rom": str(iso.with_name("gow.iso"))}
     (b.paths.data / "launch-map.json").write_text(json.dumps(lm))
     lines = run.auto_queue(b.paths, b.store, ["ps2-okami", "ps2-gow", "psx-hercules"])
-    assert any("Okami" in l and "traduzindo sozinho" in l for l in lines)
+    # regra 14/11/2026: primeiro a tradução da comunidade (busca do PC); a IA só depois
+    assert any("Okami" in l and "tradução feita por fãs" in l for l in lines)
     assert any("God of War" in l and "já está em português" in l for l in lines)
-    assert not any("Hercules" in l for l in lines)  # .chd: não dá, não incomoda
+    assert len(b.spawned) == 0
+    from dc.traducao import comunidade
+    assert "traduzindo sozinho" in comunidade.marcar(b.paths, "ps2-okami", "nao_existe", store=b.store)
     assert len(b.spawned) == 1
     assert run.auto_queue(b.paths, b.store, ["ps2-okami"]) == [] and len(b.spawned) == 1  # sem fila dupla
     (b.paths.config / "traducao.toml").write_text("auto_traduzir = false\n")
