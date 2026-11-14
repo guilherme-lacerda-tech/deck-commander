@@ -1,7 +1,8 @@
 # Manual do Deck Commander
 
-Versão 0.8.2 · 13/11/2026. Este manual serve para quem usa no dia a dia e para quem vai explicar a outra pessoa.
+Versão 0.9.0 · 14/11/2026. Este manual serve para quem usa no dia a dia e para quem vai explicar a outra pessoa.
 Instalação num Deck novo: [TUTORIAL-INSTALACAO.md](TUTORIAL-INSTALACAO.md).
+Testes que só dão para fazer com o Deck na mão, em 6 sessões curtas: [TESTES-NO-DECK.md](TESTES-NO-DECK.md).
 
 ---
 

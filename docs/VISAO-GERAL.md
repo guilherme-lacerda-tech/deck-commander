@@ -296,7 +296,7 @@ Feito pensando em quem joga retrô a sério (revisão de "retrogamer" em 12/11).
 - save do cartucho gravado a cada 10 s.
 
 ## 15.1 O que ainda falta (com honestidade)
-**Testes que só você faz, com as mãos no Deck**
+**Testes que só você faz, com as mãos no Deck** (cronograma completo, passo a passo: [TESTES-NO-DECK.md](TESTES-NO-DECK.md))
 - sentir a vibração num jogo de Switch e apertar A/B num jogo de NES com "A do Deck = A do jogo";
 - o modo repouso com o botão físico de ligar (testado pelo mesmo pedido de dormir que o botão faz);
 - jogar e conferir os botões de trás num jogo retrô;

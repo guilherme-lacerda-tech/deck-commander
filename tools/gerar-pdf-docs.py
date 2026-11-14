@@ -122,7 +122,8 @@ def build(md_path: Path, pdf_path: Path, titulo: str, sub: str) -> None:
     md = md_path.read_text("utf-8")
     md = re.sub(r"^# .*\n", "", md, count=1)  # o título vai na capa
     md = md.replace("(TUTORIAL-INSTALACAO.md)", "(Tutorial de instalação — outro PDF)").replace(
-        "(MANUAL.md)", "(Manual de uso — outro PDF)")
+        "(MANUAL.md)", "(Manual de uso — outro PDF)").replace(
+        "(TESTES-NO-DECK.md)", "(Testes no Deck — outro PDF)")
     body = f"<div class='capa'><h1>{html.escape(titulo)}</h1><p>{html.escape(sub)}</p></div>" + convert(md)
     doc = f"<!doctype html><html lang='pt-br'><head><meta charset='utf-8'><title>{html.escape(titulo)}</title>" \
           f"<style>{CSS}</style></head><body>{body}</body></html>"
@@ -154,6 +155,8 @@ if __name__ == "__main__":
           "Deck Commander — Manual de uso", "Tudo o que dá para fazer no dia a dia, pelo Telegram e pelo Deck")
     build(root / "docs/VISAO-GERAL.md", out / "Deck Commander - Visao geral do projeto.pdf",
           "Deck Commander — Visão geral do projeto", "Tudo o que o sistema faz hoje, o que foi testado e ideias do que adicionar")
+    build(root / "docs/TESTES-NO-DECK.md", out / "Deck Commander - Testes no Deck.pdf",
+          "Deck Commander — Testes no Deck", "Cronograma dos testes que só dão para fazer com o Deck na mão")
     if (root / "docs/desenvolvimento/REVISAO-NOTURNA.md").exists():
         build(root / "docs/desenvolvimento/REVISAO-NOTURNA.md", out / "Deck Commander - Revisao noturna.pdf",
               "Deck Commander — Revisão noturna", "O que foi conferido, o que estava errado e foi corrigido, e o que falta")
