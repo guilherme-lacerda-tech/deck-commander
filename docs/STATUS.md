@@ -1,6 +1,6 @@
 # Estado do projeto (v0.9.0)
 
-Validado num Steam Deck LCD (SteamOS 3.9.5). 848 testes automatizados (CI no GitHub + timer semanal no Deck) e teste de ponta a ponta no próprio aparelho (`tools/e2e_local.py`: download → biblioteca ao vivo → duplicata → remoção).
+Validado num Steam Deck LCD (SteamOS 3.9.5). 875 testes automatizados (CI no GitHub + timer semanal no Deck) e teste de ponta a ponta no próprio aparelho (`tools/e2e_local.py`: download → biblioteca ao vivo → duplicata → remoção).
 
 | Módulo (spec v5.1) | Estado | Observação |
 |---|---|---|
@@ -12,7 +12,7 @@ Validado num Steam Deck LCD (SteamOS 3.9.5). 848 testes automatizados (CI no Git
 | M2 Biblioteca | ✅ | lançador fixo + mapa, plugin ao vivo, autocorreção que respeita remoção, coleções/abas por console e por loja, capas, duplicatas (antes de baixar, no /sync e /duplicados + /remover) |
 | M3 Qualidade | ✅ parcial | 10 consoles; perfis com read-back; respeita ajuste manual; **resolução por jogo** (/qualidade); verificação de controles. Shader/aspect ratio por emulador e mapeamento automático do Dolphin ainda não |
 | M4 Telegram/torrent | ✅ | console por texto, .torrent/magnet, /sync automático com nova tentativa, .zip/.7z/.rar seguros, multidisco, energia com histerese |
-| M5 Traduções | ✅ parcial | IPS/BPS/UPS nativos com CRC; XDelta e instaladores .exe são detectados e recusados |
+| M5 Traduções | ✅ parcial | IPS/BPS/UPS/XDelta nativos (XDelta em pedaços, soma por pedaço); disco de outra versão com receita (God of War PSP); instaladores .exe recusados |
 | M6 Saves | ✅ | 4 tipos, backup diário, import que nunca sobrescreve em conflito |
 | M7 Disco | ✅ | top 10 + sugestões (nunca apaga) |
 | M20/M21 | ✅ | sensores com estado próprio; diagnóstico auto/ask/alert com limite de 3 tentativas |

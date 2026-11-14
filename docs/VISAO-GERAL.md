@@ -1,14 +1,14 @@
 # Deck Commander — Visão geral do projeto
 
 Tudo o que o sistema faz hoje, o que foi testado de verdade, os limites conhecidos e ideias do que adicionar.
-Situação em 12/11/2026, versão 0.8.2. São 804 testes automáticos passando, 247 versões salvas no histórico e cerca de
-30 mil linhas de código em 119 módulos. O repositório é público: github.com/guilherme-lacerda-tech/deck-commander.
+Situação em 14/11/2026, versão 0.9.0. São 875 testes automáticos passando, 267 versões salvas no histórico e cerca de
+32 mil linhas de código em 127 módulos. O repositório é público: github.com/guilherme-lacerda-tech/deck-commander.
 
 > **Legenda:**
 > - ✅ funcionando e testado de verdade no Deck ou no PC
 > - 🧪 pronto e com testes automáticos, mas ainda sem uso real
 > - ⚠️ funciona com limitação
-> - 🆕 novo desde o último relatório (11/11, versão 0.7)
+> - 🆕 novo desde o último relatório (12/11, versão 0.8.2)
 
 ---
 
@@ -107,7 +107,8 @@ Telas do painel:
 | Pokémon FireRed / LeafGreen (GBA no Switch) | Meowth | ✅ |
 | Castlevania Belmont's Curse | Unity | ✅ já tinha PT-BR oficial, configurado para abrir em português |
 | 🆕 Castlevania: Symphony of the Night (PS1) | formato próprio, por engenharia reversa | ✅ falas e menus com acento (fonte nova), botões da tela de arquivos em português, patch .bps de 57 KB |
-| 🆕 Zelda: Tears of the Kingdom | PT-BR oficial + dublagem | ✅ abre em português, com 360 falas das cenas dubladas |
+| Zelda: Tears of the Kingdom | PT-BR oficial + dublagem | ✅ abre em português, com 360 falas das cenas dubladas |
+| 🆕 God of War: Chains of Olympus (PSP) | tradução da comunidade (OAleex e cia) levada para a ISO russa | ✅ menus, legendas e acentos testados no Deck |
 
 ### 5.3 Formatos que o sistema lê
 - ✅ **Testados com jogo real:** Nintendo MSBT, SARC, Trinity, Next Level Games, Unreal (sem criptografia) e Unity.
@@ -157,6 +158,20 @@ Feito pensando em quem joga retrô a sério (revisão de "retrogamer" em 12/11).
 - ✅ **DuckStation a 100%:** a camada de vídeo do modo de jogo segurava o PS1 em 60% da velocidade; agora abre sem ela.
 - ✅ **Seguro na rede:** a porta de comandos do RetroArch (que aceitava comandos de qualquer aparelho do Wi-Fi) está
   fechada, e o modo "hardcore" das conquistas não tira mais o save rápido sem aviso.
+- 🆕 ✅ **Continuar de onde parou** (PS1, PS2, PSP, RetroArch; GameCube/Wii 🧪 sem jogo no Deck para testar): um
+  ponto é salvo ao apertar o botão Steam, antes de dormir e a cada 10 min; o jogo abre nele. Os saves do L4 não são
+  tocados e ponto de outra versão do emulador não é carregado.
+- 🆕 ✅ **Voltar no tempo pelo painel** (5/10/30 s) e também no PSP. Testado no Deck com um jogo de NES.
+- 🆕 ✅ **Detonado em português, por parte** (StrategyWiki): Pokémon por insígnia, God of War por capítulo; lembra
+  onde você está e funciona sem internet depois da primeira vez. Tela do painel conferida no Deck.
+- 🆕 ✅ **Perfis de imagem** (Beleza, Desempenho, Retrô, Automático). Testado: Beleza levou o Castlevania de 2× para
+  4× e voltou ao fechar.
+- 🆕 ✅ **Modo repouso:** na tomada, com download ou tradução, o Deck não dorme; o botão de ligar apaga e acende a
+  tela; quando o trabalho acaba, o Deck dorme sozinho. Testado no Deck (falta só o teste com o botão físico).
+- 🆕 🧪 **Vibração** ligada no Switch e no GameCube/Wii e **A/B por console** (NES, SNES, Game Boy, GBA): configurados
+  no Deck; falta sentir/apertar com as mãos.
+- 🆕 ✅ **Velocidade certa nos emuladores:** um limite de quadros preso em 30 deixava o NES em câmera lenta; agora o
+  limite é tirado ao abrir jogo de emulador (medido: 30 → 60 quadros).
 - ⚠️ **Conquistas (RetroAchievements):** funcionam nos 4 emuladores depois de você entrar na sua conta em cada um.
   A Steam não deixa mostrar conquistas de atalhos de fora; elas aparecem na tela do jogo e no site
   retroachievements.org.
@@ -253,7 +268,15 @@ Feito pensando em quem joga retrô a sério (revisão de "retrogamer" em 12/11).
 
 ---
 
-## 15. O que mudou desde o último relatório (11/11 → 12/11)
+## 15. O que mudou desde o último relatório (12/11 → 14/11)
+**Versão 0.9.0 — experiência de console**
+- continuar de onde parou, voltar no tempo pelo painel, detonado por capítulo em português, perfis de imagem,
+  vibração, A/B por console e modo repouso;
+- patch `.xdelta` sem programa de fora, e tradução da comunidade levada para disco de outra versão (God of War PSP);
+- corrigidos no teste do Deck: controles do PSP desligados pelo arquivo novo, NES em câmera lenta (limite de quadros),
+  jogo PAL julgado "travando", listas do painel cortando o nome e o detonado com títulos em inglês.
+
+**Antes (11/11 → 12/11)**
 **Versão 0.8.0 — retrô e revisão de lançamento**
 - botões de trás, turbo, voltar no tempo e filtros de tela nos jogos retrô;
 - Castlevania: Symphony of the Night em português, com acentos;
@@ -274,6 +297,8 @@ Feito pensando em quem joga retrô a sério (revisão de "retrogamer" em 12/11).
 
 ## 15.1 O que ainda falta (com honestidade)
 **Testes que só você faz, com as mãos no Deck**
+- sentir a vibração num jogo de Switch e apertar A/B num jogo de NES com "A do Deck = A do jogo";
+- o modo repouso com o botão físico de ligar (testado pelo mesmo pedido de dormir que o botão faz);
 - jogar e conferir os botões de trás num jogo retrô;
 - as falas do Castlevania em português dentro do jogo;
 - uma cena dublada do Zelda;
@@ -282,7 +307,7 @@ Feito pensando em quem joga retrô a sério (revisão de "retrogamer" em 12/11).
 
 **Prontos, mas sem uso real ainda**
 - Família (Deck do seu irmão), jogar na TV, assistente do PC, `/corrigir` por foto.
-- Cópia automática dos saves no RetroArch: testada no PC; no Deck ainda não há jogo de RetroArch.
+- Continuar de onde parou no GameCube/Wii: não há jogo de GameCube/Wii no Deck para testar.
 
 **Limites que não dependem do Deck Commander**
 - Conquistas retrô não aparecem na página do jogo da Steam (a Steam só permite isso para jogos vendidos nela).

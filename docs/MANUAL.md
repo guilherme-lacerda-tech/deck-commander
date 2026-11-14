@@ -172,6 +172,9 @@ plano; depois fica em português e funciona sem internet. Se o jogo não for ach
 - **Botões A/B de NES, SNES, Game Boy e GBA:** painel → Qualidade → Botões: "como o controle original" (padrão) ou
   "A do Deck = A do jogo".
 - **Vibração:** ligada sozinha no Switch (Ryujinx) e no GameCube/Wii (Dolphin), que vinham com ela desligada.
+- **Limite de quadros:** ao abrir um jogo de emulador, o Deck Commander tira o limite de quadros do menu "…" (num
+  emulador, limite abaixo do console deixa o jogo em câmera lenta). Jogos do PC ficam como você deixou. Para manter o
+  seu limite também nos emuladores, crie o arquivo `~/.config/deck-commander/limite-quadros-manter`.
 - **Controles:** `/controles` mostra o que falta. Azahar (3DS), Cemu (Wii U) e RPCS3 (PS3) pedem que você escolha o
   controle **uma vez**: modo Desktop → abra o emulador → Controles.
 

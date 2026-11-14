@@ -18,6 +18,11 @@
 - Corrigido (achado no teste do Deck): o arquivo de controles do PSP criado para o "continuar" tinha só as teclas
   novas, e o PPSSPP desligava **todos os outros botões** (o controle do Deck parava no PSP). Agora o arquivo novo
   traz os botões padrão, e quem já tinha o arquivo estragado recebe os botões de volta ao abrir um jogo de PSP.
+- Corrigido (achado no teste do Deck): **NES em câmera lenta** — um limite de quadros preso em 30 no modo de jogo
+  segurava o RetroArch em 30 (o jogo anda no ritmo da tela). Agora o limite é tirado ao abrir jogo de emulador
+  (medido: 30,00 → 59,99). Jogos do PC ficam como você deixou; `config/limite-quadros-manter` desliga.
+- Painel: listas com a largura toda (o nome do jogo não corta mais no meio) e detonado com os títulos em português.
+- Revisão ao vivo confere também os botões do PSP.
 - Corrigido: tradução de retrô pelo RomTranslate quebrava no fim ("RtsReport sem strings").
 - Corrigido: jogo PAL (50 quadros) era sempre julgado "travando" e ficava preso na resolução nativa; partida de menos
   de 2 min não ensina mais o auto-ajuste.
