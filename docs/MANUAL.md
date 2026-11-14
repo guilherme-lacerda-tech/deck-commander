@@ -1,148 +1,223 @@
-# Manual de uso do Deck Commander
+# Manual do Deck Commander
 
-Tudo se faz pelo **Telegram** (no bot que você criou na instalação) ou direto no **Steam Deck**, no modo de jogo.
-Não precisa abrir o modo Desktop no dia a dia. Instalação: [TUTORIAL-INSTALACAO.md](TUTORIAL-INSTALACAO.md).
+Versão 0.8.2 · 13/11/2026. Este manual serve para quem usa no dia a dia e para quem vai explicar a outra pessoa.
+Instalação num Deck novo: [TUTORIAL-INSTALACAO.md](TUTORIAL-INSTALACAO.md).
 
-## 1. Baixar um jogo
+---
+
+## 1. O que é, em uma frase
+Você manda um link de jogo pelo Telegram (ou toca num botão no Deck). O Deck baixa, coloca o jogo na biblioteca do
+Steam com capa, ajusta a qualidade e traduz para português, tudo sozinho.
+
+## 2. Como funciona por dentro (o que contar para quem vai usar)
+Pense em cinco peças:
+
+| Peça | Onde roda | O que faz |
+|---|---|---|
+| **Bot do Telegram** | no Deck, sempre ligado | recebe o que você manda, responde e avisa quando algo termina |
+| **qBittorrent** | no Deck, escondido | baixa os jogos (só ele fala com a internet de torrent) |
+| **Organizador** (`/sync`) | no Deck | descompacta, descobre o console, coloca o jogo na pasta certa e cria o atalho |
+| **Plugin do Decky** | dentro do Steam | faz o atalho aparecer na hora (sem reiniciar o Steam), põe capa e a aba do console; é também o **painel** |
+| **Tradutor** | no Deck (e no PC, se ligado) | tira os textos do jogo, traduz com IA e instala como mod ou cópia "(PT-BR)" |
+
+O caminho de um jogo:
+
+1. Você manda `Switch` e depois o `.torrent` ou o magnet.
+2. O bot confere se é um link válido e se o jogo já existe. Se já existir, ele avisa antes de baixar.
+3. O qBittorrent baixa o jogo. Na bateria ele espera a tomada; com menos de 30% de bateria ele sempre pausa.
+4. Quando o download termina, o organizador descompacta e reconhece o console.
+5. O plugin cria o atalho, com capa, na aba do console.
+6. Se o jogo não está em português, ele entra sozinho na fila de tradução. O bot avisa a cada 20% e quando acaba.
+7. Ao abrir o jogo, o atalho chama o `dc-launch`. Ele:
+   - escolhe o emulador;
+   - ajusta a resolução e a energia (e o modo dock, se houver monitor);
+   - guarda uma cópia dos saves;
+   - ao fechar, devolve tudo como estava.
+
+**Por que nada se estraga:**
+- O jogo original nunca é alterado. No Switch, a tradução é um mod; no retrô, é uma cópia nova.
+- Nada é apagado sem pedir confirmação, e o que você remove fica 30 dias numa quarentena.
+- Toda atualização do sistema roda mais de 800 testes antes de entrar no Deck e confere 14 itens no próprio Deck depois.
+  Se algo falhar, o Deck continua na versão anterior. Para desfazer uma atualização: `/voltar`.
+
+## 3. Baixar um jogo
 1. Mande o nome do console: `Switch`, `PS2`, `PS1`, `GBA`, `SNES`, `Wii`…
-2. Encaminhe o arquivo `.torrent` ou cole o link `magnet:`.
-3. Pronto. Quando o download terminar, o bot avisa e o jogo aparece na aba do console, com capa.
+2. Encaminhe o arquivo `.torrent` ou cole o link `magnet:`. Também vale tudo numa mensagem só: `PS2 magnet:?xt=…`.
+3. Pronto. O bot avisa quando terminar, e o jogo aparece na aba do console, com capa.
 
-- **Repetido?** O bot avisa **antes** de baixar. Quer mesmo assim: `/baixar`.
-- **Na bateria** os downloads esperam a tomada (abaixo de 30% sempre pausam). Liberar: `/bateria sim`.
-- **O bot perguntou o console?** Responda com `/console <código> <console>` (o código vem na pergunta).
-- Fila e controle: `/queue` (fila) · `/pause` · `/resume` · `/disk` (espaço livre).
+| Situação | O que acontece |
+|---|---|
+| Jogo repetido | O bot avisa **antes** de baixar. Quer mesmo assim: `/baixar` |
+| Link incompleto, arquivo que não é `.torrent`, console que não existe | O bot explica o que está errado e não baixa |
+| Torrent sem ninguém compartilhando | Depois de 30 min o bot avisa; os outros downloads continuam andando |
+| Disco cheio ou cartão SD fora | O bot avisa; libere espaço ou recoloque o cartão e mande `/resume` |
+| Na bateria | Espera a tomada. Liberar: `/bateria sim` |
+| O bot perguntou o console | Responda `/console <código> <console>` (o código vem na pergunta) |
 
-## 2. Encontrar e jogar
-- No modo de jogo, cada console tem a **sua aba** (PlayStation 2, Nintendo Switch…). Abas vazias ficam escondidas.
-- **Em português**: aba com tudo que já está em português (oficial, traduzido ou dublado).
-- **Computador**: os jogos do seu PC (veja a seção 6).
-- Jogo novo não apareceu? Espere ~10 s. Se não vier: `/sync`, e em último caso `/reiniciar` (reinicia o Steam).
+Fila: `/queue` · `/pause` · `/resume` · `/disk` (espaço).
 
-## 3. Tradução para português
-- **Automática:** jogo baixado que não está em português entra na fila sozinho e chega traduzido. O bot avisa a
-  cada 20% e quando termina.
-- **Manual:** `/traduzir <jogo>`. Todos os jogos de uma vez: `/traduzir biblioteca` (pergunta antes).
-- **Jogo de motor diferente** (Unity, GameMaker, Godot, RE Engine, RPG Maker, CRI): o bot pergunta antes,
-  com o número de frases e o tempo estimado. Responda **Sim** ou **Não**.
-- Acompanhar: `/traduzir status` · lista: `/traduzir lista` · desfazer: `/traduzir desfazer <jogo>`.
-- **Travou?** Se uma tradução ficar 45 min sem avançar, o bot avisa. `/traduzir parar <código>` libera e
-  `/traduzir retomar <código>` continua de onde parou (nada traduzido se perde).
-- **Switch:** a tradução vira um mod. O jogo precisa estar em **inglês** (padrão do Ryujinx). Viu quadradinhos no
-  lugar de ã/õ/ç? Avise quem cuida do projeto: dá para trocar esses acentos.
-- **Retrô:** sai uma cópia "(PT-BR)" que substitui o atalho do original. O original fica guardado (`/devolver`).
-- Não dá para traduzir: jogos com o pacote criptografado (seria preciso quebrar a proteção do jogo).
+## 4. Encontrar e jogar
+- Cada console tem a **sua aba** (PlayStation 2, Nintendo Switch…). Aba vazia fica escondida.
+- **Em português:** tudo que já está em português (oficial, traduzido ou dublado).
+- **Computador:** os jogos do PC (seção 9).
+- O jogo novo não apareceu? Espere uns 10 segundos. Se ainda não vier, mande `/sync`, e em último caso `/reiniciar`
+  (reinicia o Steam).
 
-## 4. Organizar a biblioteca
-- **Repetidos:** `/duplicados` mostra; `/remover <nº ou nome>` tira (pede confirmação). Os arquivos ficam 30 dias
-  na quarentena antes de sumir.
-- **Tirou um jogo pelo Steam?** Ele não volta sozinho. Para trazer de volta: `/devolver <nome>` (`/devolver` lista).
-- **Switch:** `/converter <jogo>` confere update e DLC; `organizar` arruma numa pasta só; `descompactar` tira o NSZ.
+## 5. Na TV ou no monitor (modo dock)
+Ligue o Deck no monitor ou na TV (cabo USB-C → HDMI ou dock) e abra o jogo normalmente. O Deck Commander percebe o
+monitor **no momento em que o jogo abre** e:
+- coloca a **energia no máximo** do Deck (a dock fica na tomada, então pode);
+- **sobe a resolução** para a imagem ficar nítida na tela grande:
 
-## 5. Qualidade e controles
-- Jogo pesado ou com gráfico estranho: `/qualidade <jogo> nativo|2x|3x|padrão` muda a resolução só dele.
-  `/qualidade lista` mostra as exceções.
-- `/controles` mostra em quais emuladores o controle ainda precisa ser escolhido uma vez (no modo Desktop, abra o
-  emulador → Controles → escolha o controle do Deck).
+  | Console | Na dock |
+  |---|---|
+  | PS1 | 4x |
+  | PSP e 3DS | 3x |
+  | PS2, GameCube e Wii | 2x |
+  | Switch | já roda em modo dock, 1080p |
 
-## 5.1 Jogos retrô: botões de trás e saves
-Ligue uma vez no painel: **Deck Commander → Retrô → Ligar**. Depois, em todo jogo retrô:
+- quando o jogo fecha, **volta** tudo para o modo portátil.
+
+Detalhes que valem saber:
+- A resolução só sobe. Se você já deixou um jogo mais alto (`/qualidade <jogo> 5x`), ele fica como está.
+- Jogar na dock não muda o auto-ajuste do portátil, porque a energia e a tela são outras.
+- Ligou o monitor com o jogo já aberto? Feche e abra o jogo de novo.
+- Use um controle de verdade: Bluetooth (Xbox ou PlayStation) ou USB na dock. Pareie em Configurações → Bluetooth.
+- Não quer o modo dock? No Deck, crie o arquivo `~/.config/deck-commander/dock-desligado`.
+
+**Como conferir que funcionou:** abra um jogo de PS1, PS2 ou GameCube com o monitor ligado. A imagem fica bem mais
+nítida do que no portátil, e o log mostra a linha "monitor/TV ligado: modo dock":
+
+```bash
+tail -5 ~/.local/state/deck-commander/launch.log
+```
+
+## 6. Tradução para português
+- **Automática:** o jogo baixado que não está em português entra na fila sozinho.
+- **Manual:** `/traduzir <jogo>`. Para traduzir todos os jogos de uma vez: `/traduzir biblioteca` (ele pergunta antes).
+- **Motor diferente** (Unity, GameMaker, Godot, RE Engine, RPG Maker, CRI): o bot pergunta antes, com o número de
+  frases e o tempo estimado. Responda Sim ou Não.
+- **Acompanhar e controlar:**
+  - `/traduzir status` mostra o andamento e `/traduzir lista` mostra os jogos;
+  - `/traduzir desfazer <jogo>` desfaz a tradução;
+  - se a tradução ficar 45 min parada, o bot avisa. `/traduzir parar <código>` libera a fila, e
+    `/traduzir retomar <código>` continua de onde parou.
+- **Frase estranha:** mande a foto com `/corrigir <jogo>`.
+- **Switch:** a tradução é um mod. O jogo precisa estar em inglês, que é o padrão do Ryujinx.
+- **Retrô:** sai uma cópia "(PT-BR)" no lugar do original, que fica guardado (`/devolver` traz de volta). Ao lado
+  dela fica um patch `.bps`: quem tem o jogo original aplica com o Floating IPS.
+- **Não traduz:** jogos com pacote criptografado, porque seria preciso quebrar a proteção do jogo.
+
+## 7. Jogos retrô: botões de trás e saves
+Ligue uma vez no painel: **Deck Commander → Retrô → Ligar**.
 
 | Botão | O que faz |
 |---|---|
-| **L4** | salva o estado (save rápido); cada toque vai para um espaço novo, ficam os 10 últimos |
+| **L4** | salva o estado (save rápido); ficam os 10 últimos |
 | **R4** | carrega o save rápido mais novo |
 | **L5** (segurando) | volta no tempo |
 | **R5** | liga/desliga o turbo (2x, 3x ou 4x, escolhido no painel) |
 
-- **Save rápido x save do jogo:** o save rápido é uma "foto" do emulador e pode não abrir depois que o emulador
-  atualiza (aparece um aviso quando isso acontece). O save do jogo, feito pelo menu dele, sempre abre. Use os dois.
-- **Cópias automáticas:** antes de cada vez que o jogo abre, os saves dele são copiados (ficam as 5 últimas).
-  `/saves copias <jogo>` mostra as cópias; `/saves voltar <jogo> <n>` volta para uma delas (feche o jogo antes; o save
-  de agora também vira cópia).
-- **Filtros de tela:** painel → Retrô → Ligar/Desligar filtros (TV antiga nos consoles, grade de LCD nos portáteis).
-  Com o jogo aberto, a troca vale quando você fecha e abre o jogo.
+- **Save rápido x save do jogo:**
+  - o save rápido é uma "foto" do emulador e pode não abrir depois que o emulador atualiza (aparece um aviso);
+  - o save feito pelo menu do jogo sempre abre;
+  - use os dois.
+- **Cópias automáticas:** antes de cada vez que o jogo abre, os saves dele são copiados, e ficam as 5 últimas cópias.
+  - `/saves copias <jogo>` mostra as cópias;
+  - `/saves voltar <jogo> <n>` volta para uma delas (feche o jogo antes).
+- **Filtros de tela:** painel → Retrô. O filtro de TV antiga vale para os consoles e a grade de LCD para os portáteis.
 - **Seu layout:** se você trocar o layout de controle de um jogo no Steam, o Deck Commander não mexe mais nele.
-  Desfazer tudo: painel → Retrô → Desfazer.
-- **Conquistas (RetroAchievements):** crie a conta em retroachievements.org e entre nela dentro de cada emulador
-  (RetroArch: Configurações → Conquistas). Elas aparecem na tela do jogo e no site.
-- **Tradução para compartilhar:** ao lado da cópia "(PT-BR)" fica um arquivo `.bps`. Quem tem o jogo original aplica
-  com o Floating IPS.
+- **Conquistas:** crie uma conta em retroachievements.org e entre nela dentro de cada emulador.
 
-## 6. Jogar os jogos do PC no Deck (aba "Computador")
-1. No Deck, abra a aba **Computador** e escolha o jogo.
-2. O Deck acorda o PC e espera ele ficar pronto (de 30 a 90 s; a tela fica parada nesse tempo, é normal).
-3. O jogo abre no PC e aparece no Deck. Os botões funcionam como controle de Xbox.
-4. Para sair: botão **STEAM** → **Sair do jogo**. O jogo fecha no PC e o PC volta a dormir sozinho depois de alguns minutos.
+## 8. Qualidade e controles
+- Jogo pesado ou com gráfico estranho: `/qualidade <jogo> nativo|2x|3x|padrão` muda só ele. As exceções aparecem em
+  `/qualidade lista`.
+- **Auto-ajuste:** no portátil, a qualidade sobe enquanto o jogo roda liso e desce um nível na primeira travada.
+- **Energia:** cada console tem o seu limite de energia (TDP), que volta ao valor anterior quando o jogo fecha.
+- **Controles:** `/controles` mostra o que falta. Azahar (3DS), Cemu (Wii U) e RPCS3 (PS3) pedem que você escolha o
+  controle **uma vez**: modo Desktop → abra o emulador → Controles.
 
-- Jogo novo instalado no PC aparece no Deck sozinho quando o PC reinicia ou no dia seguinte. Para aparecer na hora,
-  rode no PC `powershell -ExecutionPolicy Bypass -File C:\dev\deck-commander\tools\pc\biblioteca-pc.ps1` (como
-  administrador) e espere até 5 min.
-- No Telegram: `/pc status` (PC acordado? quantos jogos) · `/pc acordar` · `/pc sincronizar` · `/pc listar`.
-- **Fora de casa:** a Tailscale precisa estar ligada no Deck.
-- Jogos com antitrapaça (Vanguard da Riot, EAC) podem não deixar o sistema fechá-los, mas o PC dorme mesmo assim.
+## 9. Jogos do PC no Deck (aba "Computador")
+1. Escolha o jogo na aba **Computador**.
+2. O Deck acorda o PC e espera de 30 a 90 segundos. A tela fica parada nesse tempo, e isso é normal.
+3. O jogo abre no PC e aparece no Deck.
+4. Para sair: **STEAM → Sair do jogo**. O PC volta a dormir sozinho.
 
-## 7. Levar jogos entre o Deck e o PC (nos dois sentidos)
-**Do Deck para o PC**
-1. `/transferir <jogo>`: o bot mostra o que vai e o tamanho, com o botão **Enviar pro PC**.
-2. Toque no botão. O bot acorda o PC; em até 5 min o PC começa a copiar.
-3. O bot avisa quando terminar. `/transferir fila` mostra o andamento.
+- No Telegram: `/pc status` · `/pc acordar` · `/pc sincronizar` · `/pc listar` · `/pc tv`.
+- Fora de casa, a Tailscale precisa estar ligada no Deck.
 
-**Do PC para o Deck**
-1. `/trazer` lista os jogos do PC (a lista chega sozinha quando o PC liga). `/trazer <jogo>` mostra o tamanho, o que
-   vem junto e se o emulador vai ser instalado no Deck, com o botão **Trazer pro Deck**.
-2. Toque no botão. O PC acorda, envia, confere cada arquivo no Deck e instala. O jogo entra na biblioteca do Steam.
-3. O bot avisa quando terminar. `/trazer fila` mostra o andamento.
+## 10. Levar jogos e saves entre o Deck e o PC
+- **Do Deck para o PC:** `/transferir <jogo>` e depois toque em **Enviar pro PC**.
+- **Do PC para o Deck:** `/trazer <jogo>` e depois toque em **Trazer pro Deck**.
+- **Andamento:** `/transferir fila` ou `/trazer fila`.
+- **O que vai junto:** o jogo, update, DLC, saves, mods, a configuração e os controles. Se o emulador faltar do outro
+  lado, a versão oficial é instalada junto.
+- **Segurança:** cada arquivo é conferido, a cópia continua de onde parou se cair, e nada é apagado na origem.
+- **Saves iguais nos dois lados:** `/saves <jogo>`. Vale o save mais novo. Se os dois lados mudaram, você escolhe qual
+  fica.
 
-**O emulador vai junto.** Antes de enviar, o Deck Commander vê se o emulador existe do outro lado. Se não existir,
-ele instala a versão **oficial** (da página de releases do projeto, com o sha256 publicado conferido): no PC, a
-versão Windows portátil em `D:\Emuladores` (a mesma build do Deck quando dá para saber); no Deck, o Flatpak do
-Flathub ou, sem Flatpak, o AppImage oficial. O resumo antes de enviar já diz "o emulador X vai ser instalado do
-outro lado (versão Y, da página oficial)". Dolphin no Windows é a exceção: o resumo indica a página para baixar.
+## 11. Família (Deck do irmão)
+- **Parear os dois Decks:** `/familia par` num deles e `/familia autorizar` no outro.
+- **Ver o catálogo:** `/familia` mostra o que o outro Deck tem.
+- **Puxar um jogo:** `/familia puxar <jogo>`. Isso põe o **magnet** na sua fila e copia a **tradução pronta**.
+- Arquivo de jogo nunca passa de um Deck para o outro. Uma trava automática garante isso.
 
-- Vai **tudo**: jogo, update, DLC, saves, configuração do emulador (geral e do jogo), controles, mods, keys/firmware/BIOS.
-  Do PC para o Deck, a configuração **geral** do emulador do Deck é mantida (ela está ajustada para o Deck); saves,
-  config do jogo, mods e keys/BIOS do PC entram.
-- Seguro: cada arquivo é conferido (sha256); se cair, continua de onde parou; antes de sobrescrever qualquer coisa
-  do outro lado, uma cópia vai para `_backup-deck-commander`; nada é apagado na origem. O PC não dorme enquanto copia.
-- No PC: jogos em `D:\DeckCommander\Jogos\<console>\<jogo>`, emuladores em `D:\Emuladores`. No Deck: jogos em
-  `~/Emulation/roms/<console>/<jogo>`.
-- Depois da cópia: na primeira vez, escolha o controle na tela de controles do emulador. Os primeiros minutos
-  podem engasgar enquanto os shaders são refeitos (normal).
-- **Jogar esse jogo do PC também no Deck (streaming):** crie um atalho dele (.lnk, que abre o emulador com o jogo)
-  na pasta `C:\Users\Public\Documents\Deck Commander\Jogos do PC`. Ele entra na aba **Computador** como os outros
-  jogos do PC.
-
-## 8. Saúde e segurança
-- `/status`: tudo que está rodando, último backup, espaço livre.
+## 12. Saúde e segurança
+- `/status`: o que está rodando, o último backup e o espaço livre.
 - `/diagnostico`: procura problemas e diz como resolver.
-- `/sos`: modo seguro (desliga as automações, não apaga nada). `/sos off` volta ao normal.
-- Backup diário das configurações e saves; testes automáticos toda semana; nada é apagado sem confirmação.
-- Quarentena: `/quarantine list` · `review <id>` · `clear <id>`.
+- `/sos` liga o modo seguro, que desliga as automações sem apagar nada. `/sos off` volta ao normal.
+- Todo dia é feito um backup das configurações e dos saves. Toda semana rodam testes automáticos.
 
-## Pelo painel do Deck (sem Telegram)
-No modo de jogo: botão **…** → ícone do Decky (tomada) → **Deck Commander**. Tudo funciona só com o controle
-(A escolhe, B volta). A tela inicial mostra o **status** (downloads, traduções com % e previsão, espaço livre,
-bateria), o botão **Diagnóstico** (o que falta fazer) e a chave **Modo seguro**. Abaixo, uma tela para cada coisa:
+## 13. Depois de atualizar o SteamOS
+A atualização do SteamOS troca o sistema, mas **não toca na sua pasta** (`/home`). Jogos, saves, traduções, o bot, o
+qBittorrent e a IA ficam todos lá e voltam sozinhos. Duas peças ficam fora dessa pasta e podem precisar de atenção:
 
-- **Telegram:** mostra se o bot está configurado e ligado ao seu celular. **Configurar bot** mostra o QR do
-  @BotFather e um campo para o token (aperte A no campo para abrir o teclado); depois aparece o QR do seu bot para
-  ligar o celular. O token fica só no Deck e não aparece na tela.
-- **Downloads:** lista com andamento, pausar/retomar (um ou todos), **Baixar fora da tomada** e **Procurar jogos
-  repetidos** (cada um com **Remover**, que mostra antes o que vai acontecer e pede confirmação).
-- **Tradução:** **Traduzir sozinho** liga/desliga a tradução automática; **Perguntas** (Sim/Não dos jogos de motor
-  diferente e da tradução fora do padrão); **Tarefas** com Parar/Retomar; **Não traduzidos** com o botão Traduzir.
-- **PC:** campos do PC (IP de casa, rede de casa, MAC, IP da Tailscale, porteiro e código, opcionais), **Salvar**,
-  **Testar conexão**, **Acordar PC**, **Sincronizar jogos do PC** e a lista dos jogos do PC.
-- **Transferir jogos (Deck ⇄ PC):** dois blocos, **Do Deck para o PC** e **Do PC para o Deck**. Em cada um, busque o
-  jogo, escolha na lista, veja o tamanho, o que vai junto e se o emulador vai ser instalado do outro lado, e toque em
-  **Enviar pro PC** / **Trazer pro Deck** (pede confirmação). A fila mostra os dois sentidos.
-- **Qualidade e controles:** resolução por jogo (padrão, nativo, 2x, 3x…) e quais emuladores ainda precisam que
-  você escolha o controle uma vez (no modo Desktop).
-- **Biblioteca e desempenho:** situação dos atalhos criados pelo plugin e o ajuste de desempenho do jogo aberto.
+| Sintoma depois do update | Causa | O que fazer |
+|---|---|---|
+| O painel do Deck Commander (e os outros plugins) sumiu do menu **…** | o SteamOS apagou o serviço do Decky Loader | reinstale o Decky (decky.xyz, como na instalação). Os plugins e as configurações continuam lá e voltam juntos |
+| `/pc` ou a Família não conectam fora de casa | a Tailscale fica em `/opt` e pode ser apagada | rode de novo o passo da Tailscale do tutorial |
 
-O painel faz exatamente o mesmo que os comandos do bot (por baixo, `python3 -m dc.painel <ação>`). Se algo der
-errado, aparece uma mensagem simples na própria tela; detalhes ficam em `~/.local/state/deck-commander/painel.log`.
+Depois de qualquer atualização, mande `/diagnostico`: ele diz se algo dessas duas peças precisa de você.
+
+## 14. Pelo painel do Deck (sem Telegram)
+Botão **…** → ícone do Decky (tomada) → **Deck Commander**. Tudo funciona só com o controle: A escolhe, B volta.
+
+A tela inicial mostra:
+- downloads e traduções, com porcentagem e previsão;
+- o espaço livre e a bateria;
+- o **Diagnóstico** e o **Modo seguro**.
+
+Telas:
+- Telegram;
+- Downloads;
+- Tradução;
+- Computador;
+- Transferências;
+- Música;
+- Família;
+- Qualidade e controles;
+- Retrô;
+- Melhorias;
+- Espaço;
+- Desinstalar.
+
+O painel faz o mesmo que os comandos do bot.
+
+## 15. Roteiro para instalar e explicar (sábado)
+1. **Deck dele (uns 30 min):** siga a Parte 1 do [tutorial](TUTORIAL-INSTALACAO.md):
+   - senha;
+   - Decky;
+   - `install.sh`;
+   - criar o bot dele no Telegram pelo QR do painel. **Cada pessoa tem o próprio bot.**
+2. **Teste com um jogo leve:** mande `GBA` e um magnet. Mostre o aviso de download, a aba do console e a capa.
+3. **Mostre o painel:** **… → Deck Commander**, com status, Downloads e Diagnóstico.
+4. **Explique as três regras:**
+   - o jogo original nunca é alterado;
+   - nada é apagado sem confirmação;
+   - quando algo der errado, o primeiro passo é o `/diagnostico`.
+5. **Parte 2 do tutorial:** tradução com IA (uns 10 min).
+6. **Família:** pareie os dois Decks (`/familia par` e `/familia autorizar`).
+7. **Modo dock:** ligue o Deck no monitor e abra um jogo de PS2 para ele ver a diferença.
 
 ## Todos os comandos
 | Comando | Para quê |
@@ -157,16 +232,13 @@ errado, aparece uma mensagem simples na própria tela; detalhes ficam em `~/.loc
 | `/duplicados` · `/remover <jogo>` · `/devolver <jogo>` | organizar |
 | `/qualidade <jogo> <nível>` · `/controles` | qualidade e controles |
 | `/traduzir <jogo>` · `biblioteca` · `status` · `lista` · `parar` · `retomar` · `desfazer` · `config` | tradução |
+| `/corrigir <jogo>` (foto) | corrigir uma frase traduzida |
 | `/converter <jogo> [organizar\|descompactar]` | Switch: update/DLC/NSZ |
-| `/pc status\|acordar\|sincronizar\|listar` | jogos do PC no Deck |
-| `/transferir <jogo>` · `/transferir fila` | levar jogo para o PC |
-| `/trazer` · `/trazer <jogo>` · `/trazer fila` | trazer jogo do PC para o Deck |
+| `/pc status\|acordar\|sincronizar\|listar\|tv` | jogos do PC |
+| `/transferir <jogo>` · `/trazer <jogo>` · `fila` | levar jogos entre Deck e PC |
+| `/saves <jogo>` · `/saves copias <jogo>` · `/saves voltar <jogo> <n>` | saves |
+| `/familia` · `/familia puxar <jogo>` | Deck do irmão |
+| `/musica [playlist\|pausar\|proxima]` | Spotify |
 | `/status` · `/diagnostico` · `/sos` · `/sos off` | saúde |
-| `/reiniciar` | reiniciar o Steam |
-| `/musica [playlist\|pausar\|proxima]` · cole o link de uma playlist | Spotify no Deck |
-| `/pc tv` | PC na TV (em casa) |
-| `/familia` · `/familia puxar <jogo>` | jogos + tradução pronta do Deck do irmão |
-| `/corrigir` (foto com a legenda) | corrigir uma frase traduzida estranha |
-| `/saves <jogo> [deck\|pc]` | saves iguais no Deck e no PC |
-| `/saves copias <jogo>` · `/saves voltar <jogo> <n>` | cópias automáticas dos saves (5 últimas) |
+| `/reiniciar` · `/voltar` | reiniciar o Steam · desfazer a última atualização |
 | `/help` | lista curta no próprio bot |
