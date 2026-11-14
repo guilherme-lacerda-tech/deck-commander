@@ -262,6 +262,72 @@ def dolphin_defaults(home: Path = H) -> list[str]:
     return log
 
 
+def _trocar(p: Path, novo: str, velho: str) -> None:
+    if novo == velho:
+        return
+    orig = p.with_name(p.name + ".dc-orig")
+    if not orig.exists():
+        orig.write_text(velho, "utf-8")
+    tmp = p.with_name(p.name + ".dc-tmp")
+    tmp.write_text(novo, "utf-8")
+    os.replace(tmp, p)
+
+
+def _secao_com(text: str, section: str, linha: str) -> str:
+    """Põe `linha` (chave = valor) dentro de [section], trocando a chave se já existir."""
+    chave = linha.split("=")[0].strip()
+    out, dentro, feito = [], False, False
+    for ln in text.splitlines():
+        m = re.match(r"\s*\[(.+?)\]", ln)
+        if m:
+            if dentro and not feito:
+                out.append(linha); feito = True
+            dentro = m.group(1) == section
+        elif dentro and ln.split("=")[0].strip() == chave:
+            if not feito:
+                out.append(linha); feito = True
+            continue
+        out.append(ln)
+    if dentro and not feito:
+        out.append(linha)
+    return "\n".join(out) + "\n"
+
+
+def vibracao(home: Path = H) -> list[str]:
+    """Liga a vibração do controle nos emuladores que vinham com ela desligada (pedido 13/11/2026: "nunca senti o Deck
+    vibrar"). Medido no Deck: Ryujinx com "enable_rumble": false; Dolphin sem o motor ligado ao controle. DuckStation e
+    PCSX2 já vinham com os motores (SDL-0/LargeMotor). O resto do mapeamento não é tocado; o original fica em .dc-orig."""
+    log = []
+    for p in (x for x in _ryu(home) if x.exists()):  # Switch
+        velho = p.read_text("utf-8")
+        cfg = json.loads(velho)
+        mudou = False
+        for pad in cfg.get("input_config") or []:
+            if "Gamepad" in str(pad.get("backend", "")):
+                r = pad.setdefault("rumble", {"strong_rumble": 1.0, "weak_rumble": 1.0})
+                if r.get("enable_rumble") is not True:
+                    r["enable_rumble"] = True; mudou = True
+        if mudou:
+            _trocar(p, json.dumps(cfg, indent=2, ensure_ascii=False) + "\n", velho)
+            log.append("Ryujinx (Switch): vibração ligada")
+    d = _dolphin_dir(home)  # GameCube e Wii: o motor só vibra se estiver ligado ao controle
+    for fname, section in (("GCPadNew.ini", "GCPad1"), ("WiimoteNew.ini", "Wiimote1")):
+        p = d / fname
+        if not _ini_has(p, section, r"Device\s*=\s*SDL/") or _ini_has(p, section, r"^\s*Rumble/Motor\s*="):
+            continue  # sem controle SDL (ainda) ou o motor já tem dono: respeita
+        velho = p.read_text("utf-8", "replace")
+        _trocar(p, _secao_com(velho, section, "Rumble/Motor = Motor"), velho)
+        log.append(f"Dolphin ({'GameCube' if section == 'GCPad1' else 'Wii'}): vibração ligada")
+    for p in (x for x in _lichii(home) if x.exists()):  # Switch 2 (base yuzu/eden)
+        velho = p.read_text("utf-8", "replace")
+        novo = re.sub(r'^((?:player_0_)?vibration_enabled)=false$', r"\1=true", velho, flags=re.MULTILINE)
+        novo = re.sub(r'^((?:player_0_)?vibration_enabled)\\default=false$', r"\1\\default=true", novo, flags=re.MULTILINE)
+        if novo != velho:
+            _trocar(p, novo, velho)
+            log.append("Lichii (Switch 2): vibração ligada")
+    return log
+
+
 # melonDS (Nintendo DS): valores conferidos no código do melonDS (EmuInstance::joystickButtonDown):
 # botão = número; direcional = 0x100 | (chapéu << 4) | direção (1 cima, 2 direita, 4 baixo, 8 esquerda);
 # analógico = 0x10000 | (eixo << 24) | (sentido << 20) (0 positivo, 1 negativo). Um valor pode ter os dois.

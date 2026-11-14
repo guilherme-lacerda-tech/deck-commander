@@ -720,6 +720,10 @@ function TelaQualidade() {
     const j = d.jogos.find((x) => x.gid === gid);
     const faltam = d.controles.filter((c) => !c.ok);
     return h("div", null,
+        Sec("Perfil de imagem (todos os jogos)",
+            Lista("Perfil", Object.keys(d.perfis || {}).map((k) => ({ data: k, label: d.perfis[k] })), d.perfil,
+                (k) => fazer("perfil_definir", { perfil: k })),
+            Txt("Vale ao abrir o jogo (com o jogo aberto, feche e abra de novo).", { opacity: 0.8 })),
         Sec("Qualidade por jogo",
             Campo("Buscar jogo", busca, setBusca, { description: achados.length + " jogo(s)" }),
             Lista("Jogo", opcoesJogos(achados), gid, setGid),
@@ -907,6 +911,15 @@ function TelaRetro() {
             [2, 3, 4].map((x) => Bt("⏩ Turbo " + x + "x" + (d.turbo === x ? " ✓" : ""), () => fazer("retro_definir", { turbo: x }), { disabled: ocupado }, "t" + x)),
             d.aplicado ? Bt("↩️ Desfazer (voltar as configurações de antes)", () => fazer("retro_definir", { desfazer: true }), { disabled: ocupado }, "undo") : null,
             Msg(msg)),
+        Sec("Continuar de onde parou",
+            Txt(d.continuar
+                ? "✅ Ligado: ao abrir o jogo de novo, ele começa no ponto salvo (salvo ao apertar o botão Steam, antes do Deck dormir e a cada 10 min)."
+                : "Desligado: os jogos abrem do começo."),
+            Txt("Vale para PS1, PS2, PSP, GameCube/Wii e RetroArch. Switch, Wii U e Xbox 360 não têm save rápido: neles, use o descanso do Deck (botão de ligar).", { opacity: 0.8 }),
+            Bt(d.continuar ? "Desligar" : "Ligar", () => fazer("continuar_definir", { ligar: !d.continuar }), { disabled: ocupado }, "cont")),
+        aberto && d.rebobina ? Sec("Voltar no tempo (jogo aberto)",
+            [5, 10, 30].filter((s) => s <= d.rebobina).map((s) => Bt("⏪ Voltar " + s + " s", () => fazer("voltar_tempo", { segundos: s }), { disabled: ocupado }, "v" + s)),
+            Txt("O mesmo que segurar o L5.", { opacity: 0.8 })) : null,
         Sec("Filtros de tela (RetroArch)",
             Txt(d.filtros ? "✅ Ligados: TV de tubo (CRT) nos consoles de mesa, grade de LCD nos portáteis." : "Desligados: imagem pura."),
             Bt(d.filtros ? "Desligar filtros" : "Ligar filtros", () => fazer("retro_definir", { filtros: !d.filtros, agora: aberto }), { disabled: ocupado }, "flt")));
@@ -937,9 +950,26 @@ function Panel() {
         h(TELAS[tela], null));
 }
 
+// Continuar de onde parou (13/11/2026): a Steam fecha o emulador 0,2 s depois do "Sair do jogo" (medido), então o
+// ponto é salvo ANTES — ao apertar o botão Steam / "…" com jogo aberto e quando o Deck vai dormir.
+let ultimoPonto = 0;
+function pontoContinuar(motivo) {
+    if (!runningAppId()) return;
+    if (motivo !== "descanso" && Date.now() - ultimoPonto < 60000) return;  // menu aberto e fechado: 1 por minuto
+    ultimoPonto = Date.now();
+    call("salvar_continuar", motivo).then((r) => note("continuar: " + r)).catch(() => {});
+}
+function registrarContinuar() {
+    const regs = [];
+    try { regs.push(SteamClient.System.UI.RegisterForSystemKeyEvents(() => pontoContinuar("botão Steam"))); } catch (e) { }
+    try { regs.push(SteamClient.User.RegisterForPrepareForSystemSuspendProgress(() => pontoContinuar("descanso"))); } catch (e) { }
+    return regs;
+}
+
 var index = definePlugin(() => {
     loadedAt = Date.now();
     timer = setInterval(() => cycle(false), CYCLE_MS);
+    const regsContinuar = registrarContinuar();
     return {
         name: "Deck Commander",
         titleView: h("div", null, "Deck Commander"),
@@ -947,6 +977,7 @@ var index = definePlugin(() => {
         icon: h("span", { style: { fontSize: "18px" } }, "🎮"),
         onDismount() {
             clearInterval(timer);
+            regsContinuar.forEach((r) => { try { r && r.unregister && r.unregister(); } catch (e) { } });
         },
     };
 });

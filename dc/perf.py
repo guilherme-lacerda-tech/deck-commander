@@ -49,10 +49,11 @@ def parse_mangohud(path: Path) -> dict | None:
             fps_avg = sum(fps_values) / len(fps_values)
             fps_low = sorted(fps_values)[len(fps_values) // 100]  # 1% mais lento (com poucas amostras = mínimo)
 
-            target = 60 if fps_avg > 35 else 30
+            target = meta_quadros(fps_values)
             slow_share = sum(1 for f in fps_values if f < 0.9 * target) / len(fps_values)
 
             return {
+                "target": target,
                 "fps_avg": fps_avg,
                 "fps_low": fps_low,
                 "cpu_temp_max": cpu_temp_max,
@@ -123,6 +124,16 @@ def summary(stats: dict, watts_samples: list, wh_left: float, target: int) -> di
         "hours_left": hours_left,
         "verdict": verdict_value
     }
+
+
+def meta_quadros(fps_values: list[float]) -> int:
+    """Quantos quadros por segundo o jogo QUER (25, 30, 50 ou 60), pelo ritmo que ele alcança na maior parte do tempo.
+    Antes era "60 se a média passa de 35": jogo europeu (PAL) roda a 50 por natureza e era sempre julgado "travando"
+    — o auto-ajuste prendia na resolução nativa (achado no Castlevania PAL em 13/11/2026)."""
+    if not fps_values:
+        return 60
+    p90 = sorted(fps_values)[int(len(fps_values) * 0.9) - (1 if len(fps_values) > 1 else 0)]
+    return next((t for t in (25, 30, 50, 60) if p90 <= t * 1.04), 60)
 
 
 def verdict(fps_avg: float, fps_low: float, slow_share: float, target: int) -> str:
@@ -277,7 +288,7 @@ def finish_session(paths, game_id: str, console: str, title: str, log_dir, t0: f
     stats = parse_mangohud(log) if log else None
     stats = stats or {}
     fps_avg = stats.get("fps_avg")
-    target = 60 if (fps_avg or 0) > 35 else 30
+    target = stats.get("target") or (60 if (fps_avg or 0) > 35 else 30)
     # consumo: bateria quando está descarregando (o Deck inteiro); na tomada, só o chip
     watts = sampler.bat or sampler.apu
     data = {"title": title, "console": console, "minutos": round(dur / 60, 1),

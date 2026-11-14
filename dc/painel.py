@@ -795,7 +795,19 @@ def qualidade(p: Ponte, a: dict) -> dict:
         lay = controls.layouts()
     except Exception:  # noqa: BLE001
         lay = []
-    return {"jogos": jogos, "controles": ctl, "layouts": lay}
+    from . import perfil
+    return {"jogos": jogos, "controles": ctl, "layouts": lay, "perfil": perfil.atual(p.paths), "perfis": perfil.PERFIS}
+
+
+def perfil_definir(p: Ponte, a: dict) -> dict:
+    """Beleza / Desempenho / Retrô / Automático para todos os jogos (vale ao abrir o jogo)."""
+    from . import perfil
+    try:
+        nome = perfil.definir(p.paths, a.get("perfil", ""))
+    except ValueError:
+        raise Erro("Escolha Beleza, Desempenho, Retrô ou Automático.")
+    return {"texto": f"Perfil: {perfil.PERFIS[nome].split(' (')[0]}. Vale na próxima vez que abrir um jogo "
+                     "(com o jogo aberto, feche e abra de novo)."}
 
 
 def melhorias(p: Ponte, a: dict) -> dict:
@@ -848,8 +860,23 @@ def contexto(p: Ponte, a: dict) -> dict:
 
 
 def retro(p: Ponte, a: dict) -> dict:
+    from . import continuar
     from . import retro as RT
-    return RT.estado()
+    j = continuar.jogo_aberto(p.paths) or {}
+    emu = continuar.qual(j.get("cmd") or [])
+    return RT.estado() | {"continuar": continuar.ligado(p.paths), "rebobina": continuar.REBOBINA.get(emu, 0)}
+
+
+def continuar_definir(p: Ponte, a: dict) -> dict:
+    from . import continuar
+    continuar.definir(p.paths, bool(a.get("ligar")))
+    return {"texto": "Continuar de onde parou: " + ("ligado. Os jogos abrem no ponto salvo." if a.get("ligar")
+                     else "desligado. Os jogos abrem do começo (os pontos ficam guardados).")}
+
+
+def voltar_tempo(p: Ponte, a: dict) -> dict:
+    from . import continuar
+    return {"texto": continuar.voltar_no_tempo(p.paths, int(a.get("segundos") or 5))}
 
 
 def retro_jogos(p: Ponte, a: dict) -> dict:
@@ -915,7 +942,7 @@ ACOES = {f.__name__: f for f in (
     transferir_enviar, trazer_preparar, trazer_enviar, qualidade, qualidade_definir, controle_definir,
     downloads_limpar, traducao_limpar, desinstalar_lista, devolver, removido_perguntado, musica, musica_volume,
     musica_midia, musica_playlist, musica_salvar, musica_conectar, pc_tv, espaco_sugestoes, familia, familia_salvar,
-    familia_atualizar, familia_puxar, melhorias, melhorias_definir, contexto, retro, retro_definir, retro_jogos)}
+    familia_atualizar, familia_puxar, melhorias, melhorias_definir, contexto, retro, retro_definir, retro_jogos, perfil_definir, continuar_definir, voltar_tempo)}
 ACOES["downloads_pausar"] = lambda p, a: _pausar(p, a, True)
 ACOES["downloads_retomar"] = lambda p, a: _pausar(p, a, False)
 

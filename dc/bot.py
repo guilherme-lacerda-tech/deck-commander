@@ -361,6 +361,30 @@ class Bot:
             return self._remove(args)
         if cmd == "/qualidade":
             return self._quality(args)
+        if cmd == "/continuar":  # continuar de onde parou: sim | nao | esquecer <jogo>
+            from . import continuar
+            if args[:1] and args[0].lower() in ("sim", "nao", "não"):
+                continuar.definir(self.paths, args[0].lower() == "sim")
+            elif args[:1] and args[0].lower() == "esquecer" and args[1:]:
+                from .remove import find
+                hits = find(self._map(), " ".join(args[1:]))
+                if len(hits) != 1:
+                    return "Não achei um só jogo com esse nome."
+                return ("▶️ Ponto de continuar apagado: o jogo abre do começo na próxima vez." if continuar.esquecer(
+                    self.paths, hits[0]) else "Esse jogo não tinha ponto de continuar.")
+            return ("▶️ Continuar de onde parou: " + ("LIGADO" if continuar.ligado(self.paths) else "DESLIGADO")
+                    + ". Ligado, o jogo abre no ponto salvo (botão Steam, antes de dormir e a cada 10 min).\n"
+                    "/continuar sim|nao · /continuar esquecer <jogo> (abrir do começo)")
+        if cmd == "/perfil":  # Beleza / Desempenho / Retrô / Automático para todos os jogos
+            from . import perfil
+            nome = {"beleza": "beleza", "desempenho": "desempenho", "retro": "retro", "retrô": "retro",
+                    "auto": "auto", "automatico": "auto", "automático": "auto"}.get((args[:1] or [""])[0].lower())
+            if not nome:
+                self.next_buttons = [("✨ Beleza", "/perfil beleza"), ("⚡ Desempenho", "/perfil desempenho"),
+                                     ("📺 Retrô", "/perfil retro"), ("🤖 Automático", "/perfil auto")]
+                return "🎨 Perfil agora: " + perfil.PERFIS[perfil.atual(self.paths)] + "\nEscolha um:"
+            perfil.definir(self.paths, nome)
+            return f"🎨 Perfil: {perfil.PERFIS[nome]}. Vale na próxima vez que abrir um jogo."
         if cmd == "/controles":
             from . import controls
             return "\n".join(("✅ " if c.ok else "⚠️ ") + f"{c.emulator}: {c.detail}" for c in controls.check()) + \

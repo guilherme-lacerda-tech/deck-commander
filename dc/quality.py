@@ -163,6 +163,8 @@ def _plan(paths: Paths, game_id: str, console: str, dock: bool = False) -> list[
     n = get_override(paths, game_id)
     if dock_ligado(paths, dock) and console in DOCK_RES:
         n = min(max(n or 0, DOCK_RES[console]), MAX.get(console, 4))
+    from . import perfil  # Beleza / Desempenho / Retrô (painel): a palavra final é do perfil escolhido
+    n = perfil.nivel(paths, console, n, MAX.get(console, 4))
     if n and supported(console):
         t = _target(console)
         if t:
