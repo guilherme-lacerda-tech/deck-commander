@@ -53,7 +53,7 @@ EMUS = {
                        "savestate_10.sav"),
     "pcsx2": Emu("PCSX2", [H / ".var/app/net.pcsx2.PCSX2/config/PCSX2/sstates"], "*.10.p2s"),
     "ppsspp": Emu("PPSSPP", [H / ".var/app/org.ppsspp.PPSSPP/config/ppsspp/PSP/PPSSPP_STATE"], "*.ppst",
-                  tecla="F2", devolver_espaco=True),
+                  tecla="F9", devolver_espaco=True),
     "dolphin": Emu("Dolphin", [H / ".var/app/org.DolphinEmu.dolphin-emu/data/dolphin-emu/StateSaves"], "*.s10"),
     "retroarch": Emu("RetroArch", [], "", tecla="F9", apagar_criado=True),
 }
@@ -65,7 +65,19 @@ ATALHOS = {
                "Keyboard/Control & Keyboard/F9")],
     "dolphin": [(H / ".var/app/org.DolphinEmu.dolphin-emu/config/dolphin-emu/Hotkeys.ini", "Hotkeys",
                  "Save State/Save State Slot 10", "@(`Control_L`+`F9`)")],
+    # PSP (testado no Deck 13/11/2026): o PPSSPP não tinha tecla de salvar no teclado. Códigos do PPSSPP (1 =
+    # teclado; 139/140/141 = F9/F10/F11): os mesmos L4 salva / R4 carrega / L5 volta no tempo dos outros.
+    "ppsspp": [(H / ".var/app/org.ppsspp.PPSSPP/config/ppsspp/PSP/SYSTEM/controls.ini", "ControlMapping",
+                "Save State", "1-139"),
+               (H / ".var/app/org.ppsspp.PPSSPP/config/ppsspp/PSP/SYSTEM/controls.ini", "ControlMapping",
+                "Load State", "1-140"),
+               (H / ".var/app/org.ppsspp.PPSSPP/config/ppsspp/PSP/SYSTEM/controls.ini", "ControlMapping",
+                "Rewind", "1-141"),
+               # voltar no tempo: uma foto a cada 2 s (0 = desligado, como vinha)
+               (H / ".var/app/org.ppsspp.PPSSPP/config/ppsspp/PSP/SYSTEM/ppsspp.ini", "General",
+                "RewindSnapshotInterval", "2")],
 }
+CRIAR = {"controls.ini"}  # pode ser criado se não existir (o PPSSPP só cria quando você muda um botão)
 
 
 def qual(cmd: list[str]) -> str | None:
@@ -119,9 +131,9 @@ def preparar(emu: str) -> list[str]:
     """Põe a tecla do ponto de continuar na configuração do emulador (só se o arquivo já existe)."""
     feito = []
     for arq, secao, chave, valor in ATALHOS.get(emu, []):
-        if not arq.exists():
+        if not arq.exists() and not (arq.name in CRIAR and arq.parent.exists()):
             continue
-        velho = arq.read_text("utf-8", "replace")
+        velho = arq.read_text("utf-8-sig", "replace") if arq.exists() else ""
         novo = _ini_com(velho, secao, chave, valor)
         if novo != velho:
             tmp = arq.with_name(arq.name + ".dc-tmp")
@@ -173,8 +185,13 @@ def _novo(antes: dict, pasta: Path, padrao: str, desde: float) -> Path | None:
 
 
 def _tecla(display: str, tecla: str) -> bool:
+    """Aperta e SEGURA 0,15 s. O RetroArch olha o teclado uma vez por quadro: o "xdotool key" (aperta e solta em
+    menos de 1 ms) passava entre duas olhadas e não salvava (visto no Deck 13/11/2026)."""
     env = dict(os.environ, DISPLAY=display)
-    return subprocess.run(["xdotool", "key", tecla], env=env, capture_output=True, timeout=10).returncode == 0
+    ok = subprocess.run(["xdotool", "keydown", tecla], env=env, capture_output=True, timeout=10).returncode == 0
+    time.sleep(0.15)
+    subprocess.run(["xdotool", "keyup", tecla], env=env, capture_output=True, timeout=10)
+    return ok
 
 
 def salvar_ponto(paths, game_id: str, cmd: list[str], display: str, rom: str = "", espera: float = 8,
@@ -340,7 +357,8 @@ if __name__ == "__main__":
 
 
 # ------------------------------------------------------------------------------------------------ voltar no tempo
-REBOBINA = {"retroarch": 30, "duckstation": 10}  # até quantos segundos dá para voltar (memória de cada emulador)
+REBOBINA = {"retroarch": 30, "duckstation": 10, "ppsspp": 30}  # até quantos s dá para voltar em cada emulador
+PASSOS = {"ppsspp": 2}  # PPSSPP volta UMA foto por toque (uma a cada 2 s); os outros rebobinam enquanto segura
 
 
 def voltar_no_tempo(paths, segundos: int, tecla_fn=None) -> str:
@@ -358,10 +376,14 @@ def voltar_no_tempo(paths, segundos: int, tecla_fn=None) -> str:
     if tecla_fn is None:
         def tecla_fn(acao):
             subprocess.run(["xdotool", acao, "F11"], env=env, capture_output=True, timeout=10)
-    tecla_fn("keydown")
-    try:
-        time.sleep(seg / 2)  # a volta toca a ~2x
-    finally:
-        tecla_fn("keyup")
+    if emu in PASSOS:
+        for _ in range(max(1, seg // PASSOS[emu])):
+            tecla_fn("keydown"); time.sleep(0.15); tecla_fn("keyup"); time.sleep(0.3)
+    else:
+        tecla_fn("keydown")
+        try:
+            time.sleep(seg / 2)  # a volta toca a ~2x
+        finally:
+            tecla_fn("keyup")
     return f"Voltei cerca de {seg} s." + (f" ({EMUS[emu].nome} guarda no máximo {REBOBINA[emu]} s.)"
                                           if seg < int(segundos) else "")

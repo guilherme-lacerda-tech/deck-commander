@@ -55,7 +55,7 @@ def test_ppsspp_devolve_o_espaco_que_usou(tmp_path, monkeypatch):
     slot.write_bytes(b"save do usuario")
 
     def tecla(display, t):
-        assert t == "F2"
+        assert t == "F9"
         import os
         import time
         slot.write_bytes(b"ponto novo"); os.utime(slot, (time.time() + 1, time.time() + 1))
@@ -144,3 +144,24 @@ def test_flatpak_com_opcoes_do_medidor():
     cmd = ["flatpak", "run", "--env=MANGOHUD=1", "--filesystem=/x", "--env=VK_ADD_LAYER_PATH=/y", "net.pcsx2.PCSX2",
            "-fullscreen", "-batch", "--", "/roms/ps2/Dolphin (Retroarch).iso"]
     assert C.qual(cmd) == "pcsx2" and C.qual(["/x/Ryujinx", "/roms/ps2/duckstation.iso"]) is None
+
+
+def test_ppsspp_ganha_as_teclas_e_o_voltar_no_tempo(tmp_path, monkeypatch):
+    """No Deck o PPSSPP não tinha tecla de salvar (só cria o controls.ini quando você muda um botão)."""
+    sysdir = tmp_path / "SYSTEM"; sysdir.mkdir()
+    (sysdir / "ppsspp.ini").write_text("[General]\nRewindSnapshotInterval = 0\n[Graphics]\nX = 1\n")
+    monkeypatch.setitem(C.ATALHOS, "ppsspp", [(sysdir / "controls.ini", s, k, v) for _a, s, k, v in C.ATALHOS["ppsspp"][:3]]
+                        + [(sysdir / "ppsspp.ini", "General", "RewindSnapshotInterval", "2")])
+    assert C.preparar("ppsspp")
+    ctl = (sysdir / "controls.ini").read_text()
+    assert "[ControlMapping]" in ctl and "Save State = 1-139" in ctl and "Rewind = 1-141" in ctl
+    assert "RewindSnapshotInterval = 2" in (sysdir / "ppsspp.ini").read_text()
+
+
+def test_voltar_no_ppsspp_toca_varias_vezes(tmp_path, monkeypatch):
+    p = get_paths(tmp_path / "dc").ensure()
+    monkeypatch.setattr(C.time, "sleep", lambda s: None)
+    (p.state / "jogo-aberto.json").write_text(json.dumps({"game_id": "psp-x", "cmd": PSP, "display": ":1"}))
+    acoes = []
+    C.voltar_no_tempo(p, 10, tecla_fn=acoes.append)
+    assert acoes.count("keydown") == 5 and acoes.count("keyup") == 5
