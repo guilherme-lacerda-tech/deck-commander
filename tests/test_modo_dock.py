@@ -58,3 +58,71 @@ def test_dock_detection(tmp_path):
     assert tdp.em_dock(tmp_path) is False
     (tmp_path / "card0-DP-1" / "status").write_text("connected\n")
     assert tdp.em_dock(tmp_path) is True
+
+
+# ---- troca de monitor com o Deck rodando (dock_watch) ----
+import json  # noqa: E402
+
+from dc import dock_watch  # noqa: E402
+
+
+class FakeTdp:
+    feitos = []
+
+    def __init__(self, estado):
+        pass
+
+    def maximo(self):
+        return 15
+
+    def definir(self, w):
+        FakeTdp.feitos.append(w)
+        return True
+
+
+def _w(P, valor):
+    return dock_watch.verificar(P, detectar=lambda: valor, tdp_factory=FakeTdp)
+
+
+def test_first_read_is_not_a_change(tmp_path):
+    P = get_paths(tmp_path).ensure()
+    assert _w(P, False) is None and _w(P, False) is None
+    assert not (P.data / "launch-error.json").exists()
+
+
+def test_plug_with_game_open_raises_power_now_and_warns(tmp_path):
+    P = get_paths(tmp_path).ensure()
+    FakeTdp.feitos = []
+    _w(P, False)
+    (P.state / "jogo-aberto.json").write_text(json.dumps({"game_id": "g", "console": "ps2", "title": "Okami"}))
+    (P.state / "tdp-anterior.json").write_text('{"anterior": 12}')
+    assert _w(P, True) == "dock: conectado · energia 15 W"
+    aviso = json.loads((P.data / "launch-error.json").read_text("utf-8"))
+    assert aviso["title"].endswith("monitor conectado") and aviso["message"].startswith("Okami:")
+    assert _w(P, False) == "dock: desconectado · energia 12 W"
+    assert FakeTdp.feitos == [15, 12]
+    assert _w(P, False) is None  # sem troca, sem aviso repetido
+
+
+def test_plug_without_game_only_warns(tmp_path):
+    P = get_paths(tmp_path).ensure()
+    FakeTdp.feitos = []
+    _w(P, False)
+    assert _w(P, True) == "dock: conectado"
+    assert FakeTdp.feitos == []
+    assert "Os próximos jogos" in json.loads((P.data / "launch-error.json").read_text("utf-8"))["message"]
+
+
+def test_tdp_off_is_respected(tmp_path):
+    P = get_paths(tmp_path).ensure()
+    FakeTdp.feitos = []
+    _w(P, False)
+    (P.state / "jogo-aberto.json").write_text(json.dumps({"game_id": "g", "console": "ps2", "title": "Okami"}))
+    (P.state / "tdp-anterior.json").write_text('{"anterior": 12}')
+    (P.config / "tdp-desligado").write_text("")
+    assert _w(P, True) == "dock: conectado" and FakeTdp.feitos == []
+
+
+def test_detector_crash_never_raises(tmp_path):
+    P = get_paths(tmp_path).ensure()
+    assert dock_watch.verificar(P, detectar=lambda: 1 / 0).startswith("dock: erro")

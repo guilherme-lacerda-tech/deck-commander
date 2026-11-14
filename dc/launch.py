@@ -174,6 +174,11 @@ def main(argv: list[str]) -> None:
     import subprocess
     import time
     t0 = time.time()
+    try:  # para o vigia do monitor (dock_watch) saber qual jogo está aberto
+        (paths.state / "jogo-aberto.json").write_text(json.dumps(
+            {"game_id": game_id, "console": console, "title": title}, ensure_ascii=False), "utf-8")
+    except OSError:
+        pass
     child = subprocess.Popen(cmd)
     sampler = perf.Sampler().start() if measure else None
 
@@ -204,6 +209,7 @@ def main(argv: list[str]) -> None:
                 pass
             say(f"emulador caiu ao abrir: código {code}")
     finally:
+        (paths.state / "jogo-aberto.json").unlink(missing_ok=True)
         if saves_auto:
             try:
                 if saves_sync.pedir_ao_fechar(paths, game_id, title, time.time() - t0):

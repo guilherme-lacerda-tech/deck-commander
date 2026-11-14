@@ -122,6 +122,15 @@ def power_loop(paths: Paths, interval: float = 30) -> None:
                 pass  # desligado (arquivo não existe)
             except Exception as e:  # noqa: BLE001
                 _log(paths, "worker", f"shaders: {e}")
+        try:  # monitor/TV ligado ou tirado agora: energia na hora + aviso na tela
+            from . import dock_watch
+            if not running:
+                (paths.state / "jogo-aberto.json").unlink(missing_ok=True)  # sobra de jogo fechado à força
+            msg = dock_watch.verificar(paths)
+            if msg:
+                _log(paths, "worker", msg)
+        except Exception as e:  # noqa: BLE001
+            _log(paths, "worker", f"dock: {e}")
         if not running:  # qualidade por jogo: devolve o valor global se o jogo foi fechado à força
             try:
                 from . import quality
