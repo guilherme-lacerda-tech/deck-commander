@@ -110,6 +110,21 @@ def _run(args: list[str], timeout: int = 7200) -> dict:
         return {"raw": line}
 
 
+def restantes(au: dict) -> int:
+    """Trechos que ficaram no idioma de origem segundo o `romtranslate audit --json`. O campo "remaining" é a LISTA
+    dos trechos (falha real 14/11/2026, Nova the Squirrel: int(lista) quebrava a conferência)."""
+    for chave in ("remaining", "sourceLanguage", "untranslated"):
+        v = au.get(chave)
+        if isinstance(v, list):
+            return len(v)
+        if v not in (None, ""):
+            try:
+                return int(v)
+            except (TypeError, ValueError):
+                continue
+    return 0
+
+
 def output_name(rom: Path) -> Path:
     stem = re.sub(r"\s*\((pt-?br|br)\)\s*$", "", rom.stem, flags=re.IGNORECASE)
     return rom.with_name(f"{stem} (PT-BR){rom.suffix}")
@@ -242,7 +257,7 @@ def translate_rom(paths: Paths, rom: Path, console: str, title: str = "", chain=
     rep.translated = int(ri.get("written") or ri.get("applied") or len(lines))
     try:
         au = _run(["audit", str(proj)])
-        rep.audit_left = int(au.get("remaining") or au.get("sourceLanguage") or au.get("untranslated") or 0)
+        rep.audit_left = restantes(au)
     except (RuntimeError, ValueError, TypeError) as e:
         rep.errors.append(f"conferência: {e}")
     if rom.suffix.lower() == ".cue":
