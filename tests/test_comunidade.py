@@ -49,7 +49,7 @@ def test_nao_existe_e_72h_liberam_a_ia(P, monkeypatch):
 def test_codigo_do_disco_vai_para_a_busca(tmp_path, P):
     d = tmp_path / "mgs"
     d.mkdir()
-    (d / "mgs_cd1.bin").write_bytes(_bin_2352(iso({"/SYSTEM.CNF": b"BOOT = cdrom:\\SLUS_005.94;1\r\n"})))
+    (d / "mgs_cd1.bin").write_bytes(_bin_2352(iso({"/SYSTEM.CNF": b"BOOT = cdrom:\\slus_005.94;1\r\n"})))  # minúsculo (disco real)
     (d / "mgs_cd1.cue").write_text('FILE "mgs_cd1.bin" BINARY\n  TRACK 01 MODE2/2352\n')
     (d / "MGS.m3u").write_text("mgs_cd1.cue\n")
     assert C.serial(str(d / "MGS.m3u")) == "SLUS_005.94"

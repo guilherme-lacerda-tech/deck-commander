@@ -56,8 +56,8 @@ def serial(rom: str) -> str:
             p = alvo
         cnf = system_cnf(p) or b""
         import re
-        m = re.search(rb"(S[LC][A-Z]{2}[_-]\d{3}\.?\d{2})", cnf)
-        return m.group(1).decode() if m else ""
+        m = re.search(rb"(?i)(S[LC][A-Z]{2}[_-]\d{3}\.?\d{2})", cnf)  # o MGS russo grava "slus_005.94"
+        return m.group(1).decode().upper() if m else ""
     except Exception:  # noqa: BLE001 — sem código: a busca usa só o nome
         return ""
 
