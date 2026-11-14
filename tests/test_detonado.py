@@ -81,3 +81,25 @@ def test_sem_ia_fica_o_original(tmp_path):
     D.preparar(paths, "gba-pokemon", "Pokemon FireRed", api=_api)
     c = D.capitulo(paths, "gba-pokemon", 0, api=_api, tradutor=lambda *a: None)
     assert not c["traduzido"] and c["paragrafos"][0] == "Pallet Town"
+
+
+def test_detonado_vai_junto_para_o_jogo_traduzido(tmp_path):
+    """God of War do PSP (14/11/2026): a versão (PT-BR) substitui a russa; os 9 capítulos traduzidos vão junto."""
+    paths = get_paths(tmp_path).ensure()
+    D.preparar(paths, "psp-gow-rus", "God of War", jogo="Pokémon FireRed and LeafGreen", api=_api)
+    D.marcar(paths, "psp-gow-rus", 2)
+    assert D.herdar(paths, "psp-gow-rus", "psp-gow-pt-br")
+    assert D.info(paths, "psp-gow-pt-br")["atual"] == 2
+    assert not D.herdar(paths, "psp-gow-rus", "psp-gow-pt-br")  # já tem: não sobrescreve
+    assert not D.herdar(paths, "nao-existe", "x")
+
+
+def test_traducao_que_substitui_o_jogo_leva_o_detonado(tmp_path):
+    from dc.traducao import run
+    paths = get_paths(tmp_path / "dc").ensure()
+    D.preparar(paths, "psp-god-of-war-rus", "God of War", jogo="Pokémon FireRed and LeafGreen", api=_api)
+    (tmp_path / "roms/psp").mkdir(parents=True)
+    rom = tmp_path / "roms/psp/God of War (PT-BR).iso"
+    rom.write_bytes(b"\0" * 4096)
+    run._herdar_detonado(paths, "psp-god-of-war-rus", rom)
+    assert len(list((paths.data / "detonado").iterdir())) == 2

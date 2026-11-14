@@ -156,6 +156,26 @@ def test_ppsspp_ganha_as_teclas_e_o_voltar_no_tempo(tmp_path, monkeypatch):
     ctl = (sysdir / "controls.ini").read_text()
     assert "[ControlMapping]" in ctl and "Save State = 1-139" in ctl and "Rewind = 1-141" in ctl
     assert "RewindSnapshotInterval = 2" in (sysdir / "ppsspp.ini").read_text()
+    # o arquivo novo traz os botões padrão: o PPSSPP apaga o botão de tudo que não está nele (Deck 14/11/2026:
+    # o PSP ficou sem controle nenhum)
+    assert "Cross = 1-54,10-189" in ctl and "An.Up = 1-37,10-4003" in ctl and ctl.count("Rewind =") == 1
+
+
+def test_controls_ini_estragado_ganha_os_botoes_de_volta(tmp_path, monkeypatch):
+    """Quem já recebeu o arquivo só com as 3 teclas (0.9.0) tem os botões do PSP devolvidos."""
+    sysdir = tmp_path / "SYSTEM"; sysdir.mkdir()
+    (sysdir / "controls.ini").write_text("﻿[ControlMapping]\nSave State = 1-139\nLoad State = 1-140\n"
+                                         "Rewind = 1-141\n", "utf-8")
+    monkeypatch.setitem(C.ATALHOS, "ppsspp", [(sysdir / "controls.ini", s, k, v) for _a, s, k, v in C.ATALHOS["ppsspp"][:3]])
+    assert C.preparar("ppsspp")
+    ctl = (sysdir / "controls.ini").read_text("utf-8")
+    assert "Cross = 1-54,10-189" in ctl and "Start = 1-62,10-197" in ctl and "Save State = 1-139" in ctl
+    assert not C.preparar("ppsspp")  # 2ª vez: nada muda
+    # quem mudou os botões no PPSSPP fica com os seus
+    (sysdir / "controls.ini").write_text("[ControlMapping]\nCross = 10-190\n", "utf-8")
+    C.preparar("ppsspp")
+    ctl = (sysdir / "controls.ini").read_text("utf-8")
+    assert "Cross = 10-190" in ctl and "Circle =" not in ctl
 
 
 def test_voltar_no_ppsspp_toca_varias_vezes(tmp_path, monkeypatch):

@@ -24,7 +24,7 @@ Tudo roda a partir de `~/deck-commander` (Konsole no modo Desktop, ou SSH).
 | `python3 -m dc x qualidade [<jogo> nativo\|2x\|3x\|4x\|padrão]` | resolução só daquele jogo (sem argumentos lista os ajustes) |
 | `python3 -m dc x controles [labels\|positional]` | situação dos controles; troca o layout de botões do Switch (labels = A=A) |
 | `python3 -m dc x tabs` | regera as abas do TabMaster |
-| `python3 -m dc x patch <rom> <patch>` | aplica tradução IPS/BPS/UPS numa cópia "(patch)" |
+| `python3 -m dc x patch <rom> <patch>` | aplica tradução IPS/BPS/UPS/XDelta numa cópia "(patch)" (disco de outra versão: só com receita) |
 | `python3 -m dc x steam-restart` | reinicia o Steam (recusa se houver jogo aberto; só necessário sem o plugin) |
 
 ## Tradução e conversão (A1/A2/A3) — pelo Telegram

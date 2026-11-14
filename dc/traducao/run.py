@@ -891,6 +891,7 @@ def _dispatch(paths, store, job, cfg, progress, should_pause) -> tuple[dict, str
             store.finish(op2, True)
             from ..remove import hide
             hide(paths, job["game_id"], "substituído pela versão traduzida (PT-BR)")
+            _herdar_detonado(paths, job["game_id"], rep.output)
             rep.errors.append("o original saiu da biblioteca (arquivo guardado); para ter os dois: "
                               f"/devolver {g.get('title', '')}")
             _refresh_tabs(paths)
@@ -912,6 +913,18 @@ def _dispatch(paths, store, job, cfg, progress, should_pause) -> tuple[dict, str
         store.finish(op2, True)
         return {"acao": action, "title_id": tid, "linhas": lines}, "\n".join(lines), not any("❌" in l for l in lines)
     raise ValueError(f"tipo desconhecido: {job['type']}")
+
+
+def _herdar_detonado(paths, game_id: str, rom_nova) -> None:
+    """O detonado (já traduzido) vai para o jogo "(PT-BR)" que substituiu o original."""
+    try:
+        from .. import detonado, library
+        games, _ = library.scan([Path(rom_nova).parent.parent])  # raiz "roms" (o scan olha roms/<console>)
+        novo = next((g.game_id for g in games if Path(g.path) == Path(rom_nova)), None)
+        if novo:
+            detonado.herdar(paths, game_id, novo)
+    except Exception:  # noqa: BLE001 — o detonado nunca atrapalha a tradução
+        pass
 
 
 def main() -> None:

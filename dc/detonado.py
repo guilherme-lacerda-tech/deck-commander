@@ -223,6 +223,17 @@ def _traduzir(paths, game_id: str, textos: list[str]) -> list[str] | None:
     return [res.translated.get(str(i), t) for i, t in enumerate(textos)]
 
 
+def herdar(paths, de: str, para: str) -> bool:
+    """Jogo trocado pela versão traduzida (outro game_id): o detonado já traduzido e o capítulo onde você está vão
+    junto (visto 14/11/2026 com o God of War do PSP: 9 capítulos traduzidos ficariam presos ao jogo antigo)."""
+    import shutil
+    a, b = _pasta(paths, de), _pasta(paths, para)
+    if not (a / "indice.json").exists() or (b / "indice.json").exists():
+        return False
+    shutil.copytree(a, b, dirs_exist_ok=True)
+    return True
+
+
 def baixar_tudo(paths, game_id: str, titulo: str, api=_api, tradutor=None, log=print) -> str:
     d = info(paths, game_id) or preparar(paths, game_id, titulo, api=api)
     if d.get("erro"):

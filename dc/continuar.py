@@ -79,6 +79,49 @@ ATALHOS = {
 }
 CRIAR = {"controls.ini"}  # pode ser criado se não existir (o PPSSPP só cria quando você muda um botão)
 
+# Defeito achado no Deck 14/11/2026: o PPSSPP APAGA o botão padrão de tudo que não está no controls.ini. Criar o
+# arquivo só com as 3 teclas do ponto deixava o PSP sem nenhum botão (nem teclado nem o controle do Deck). Por isso o
+# arquivo novo (ou um já estragado, sem "Cross") começa com o padrão do próprio PPSSPP — gravado por ele (1.20.4) ao
+# sair sem controls.ini.
+PADRAO = {"controls.ini": ("ControlMapping", "Cross", """[ControlMapping]
+Up = 1-19,10-19
+Down = 1-20,10-20
+Left = 1-21,10-21
+Right = 1-22,10-22
+Circle = 1-52,10-190
+Cross = 1-54,10-189
+Square = 1-29,10-191
+Triangle = 1-47,10-188
+Start = 1-62,10-197
+Select = 1-66,10-196
+L = 1-45,10-194
+R = 1-51,10-195
+An.Up = 1-37,10-4003
+An.Down = 1-39,10-4002
+An.Left = 1-38,10-4001
+An.Right = 1-40,10-4000
+Analog limiter = 1-60
+RapidFire = 1-59
+Fast-forward = 1-61
+Pause = 1-111,10-109,10-104,10-4034
+Pause (no menu) = 1-138
+SpeedToggle = 1-68
+Analog speed = 10-4036
+Rewind = 1-67
+Toggle Debugger = 1-142
+""")}
+
+
+def _tem_chave(texto: str, secao: str, chave: str) -> bool:
+    dentro = False
+    for ln in texto.splitlines():
+        s = ln.strip().lstrip("﻿")
+        if s.startswith("[") and s.endswith("]"):
+            dentro = s[1:-1] == secao
+        elif dentro and ln.split("=")[0].strip() == chave:
+            return True
+    return False
+
 
 def qual(cmd: list[str]) -> str | None:
     """Qual emulador o comando abre. Flatpak: o nome do app (o medidor de desempenho põe opções entre "run" e o app —
@@ -134,7 +177,16 @@ def preparar(emu: str) -> list[str]:
         if not arq.exists() and not (arq.name in CRIAR and arq.parent.exists()):
             continue
         velho = arq.read_text("utf-8-sig", "replace") if arq.exists() else ""
-        novo = _ini_com(velho, secao, chave, valor)
+        base = velho
+        if arq.name in PADRAO:
+            sec_p, chave_p, texto_p = PADRAO[arq.name]
+            if not _tem_chave(velho, sec_p, chave_p):  # sem os botões: o PPSSPP ficaria sem controle
+                base = texto_p
+                for ln in velho.splitlines():  # guarda o que já havia (ex.: as teclas do ponto)
+                    if "=" in ln and not ln.strip().startswith("["):
+                        k, v = ln.split("=", 1)
+                        base = _ini_com(base, sec_p, k.strip(), v.strip())
+        novo = _ini_com(base, secao, chave, valor)
         if novo != velho:
             tmp = arq.with_name(arq.name + ".dc-tmp")
             tmp.write_text(novo, "utf-8")

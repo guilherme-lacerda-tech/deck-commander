@@ -106,6 +106,13 @@ tail -5 ~/.local/state/deck-commander/launch.log
 - **Switch:** a tradução é um mod. O jogo precisa estar em inglês, que é o padrão do Ryujinx.
 - **Retrô:** sai uma cópia "(PT-BR)" no lugar do original, que fica guardado (`/devolver` traz de volta). Ao lado
   dela fica um patch `.bps`: quem tem o jogo original aplica com o Floating IPS.
+- **Tradução feita pela comunidade (patch `.ips`, `.bps`, `.ups` ou `.xdelta`):** no Deck (Konsole),
+  `cd ~/deck-commander && python3 -m dc x patch <jogo> <patch>`. Sai um jogo novo ao lado do original, que não é alterado.
+  - O patch confere se o jogo é exatamente o que ele pede. Se não for, nada é gravado e ele explica.
+  - **Disco de outra versão** (ex.: uma ISO já traduzida para outra língua): para jogos com receita, o Deck
+    Commander leva só os arquivos traduzidos (textos e fonte) para o seu disco. Hoje com receita:
+    **God of War: Chains of Olympus** (tradução da OAleex e cia, v1.1), testado no Deck com menus, legendas e
+    acentos em português.
 - **Não traduz:** jogos com pacote criptografado, porque seria preciso quebrar a proteção do jogo.
 
 ## 7. Jogos retrô: botões de trás e saves

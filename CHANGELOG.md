@@ -11,6 +11,14 @@
 - **Vibração** ligada no Switch (Ryujinx) e no GameCube/Wii (Dolphin) — vinham desligadas.
 - **A/B por console**: NES, SNES, Game Boy e GBA podem usar "A do Deck = A do jogo".
 - **Modo repouso**: na tomada, com download/tradução, o Deck não dorme até terminar (uma permissão de administrador).
+- **Patch `.xdelta` (VCDIFF) sem programa de fora**, em pedaços (patch de 1 GB sem estourar a memória). Disco de
+  outra versão com receita: leva só os arquivos traduzidos para o seu disco. **God of War: Chains of Olympus** (PSP)
+  agora em português com a tradução da OAleex e cia (era a ISO russa): menus, legendas e acentos testados no Deck.
+- **Detonado acompanha o jogo** quando a versão "(PT-BR)" substitui a original.
+- Corrigido (achado no teste do Deck): o arquivo de controles do PSP criado para o "continuar" tinha só as teclas
+  novas, e o PPSSPP desligava **todos os outros botões** (o controle do Deck parava no PSP). Agora o arquivo novo
+  traz os botões padrão, e quem já tinha o arquivo estragado recebe os botões de volta ao abrir um jogo de PSP.
+- Corrigido: tradução de retrô pelo RomTranslate quebrava no fim ("RtsReport sem strings").
 - Corrigido: jogo PAL (50 quadros) era sempre julgado "travando" e ficava preso na resolução nativa; partida de menos
   de 2 min não ensina mais o auto-ajuste.
 

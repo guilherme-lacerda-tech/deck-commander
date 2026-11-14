@@ -3,8 +3,9 @@
 - Formato detectado pelo CONTEÚDO (assinatura), não pela extensão.
 - A ROM original nunca é alterada: o resultado vai para um arquivo novo "<nome> (patch).ext".
 - BPS/UPS conferem CRC32 de origem e destino; falha => nada é publicado e o patch vai para quarentena.
-- XDelta (VCDIFF) e instaladores .exe: detectados e recusados com motivo (precisam de xdelta3 /
-  execução no prefixo Proton — pendentes, ver relatório).
+- XDelta (VCDIFF): aplicado pelo leitor próprio (dc/vcdiff.py, 14/11/2026), em pedaços, sem carregar o jogo na memória;
+  a soma de cada pedaço confere o resultado. Disco de outra versão: só com receita (dc/traducao/transplante.py).
+- Instaladores .exe: detectados e recusados com motivo (precisam de execução no prefixo Proton).
 """
 from __future__ import annotations
 
@@ -171,13 +172,38 @@ def apply_ups(src: bytes, patch: bytes) -> bytes:
 APPLY = {"ips": apply_ips, "bps": apply_bps, "ups": apply_ups}
 
 
+def _apply_xdelta(rom: Path, patch: Path, out: Path | None) -> Path:
+    """Disco original: resultado exato. Outra versão do disco (ex.: ISO já modificada por outra tradução) com receita
+    em dc/traducao/transplante.py: leva só os arquivos traduzidos para o disco do usuário. Senão: falha, nada gravado."""
+    from . import vcdiff
+    from .traducao import transplante
+    out = Path(out) if out else rom.with_name(f"{rom.stem} (patch){rom.suffix}")
+    if out.exists():
+        raise FileExistsError(out)
+    try:
+        transplante.aplicar(rom, patch, out, out.parent / ".dc-patch", log=lambda s: None)
+    except (vcdiff.ErroVcdiff, transplante.ErroTransplante) as e:
+        raise PatchError(f"xdelta: {e}") from e
+    finally:
+        try:
+            (out.parent / ".dc-patch").rmdir()
+        except OSError:
+            pass
+    return out
+
+
 def apply_file(rom: Path, patch: Path, out: Path | None = None) -> Path:
     rom, patch = Path(rom), Path(patch)
+    with open(patch, "rb") as f:
+        data = f.read(8)
+    if detect(data) == "xdelta":
+        return _apply_xdelta(rom, patch, out)
     data = patch.read_bytes()
     kind = detect(data)
-    if kind in ("xdelta", "exe"):
-        raise PatchError(f"formato {kind} detectado: ainda não suportado (precisa de "
-                         f"{'xdelta3' if kind == 'xdelta' else 'execução no prefixo Proton'})")
+    if kind == "exe":
+        raise PatchError("formato exe detectado: ainda não suportado (precisa de execução no prefixo Proton)")
+    if kind == "xdelta":
+        return _apply_xdelta(rom, patch, out)
     if kind not in APPLY:
         raise PatchError("arquivo não é um patch IPS/BPS/UPS")
     out = Path(out) if out else rom.with_name(f"{rom.stem} (patch){rom.suffix}")
