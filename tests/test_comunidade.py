@@ -234,3 +234,15 @@ def test_ia_trabalhando_nao_conta_como_falha(P, monkeypatch):
                                                          {"game_id": "psx-h", "status": "rodando"}])
     r = C.conferir(P)
     assert r["ia_falhou"] == [] and r["sem_tradutor"] == []
+
+
+def test_jogo_com_pouco_texto_nao_vira_falha_da_ia(P, monkeypatch):
+    from dc.traducao import portugues
+    (P.data / "launch-map.json").write_text(json.dumps({"psx-h": {"title": "Hercules", "console": "psx"}}))
+    C.registrar(P, "psx-h", {"title": "Hercules", "console": "psx"})
+    monkeypatch.setattr(run, "auto_queue", lambda *a: [])
+    C.marcar(P, "psx-h", "nao_existe", store=object())
+    monkeypatch.setattr(run, "all_jobs", lambda paths: [{"game_id": "psx-h", "status": "falhou"}])
+    assert C.conferir(P)["ia_falhou"] == ["psx-h"]
+    portugues.mark(P.data, "psx-h", pouco_texto=True)
+    assert C.conferir(P)["ia_falhou"] == []

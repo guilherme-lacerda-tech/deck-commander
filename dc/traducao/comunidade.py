@@ -206,6 +206,8 @@ def conferir(paths, agora: float | None = None, intervalo: float = 0) -> dict | 
     for gid, e in dados.items():
         if e["situacao"] not in LIBERA_IA or lm.get(gid, {}).get("removed"):
             continue
+        if idi.get(gid, {}).get("pouco_texto"):
+            continue  # analisado: quase tudo é imagem (ex.: Hercules PS1, 14/11/2026) — nada a traduzir
         meus = jobs.get(gid, [])
         if any(j.get("status") in run.ATIVOS_FILA for j in meus):
             continue  # a IA está trabalhando agora
