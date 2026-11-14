@@ -104,20 +104,28 @@ def marcar(paths, gid: str, situacao: str, nota: str = "", store=None) -> str:
         raise KeyError(f"{gid} não está na fila da comunidade")
     e = dados[gid]
     e.update(situacao=situacao, nota=nota, quando=time.time())
+    salvar(paths, dados)
     titulo = e.get("titulo", gid)
+    ia = []
+    if situacao in LIBERA_IA:  # a IA entra primeiro: o aviso diz a verdade sobre o que vai acontecer
+        ia = _liberar_ia(paths, gid, store)
+    dados = carregar(paths)
+    e = dados[gid]
+    # falha real 14/11/2026: Xbox 360 e Switch 2 ouviam "a IA vai traduzir", mas não há tradutor para eles
+    vai = any("traduzindo" in ln or "fora do padrão" in ln for ln in ia)
+    e["sem_tradutor"] = situacao in LIBERA_IA and not vai
+    seguinte = ("A IA vai traduzir." if vai else
+                "A IA do Deck ainda não traduz este jogo: fica para engenharia reversa (aviso quando tiver novidade).")
     aviso = {
         "aplicado": f"🇧🇷 {titulo}: achei a tradução da comunidade e apliquei. {nota}".strip(),
-        "nao_existe": f"🔎 {titulo}: não existe tradução da comunidade. A IA vai traduzir. {nota}".strip(),
+        "nao_existe": f"🔎 {titulo}: não existe tradução da comunidade. {seguinte} {nota}".strip(),
         "precisa_voce": f"🔎 {titulo}: achei a tradução da comunidade, mas preciso de você: {nota}".strip(),
-        "sem_resposta": f"🔎 {titulo}: o PC não procurou a tradução em {ESPERA_MAX_H} h. A IA vai traduzir.",
+        "sem_resposta": f"🔎 {titulo}: o PC não procurou a tradução em {ESPERA_MAX_H} h. {seguinte}",
     }.get(situacao)
     if aviso:
         e["avisar"] = aviso
     salvar(paths, dados)
-    linhas = [aviso or f"{titulo}: {situacao}"]
-    if situacao in LIBERA_IA:
-        linhas += _liberar_ia(paths, gid, store)
-    return "\n".join(linhas)
+    return "\n".join([aviso or f"{titulo}: {situacao}"] + ia)
 
 
 def _liberar_ia(paths, gid: str, store=None) -> list[str]:
@@ -191,11 +199,24 @@ def conferir(paths, agora: float | None = None, intervalo: float = 0) -> dict | 
     situacoes: dict[str, list[str]] = {}
     for gid, e in dados.items():
         situacoes.setdefault(e["situacao"], []).append(gid)
-    ia_falhou = sorted({j["game_id"] for j in run.all_jobs(paths)
-                        if j.get("status") in ("falhou", "aguardando análise")
-                        and dados.get(j.get("game_id"), {}).get("situacao") in LIBERA_IA
-                        and not lm.get(j.get("game_id"), {}).get("removed")})
-    return {"novos": novos, "situacoes": situacoes, "ia_falhou": ia_falhou}
+    jobs: dict[str, list] = {}
+    for j in run.all_jobs(paths):
+        jobs.setdefault(j.get("game_id"), []).append(j)
+    ia_falhou, sem_tradutor = [], []
+    for gid, e in dados.items():
+        if e["situacao"] not in LIBERA_IA or lm.get(gid, {}).get("removed"):
+            continue
+        meus = jobs.get(gid, [])
+        if any(j.get("status") in run.ATIVOS_FILA for j in meus):
+            continue  # a IA está trabalhando agora
+        if any(j.get("status") == "concluido" for j in meus):
+            continue
+        if any(j.get("status") in ("falhou", "aguardando análise") for j in meus):
+            ia_falhou.append(gid)
+        elif e.get("sem_tradutor"):
+            sem_tradutor.append(gid)
+    return {"novos": novos, "situacoes": situacoes, "ia_falhou": sorted(ia_falhou),
+            "sem_tradutor": sorted(sem_tradutor)}
 
 
 def aplicar(paths, gid: str, patch: Path, disco: Path | None = None, store=None) -> str:

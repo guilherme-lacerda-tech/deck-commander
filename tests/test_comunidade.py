@@ -35,7 +35,8 @@ def test_fila_espera_e_libera(P):
 
 def test_nao_existe_e_72h_liberam_a_ia(P, monkeypatch):
     chamados = []
-    monkeypatch.setattr(run, "auto_queue", lambda paths, store, gids: chamados.append(gids) or ["🈯 IA"])
+    monkeypatch.setattr(run, "auto_queue", lambda paths, store, gids: chamados.append(gids)
+                        or ["🈯 X: não está em português — traduzindo sozinho"])
     C.registrar(P, "psx-a", {"title": "A"})
     C.registrar(P, "psx-b", {"title": "B"})
     assert "A IA vai traduzir" in C.marcar(P, "psx-a", "nao_existe", store=object())
@@ -211,3 +212,25 @@ def test_disco_ja_com_patch_de_outro_fa_recusa_patch_sem_conferencia(P, tmp_path
     assert not iso_.with_name("KH Final Mix ENG Patch (PT-BR).iso").exists()
     assert C.carregar(P)["ps2-kh"]["situacao"] == "procurar"
     assert C.JA_MODIFICADO.search("Need for Speed [RUS NTSC]") is None  # versão russa refeita (NFS deu certo)
+
+
+def test_console_sem_tradutor_nao_promete_ia_e_aparece_no_conferir(P, monkeypatch):
+    """Falha real 14/11/2026: Call of Duty (Xbox 360) e jogos de Switch 2 ouviam "A IA vai traduzir"."""
+    (P.data / "launch-map.json").write_text(json.dumps({"x360-cod": {"title": "CoD", "console": "x360"}}))
+    C.registrar(P, "x360-cod", {"title": "CoD", "console": "x360"})
+    monkeypatch.setattr(run, "auto_queue", lambda *a: [])  # sem tradutor: a IA não pega
+    r = C.marcar(P, "x360-cod", "nao_existe", store=object())
+    assert "A IA vai traduzir" not in r and "engenharia reversa" in r
+    monkeypatch.setattr(run, "all_jobs", lambda paths: [])
+    assert C.conferir(P)["sem_tradutor"] == ["x360-cod"]
+
+
+def test_ia_trabalhando_nao_conta_como_falha(P, monkeypatch):
+    (P.data / "launch-map.json").write_text(json.dumps({"psx-h": {"title": "H", "console": "psx"}}))
+    C.registrar(P, "psx-h", {"title": "H", "console": "psx"})
+    monkeypatch.setattr(run, "auto_queue", lambda *a: ["🈯 H: traduzindo sozinho"])
+    C.marcar(P, "psx-h", "nao_existe", store=object())
+    monkeypatch.setattr(run, "all_jobs", lambda paths: [{"game_id": "psx-h", "status": "falhou"},
+                                                         {"game_id": "psx-h", "status": "rodando"}])
+    r = C.conferir(P)
+    assert r["ia_falhou"] == [] and r["sem_tradutor"] == []
