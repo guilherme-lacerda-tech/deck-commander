@@ -74,3 +74,20 @@ def test_trava_marca_e_desmarca(tmp_path):
     assert marca.read_text() == "tradução"
     t.ajustar(None)
     assert not marca.exists()
+
+
+def test_vigia_o_botao_pelo_registro_do_sistema(tmp_path, monkeypatch):
+    """No Deck o aviso do plugin não dispara quando o pedido de dormir é recusado; a linha da Steam aparece sempre."""
+    import io
+    p = get_paths(tmp_path).ensure()
+    linhas = ("outra coisa\n" + "Error org.freedesktop.login1.BlockedByInhibitorLock: x\n" * 2)
+
+    class _J:
+        stdout = io.StringIO(linhas)
+
+    apertos = []
+    monkeypatch.setattr(R, "botao", lambda paths, *a: apertos.append(1))
+    R.vigiar_botao(p, abrir=lambda *a, **k: _J(), agora=lambda: 100.0)
+    assert apertos == [1]  # duas linhas do mesmo aperto = um aperto
+
+

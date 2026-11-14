@@ -160,6 +160,24 @@ def ao_terminar(paths, dormir=None, brilho: Path = BRILHO) -> str | None:
         return f"repouso: terminou, mas não consegui pôr o Deck para dormir ({e})"
 
 
+def vigiar_botao(paths, abrir=subprocess.Popen, agora=None) -> None:
+    """Escuta o registro do sistema: cada pedido de dormir recusado pela trava ("BlockedByInhibitorLock", gravado
+    pela Steam) é um aperto no botão de ligar -> apaga/acende a tela. Testado no Deck 14/11/2026: o aviso do plugin
+    (PrepareForSystemSuspendProgress) não dispara quando o pedido é recusado; esta linha aparece sempre."""
+    import time
+    agora = agora or time.time
+    proc = abrir(["journalctl", "-f", "-n", "0", "-o", "cat", "-t", "steam"], stdout=subprocess.PIPE,
+                 stderr=subprocess.DEVNULL, text=True)
+    ultimo = 0.0
+    for linha in proc.stdout:
+        if "BlockedByInhibitorLock" in linha and agora() - ultimo > 3:  # um aperto gera mais de uma linha
+            ultimo = agora()
+            try:
+                botao(paths)
+            except OSError:
+                pass
+
+
 def main(argv: list[str]) -> int:
     from .paths import get_paths
     if argv[:1] == ["botao"]:

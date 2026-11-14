@@ -72,6 +72,8 @@ def power_loop(paths: Paths, interval: float = 30) -> None:
                 if trava is None:  # serviço (re)começou: marca velha não pode apagar a tela sem trava de verdade
                     (paths.state / "repouso-ativo").unlink(missing_ok=True)
                     trava = repouso.Trava(marca=paths.state / "repouso-ativo")
+                    import threading  # botão de ligar com a trava: apaga/acende a tela
+                    threading.Thread(target=repouso.vigiar_botao, args=(paths,), daemon=True).start()
                 power_loop._trava = trava
                 try:
                     tors = q.torrents()

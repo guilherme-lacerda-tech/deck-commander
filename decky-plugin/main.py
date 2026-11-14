@@ -236,23 +236,6 @@ class Plugin:
         _save(str(f), cfg)
         return "medição ligada" if on else "medição desligada"
 
-    async def repouso_botao(self):
-        """Botão de ligar com o repouso segurando: apaga/acende a tela (dc.repouso)."""
-        import asyncio
-        repo = os.environ.get("DC_PAINEL_REPO") or os.path.join(HOME, "deck-commander")
-        env = {k: v for k, v in os.environ.items() if k not in ("LD_LIBRARY_PATH", "PYTHONHOME", "PYTHONPATH")}
-        if os.environ.get("LD_LIBRARY_PATH_ORIG"):
-            env["LD_LIBRARY_PATH"] = os.environ["LD_LIBRARY_PATH_ORIG"]
-        env.update(HOME=HOME, PYTHONPATH=repo, PYTHONIOENCODING="utf-8")
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                "/usr/bin/python3", "-m", "dc.repouso", "botao", cwd=repo, env=env, start_new_session=True,
-                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
-            out, _ = await asyncio.wait_for(proc.communicate(), 10)
-            return out.decode("utf-8", "replace").strip()[-200:]
-        except Exception as e:  # noqa: BLE001
-            return f"repouso: {type(e).__name__}"
-
     async def salvar_continuar(self, motivo="botão Steam"):
         """Ponto de continuar do jogo aberto (dc.continuar): botão Steam / "…" ou o Deck indo dormir."""
         import asyncio
