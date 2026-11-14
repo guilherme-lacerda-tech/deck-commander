@@ -5,6 +5,9 @@
   (`dc/traducao/comunidade.py`) antes da IA. Uma tarefa agendada no PC procura a tradução de fãs, baixa só o
   patch, confere a versão do disco, aplica (`aplicar`, inclusive jogo de vários CDs) e avisa no Telegram. Sem
   tradução de fã, ou 72 h sem o PC procurar, a IA traduz como antes.
+- Corrigido (achado no teste, 14/11): xdelta sem soma por pedaço era chamado de "exato" mesmo em disco de outra
+  versão. Agora é "sem conferência" (diz quanto veio do seu disco); e em disco que já tem patch de outro fã é
+  recusado (KH Final Mix "ENG Patch" ficava na tela preta). NFS Most Wanted BE (russo refeito) testado em PT-BR.
 - **Patch `.xdelta` com compressão secundária** (DJW/LZMA, comum nas traduções do João13 para PS2): o xdelta3 oficial
   (pacote do Arch) desempacota o patch (`recode -S none`, ~40 s para 2 GB) e o leitor próprio aplica.
 - **Monitoramento da tradução:** `conferir` de hora em hora no Deck (nenhum jogo fica fora da fila) e resumo da tarefa

@@ -113,6 +113,11 @@ tail -5 ~/.local/state/deck-commander/launch.log
   - Se o site só entrega o arquivo com clique no navegador, o bot avisa com o link: baixe pelo navegador do PC e
     salve em `Downloads\deck-traducoes`. Na próxima rodada a tarefa aplica.
   - Não existe tradução de fã? A IA traduz, como antes. Se o PC ficar 72 h sem procurar, a IA também começa.
+  - **A tradução de fã é feita para UMA versão do disco** (ex.: japonês original SLPS-25198). Se o seu disco já veio
+    com o patch de outro fã (nome com "ENG Patch", "Translated", "hack"…), o bot pede para você mandar o
+    torrent do disco original — aplicar em cima de outro patch deixa o jogo quebrado (testado: KH Final Mix
+    ficou na tela preta). Versão russa refeita costuma funcionar (NFS Most Wanted BE testado em português).
+  - Patch de PS2 do João13 vem com compressão "DJW": o Deck desempacota sozinho com o xdelta3 oficial.
   - Fila no Deck: `python3 -m dc.traducao.comunidade listar`.
 - **Automática (IA):** o jogo que não tem tradução de fã entra na fila da IA sozinho.
 - **Manual:** `/traduzir <jogo>`. Para traduzir todos os jogos de uma vez: `/traduzir biblioteca` (ele pergunta antes).

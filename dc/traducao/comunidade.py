@@ -23,6 +23,12 @@ import time
 from pathlib import Path
 
 ESPERA_MAX_H = 72
+# disco que já recebeu patch de outro fã (o nome diz): patch sem conferência em cima dele sai quebrado
+JA_MODIFICADO = __import__("re").compile(r"(?i)\bpatch(ed)?\b|translat|traduzid|\bhack|\bundub\b")
+
+
+class ErroComunidade(ValueError):
+    pass
 SITUACOES = ("procurar", "aplicado", "nao_existe", "precisa_voce", "sem_resposta")
 LIBERA_IA = ("nao_existe", "sem_resposta")
 
@@ -208,6 +214,11 @@ def aplicar(paths, gid: str, patch: Path, disco: Path | None = None, store=None)
     patches.ULTIMO_XDELTA.clear()
     feito = patches.apply_file(alvo, Path(patch), saida)
     rel = dict(patches.ULTIMO_XDELTA)
+    if rel.get("modo") == "sem_conferencia" and JA_MODIFICADO.search(f"{g.get('title', '')} {alvo.name}"):
+        Path(feito).unlink(missing_ok=True)  # falha real 14/11/2026: KH Final Mix "ENG Patch" -> tela preta
+        raise ErroComunidade("o seu disco já tem a tradução de outro fã (o nome diz patch/translated/hack) e este "
+                             "patch não traz conferência: o resultado sai quebrado. Precisa do disco original que a "
+                             "tradução pede.")
     publicado = _montar_discos(rom_lib, alvo, Path(feito))
     store = store or Store(paths.db)
     op = store.enqueue("library-add", {"from": f"comunidade:{gid}"})
@@ -265,7 +276,11 @@ def main(argv: list[str]) -> int:
     elif argv[:1] == ["marcar"] and len(argv) >= 3:
         print(marcar(paths, argv[1], argv[2], " ".join(argv[3:])))
     elif argv[:1] == ["aplicar"] and len(argv) in (3, 4):
-        print(aplicar(paths, argv[1], Path(argv[2]), Path(argv[3]) if len(argv) == 4 else None))
+        try:
+            print(aplicar(paths, argv[1], Path(argv[2]), Path(argv[3]) if len(argv) == 4 else None))
+        except (ErroComunidade, ValueError, FileExistsError) as e:
+            print(f"NÃO APLICADO: {e}")
+            return 1
     else:
         print(__doc__)
         return 2

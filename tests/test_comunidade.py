@@ -1,6 +1,7 @@
 """Regra do usuário (14/11/2026): todo jogo novo procura PRIMEIRO uma tradução feita por fãs (a tarefa do PC busca);
 a IA só traduz quando não existe, ou quando o PC ficou 72 h sem procurar."""
 import json
+from pathlib import Path
 
 import pytest
 
@@ -186,3 +187,27 @@ def test_conferir_poe_na_fila_o_que_faltou_e_aponta_ia_que_falhou(P, monkeypatch
 def test_avisar_vai_para_o_telegram_uma_vez(P):
     C.avisar(P, "Resumo: 2 aplicados")
     assert C.avisos(P) == ["Resumo: 2 aplicados"] and C.avisos(P) == []
+
+
+def test_disco_ja_com_patch_de_outro_fa_recusa_patch_sem_conferencia(P, tmp_path, monkeypatch):
+    """Falha real 14/11/2026: KH Final Mix "ENG Patch Gledson999" + tradução PT feita para o japonês original
+    (xdelta sem soma) = tela preta. Agora é recusado e nada fica pela metade."""
+    from dc import patches
+    iso_ = tmp_path / "roms/ps2/KH/KH Final Mix ENG Patch.iso"
+    iso_.parent.mkdir(parents=True)
+    iso_.write_bytes(b"\0" * 64)
+    (P.data / "launch-map.json").write_text(json.dumps({"ps2-kh": {"title": "Kingdom Hearts Final Mix English "
+                                                                   "Patched", "console": "ps2", "rom": str(iso_)}}))
+    C.registrar(P, "ps2-kh", {"title": "KH", "console": "ps2", "rom": str(iso_)})
+
+    def aplica(rom, patch, out):
+        Path(out).write_bytes(b"x")
+        patches.ULTIMO_XDELTA.update(modo="sem_conferencia", do_disco=0.6)
+        return Path(out)
+    monkeypatch.setattr(patches, "apply_file", aplica)
+    _escondidos, store = _publicacao_falsa(monkeypatch)
+    with pytest.raises(C.ErroComunidade, match="outro fã"):
+        C.aplicar(P, "ps2-kh", tmp_path / "pt.xdelta", store=store)
+    assert not iso_.with_name("KH Final Mix ENG Patch (PT-BR).iso").exists()
+    assert C.carregar(P)["ps2-kh"]["situacao"] == "procurar"
+    assert C.JA_MODIFICADO.search("Need for Speed [RUS NTSC]") is None  # versão russa refeita (NFS deu certo)
