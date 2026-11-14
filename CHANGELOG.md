@@ -1,6 +1,9 @@
 # Changelog
 
 ## Depois da 0.9.0 (ainda não publicado)
+- Corrigido (achado no teste, 14/11): a cópia do Nova the Squirrel traduzida pela IA travava depois do Start e
+  tinha **substituído** o original. Agora a cópia da IA entra ao lado do original; e a conferência da tradução
+  retrô (`romtranslate audit`) quebrava com a lista de trechos (`int(lista)`).
 - **Tradução da comunidade primeiro** (regra do usuário, 14/11): todo jogo novo vai para a fila de busca
   (`dc/traducao/comunidade.py`) antes da IA. Uma tarefa agendada no PC procura a tradução de fãs, baixa só o
   patch, confere a versão do disco, aplica (`aplicar`, inclusive jogo de vários CDs) e avisa no Telegram. Sem

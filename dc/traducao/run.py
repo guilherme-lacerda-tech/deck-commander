@@ -890,16 +890,16 @@ def _dispatch(paths, store, job, cfg, progress, should_pause) -> tuple[dict, str
                 from . import portugues
                 portugues.mark(paths.data, job["game_id"], pouco_texto=True)
         ok = bool(rep.output) and Path(rep.output).parent == rom.parent
-        if ok:  # ROM "(PT-BR)" entra na biblioteca e SUBSTITUI o atalho do original (sem duplicar)
+        if ok:  # ROM "(PT-BR)" entra na biblioteca AO LADO do original
+            # Falha real 14/11/2026: a cópia do Nova the Squirrel feita pela IA travava depois do Start e tinha
+            # SUBSTITUÍDO o original. Tradução por IA não é conferida jogando: o original fica até você testar.
             op2 = store.enqueue("library-add", {"from": job["op"]})
             store.claim(op2)
             syncer.add_to_steam(paths, store, op2)
             store.finish(op2, True)
-            from ..remove import hide
-            hide(paths, job["game_id"], "substituído pela versão traduzida (PT-BR)")
             _herdar_detonado(paths, job["game_id"], rep.output)
-            rep.errors.append("o original saiu da biblioteca (arquivo guardado); para ter os dois: "
-                              f"/devolver {g.get('title', '')}")
+            rep.errors.append("a cópia (PT-BR) entrou na biblioteca ao lado do original: jogue um pouco nela; se "
+                              "travar ou ficar estranha, continue no original e me avise (/corrigir)")
             _refresh_tabs(paths)
         from .. import backup
         result = {"traducao_pt_br": ok, "provider": rep.provider, "strings": getattr(rep, "strings", getattr(rep, "found", 0)), "translated": rep.translated,

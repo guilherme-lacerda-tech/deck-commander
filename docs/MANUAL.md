@@ -130,8 +130,10 @@ tail -5 ~/.local/state/deck-commander/launch.log
     `/traduzir retomar <código>` continua de onde parou.
 - **Frase estranha:** mande a foto com `/corrigir <jogo>`.
 - **Switch:** a tradução é um mod. O jogo precisa estar em inglês, que é o padrão do Ryujinx.
-- **Retrô:** sai uma cópia "(PT-BR)" no lugar do original, que fica guardado (`/devolver` traz de volta). Ao lado
-  dela fica um patch `.bps`: quem tem o jogo original aplica com o Floating IPS.
+- **Retrô (IA):** sai uma cópia "(PT-BR)" **ao lado** do original — os dois ficam na biblioteca. Jogue um pouco na
+  cópia: tradução por IA não é conferida jogando e pode travar (aconteceu com o Nova the Squirrel em 14/11/2026). Ao
+  lado dela fica um patch `.bps`: quem tem o jogo original aplica com o Floating IPS. A tradução de fãs (testada
+  pelos grupos) é a única que substitui o original.
 - **Tradução feita pela comunidade à mão (patch `.ips`, `.bps`, `.ups`, `.ppf` ou `.xdelta`):** no Deck (Konsole),
   `cd ~/deck-commander && python3 -m dc x patch <jogo> <patch>`. Sai um jogo novo ao lado do original, que não é alterado.
   - O patch confere se o jogo é exatamente o que ele pede. Se não for, nada é gravado e ele explica.
