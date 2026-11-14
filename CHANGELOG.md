@@ -1,5 +1,13 @@
 # Changelog
 
+## Depois da 0.9.0 (ainda não publicado)
+- Corrigido (achado no uso, 14/11): mandar o console **depois** de um download sem console ("Ps1") virava o console
+  do **próximo** download, e um jogo de PS2 ("(PS2)DARKWATCH.7z") foi marcado como PS1. Agora:
+  - o console respondido logo depois de um download sem console vale para ele;
+  - o nome de dentro do torrent/magnet vale mais que o console dito antes (com aviso);
+  - `/console <código ou nome> <console>` corrige um download que ainda está baixando;
+  - no `/sync`, o próprio disco diz se é PS1 ou PS2 (SYSTEM.CNF) e o jogo vai para a aba certa.
+
 ## 0.9.0 — 2026-11-14 — experiência de console
 - **Continuar de onde parou** (PS1, PS2, PSP, GameCube/Wii, RetroArch): ponto salvo ao apertar o botão Steam/"…",
   antes de dormir e a cada 10 min; o jogo abre nele. Testado no Deck em DuckStation, PCSX2, PPSSPP e RetroArch.

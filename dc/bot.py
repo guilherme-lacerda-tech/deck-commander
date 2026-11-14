@@ -54,6 +54,15 @@ ALIASES = [
 ]
 
 
+CURTO = {"psx": "PS1", "ps2": "PS2", "ps3": "PS3", "psp": "PSP", "switch": "Switch", "nds": "DS", "n3ds": "3DS",
+         "gc": "GameCube", "wii": "Wii", "wiiu": "Wii U", "x360": "Xbox 360", "xbox": "Xbox"}
+
+
+def rotulo(c: str | None) -> str:
+    from .emulators import CONSOLES
+    return CURTO.get(c or "", (CONSOLES.get(c or "") or {}).get("label", c or "?"))
+
+
 def parse_console(text: str):
     import re
     t = (text or "").strip().lower()
@@ -88,7 +97,7 @@ Aviso aqui quando o download terminar.
 
 /add [console] <magnet> — baixa (console: ps2 psx gc wii snes n64 gba psp nds switch)
 /sync — leva downloads concluídos para a biblioteca  (/sync tudo confirma pacotes grandes)
-/console <id> <console> — responde quando o /sync perguntar
+/console <id ou nome> <console> — diz ou corrige o console de um download (também baixando)
 /reiniciar — reinicia o Steam para mostrar jogos novos
 /duplicados — jogos repetidos · /remover <nº ou nome> — tira um jogo (pede confirmação)
 /qualidade <jogo> nativo|2x|3x|padrão — resolução só daquele jogo · /qualidade lista
@@ -281,8 +290,14 @@ class Bot:
                 self.qbt.add(magnet, cat, str(Path(syncer._cfg(P)["downloads_root"]) / cat))
             except QbtError as e:
                 return f"❌ {e} (sem internet? o /sync continua funcionando com o que já baixou)"
-            where = cat if console else "descubro o console quando terminar; se não der, pergunto"
-            return f"Adicionado ({where}). Aviso quando terminar." + self._power_note()
+            h = dedup.magnet_hash(magnet)
+            if console:
+                self.cfg.get("sem_console", {}).pop(str(uid), None); self.save_cfg()
+                fim = f"\nConsole errado? /console {h[:8]} <console>" if h else ""
+                return f"Adicionado ({cat}). Aviso quando terminar." + fim + self._power_note()
+            self._lembrar_sem_console(uid, h, dedup.magnet_name(magnet) or "o download"); self.save_cfg()
+            return ("Adicionado (descubro o console quando terminar). Se você souber, responda só o nome do console "
+                    "(ex.: PS1).") + self._power_note()
         if cmd == "/sync":
             return syncer.run_sync(P, S, self.qbt, confirm_many=bool(args and args[0] == "tudo"),
                                    explicit=self.cfg.get("explicit"))
@@ -290,16 +305,29 @@ class Bot:
             return "Uso: /console <id> <console>" if cmd == "/console" else "Uso: /aprovar <id>"
         if cmd == "/console" and len(args) == 2:
             st = syncer._state(P)
-            h = next((k for k in st.get("pending", {}) if k.startswith(args[0])), None)
+            alvo = args[0].lower()
+            h = next((k for k in st.get("pending", {}) if k.startswith(alvo)), None)
+            nome = st.get("pending", {}).get(h) if h else None
+            if not h:  # ainda baixando (ex.: console errado escolhido na hora de mandar — Deck 14/11/2026)
+                try:
+                    ts = self.qbt.torrents()
+                except Exception:  # noqa: BLE001 — qBittorrent fora do ar
+                    ts = []
+                t = next((t for t in ts if (t.get("hash") or "").startswith(alvo)), None) or next(
+                    (t for t in ts if len(alvo) >= 3 and alvo in (t.get("name") or "").lower()), None)
+                if t:
+                    h, nome = t["hash"], t.get("name") or t["hash"][:8]
             if not h:
-                return "Não achei esse download pendente."
+                return "Não achei esse download (nem baixando, nem esperando o console)."
             console = parse_console(args[1])
             if not console:
                 return f"Não conheço o console \"{args[1][:30]}\".\n{UNKNOWN_CONSOLE}"
-            if st.get("ingested", {}).get(h, {}).get("skipped"):  # tinha sido pulado: deixa o /sync tentar de novo
-                st["ingested"].pop(h); syncer._save_state(P, st)
-            self.cfg.setdefault("explicit", {})[h] = console; self.save_cfg()
-            return f"Ok, {st['pending'][h]} = {console}. Rode /sync."
+            ing = st.get("ingested", {}).get(h, {})
+            if ing and not ing.get("skipped"):
+                return f"{nome} já foi para a biblioteca; o console dele não muda mais por aqui."
+            self._definir_console(h, console); self.save_cfg()
+            return f"Ok, {nome} = {rotulo(console)}." + (" Rode /sync." if h in st.get("pending", {}) else
+                                                         " Vale quando terminar de baixar.")
         if cmd == "/transferir":  # leva um jogo + emulador + config + saves do Deck para o PC
             from .transferir import comando_transferir
             return comando_transferir(self, args)
@@ -494,19 +522,18 @@ class Bot:
             found = parse_console(rest) if rest else None
             if rest and not found and len(rest) <= 24:
                 return f"Não conheço o console \"{rest}\". Não baixei.\n{UNKNOWN_CONSOLE}"
-            c = self._console_for(uid, found)
+            from . import dedup
+            c, aviso = self._escolher_console(uid, found, dedup.magnet_name(mm.group(0)))
             if c:
                 pend.pop(str(uid), None)
-            return self.handle(uid, chat, f"/add {c} {mm.group(0)}" if c else f"/add {mm.group(0)}")
+            r = self.handle(uid, chat, f"/add {c} {mm.group(0)}" if c else f"/add {mm.group(0)}")
+            return r + aviso if aviso and isinstance(r, str) and r.startswith("Adicionado") else r
         if doc:
             name = doc.get("file_name") or "arquivo"
             if not name.lower().endswith(".torrent"):
                 return f"Recebi {name}, mas só sei usar arquivos .torrent."
             if (doc.get("file_size") or 0) > 5 * 1024 * 1024:
                 return "Esse .torrent é grande demais (>5 MB) — não parece um .torrent válido."
-            console = self._console_for(uid, parse_console(caption) or parse_console(name))
-            if console == "switch2":
-                return "Switch 2 ainda não é suportado no Deck (o Lichii é experimental). Não baixei."
             if ops.in_safe_mode(self.paths):
                 return "Safe-mode ativo."
             try:
@@ -519,9 +546,13 @@ class Bot:
                 return f"❌ Não consegui pegar o arquivo {name} do Telegram (internet?). Encaminhe de novo daqui a pouco."
             if not looks_like_torrent(data):
                 return f"{name} não é um .torrent válido (parece outro tipo de arquivo renomeado). Não baixei."
-            cat = console or "auto"
             from . import dedup
-            dup = self._already(dedup.torrent_name(data) or name, console)
+            interno = dedup.torrent_name(data)
+            console, aviso = self._escolher_console(uid, parse_console(caption) or parse_console(name), interno)
+            if console == "switch2":
+                return "Switch 2 ainda não é suportado no Deck (o Lichii é experimental). Não baixei."
+            cat = console or "auto"
+            dup = self._already(interno or name, console)
             if dup:
                 held = self.paths.state / "held.torrent"
                 held.write_bytes(data)
@@ -532,16 +563,27 @@ class Bot:
                 self.qbt.add_file(data, name, cat, str(Path(syncer._cfg(self.paths)["downloads_root"]) / cat))
             except QbtError as e:
                 return f"❌ {e}"
-            pend.pop(str(uid), None); self.save_cfg()
+            pend.pop(str(uid), None)
+            h = dedup.info_hash(data)
+            if console:
+                self.cfg.get("sem_console", {}).pop(str(uid), None)
+            else:
+                self._lembrar_sem_console(uid, h, name[:-8])
+            self.save_cfg()
             self.log(f"{uid}: torrent {name} ({cat})")
-            label = {"switch": "Switch", "ps2": "PS2", "psx": "PS1", "nds": "DS", "psp": "PSP"}.get(cat, cat)
-            return (f"⬇️ Baixando {name[:-8]} ({label}). Aviso aqui quando terminar."
-                    if console else f"⬇️ Baixando {name[:-8]}. Não sei o console ainda — o /sync vai perguntar.") \
-                + self._power_note()
+            if console:
+                fim = f"\nConsole errado? /console {h[:8]} <console>" if h else ""
+                return f"⬇️ Baixando {name[:-8]} ({rotulo(cat)}). Aviso aqui quando terminar." + aviso + fim \
+                    + self._power_note()
+            return (f"⬇️ Baixando {name[:-8]}. Não sei o console: responda só o nome dele (ex.: PS1)."
+                    + self._power_note())
         c = parse_console(text)
         if c == "switch2":
             return "Switch 2 ainda não é suportado no Deck (o Lichii é experimental)."
         if c:
+            r = self._console_do_ultimo(uid, c)
+            if r:
+                return r
             pend[str(uid)] = {"console": c, "at": time.time()}; self.save_cfg()
             return f"Ok, próximo .torrent ou magnet = {c}. Pode encaminhar."
         import re as _re
@@ -869,6 +911,50 @@ class Bot:
             return f"{lm[g]['title']}: " + quality.set_override(self.paths, g, lm[g]["console"], args[-1].lower())
         except ValueError as ex:
             return str(ex)
+
+    def _escolher_console(self, uid: int, dito, interno: str | None):
+        """Console do download: o que a pessoa disse JUNTO > o nome de dentro do torrent > o dito ANTES.
+        Falha real 14/11/2026: "Ps1" (resposta sobre o download anterior) virou o console do próximo, e o
+        "(PS2)DARKWATCH.7z" foi marcado como PS1. O nome de dentro do torrent agora vale mais que o dito antes."""
+        from . import content
+        pista = content.classify(interno) if interno else None
+        if dito:
+            if pista and pista != dito:
+                return dito, f"\n⚠️ O download se chama «{interno}», que parece {rotulo(pista)}."
+            return dito, ""
+        antes = self._console_for(uid, None)
+        if pista:
+            if antes and antes != pista:
+                return pista, (f"\n⚠️ Você tinha dito {rotulo(antes)}, mas o próprio download se chama «{interno}». "
+                               f"Baixei como {rotulo(pista)}.")
+            return pista, ""
+        return antes, ""
+
+    def _lembrar_sem_console(self, uid: int, h: str | None, nome: str) -> None:
+        """Download sem console: o próximo nome de console que a pessoa mandar (em 10 min) vale para ELE."""
+        if h:
+            self.cfg.setdefault("sem_console", {})[str(uid)] = {"hash": h, "name": nome, "at": time.time()}
+
+    def _console_do_ultimo(self, uid: int, c: str) -> str | None:
+        s = self.cfg.get("sem_console", {}).get(str(uid))
+        if not s or time.time() - s.get("at", 0) >= PENDING_TTL:
+            return None
+        self.cfg["sem_console"].pop(str(uid))
+        self._definir_console(s["hash"], c)
+        self.save_cfg()
+        return (f"Ok, {s['name']} = {rotulo(c)}.\nPara escolher o console do próximo download, mande o nome dele de "
+                "novo antes do link.")
+
+    def _definir_console(self, h: str, c: str) -> None:
+        """Vale no /sync (explicit) e no qBittorrent (categoria). Download pulado volta a ser tentado."""
+        self.cfg.setdefault("explicit", {})[h] = c
+        st = syncer._state(self.paths)
+        if st.get("ingested", {}).get(h, {}).get("skipped"):
+            st["ingested"].pop(h); syncer._save_state(self.paths, st)
+        try:
+            self.qbt.set_category(h, c)
+        except Exception as e:  # noqa: BLE001 — o explicit já basta para o /sync
+            self.log(f"categoria não trocada no qBittorrent ({type(e).__name__}); o /sync usa o console escolhido")
 
     def _console_for(self, uid: int, found):
         if found:

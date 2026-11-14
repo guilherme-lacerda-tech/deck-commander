@@ -121,6 +121,34 @@ def torrent_name(data: bytes) -> str | None:
         return None
 
 
+def info_hash(data: bytes) -> str | None:
+    """Código do torrent (o mesmo que o qBittorrent usa): sha1 do dicionário "info" exatamente como está no arquivo."""
+    import hashlib
+    try:
+        if data[:1] != b"d":
+            return None
+        i = 1
+        while data[i:i + 1] != b"e":
+            k, i = _bdecode(data, i)
+            ini = i
+            _v, i = _bdecode(data, i)
+            if k == b"info":
+                return hashlib.sha1(data[ini:i]).hexdigest()
+    except Exception:  # noqa: BLE001 — .torrent estranho
+        return None
+    return None
+
+
+def magnet_hash(magnet: str) -> str | None:
+    """Código do torrent de um magnet (hex ou base32), em hex minúsculo."""
+    import base64
+    m = re.search(r"(?i)btih:([0-9a-f]{40}|[a-z2-7]{32})(?![0-9a-z])", magnet or "")
+    if not m:
+        return None
+    h = m.group(1).lower()
+    return base64.b32decode(h.upper()).hex() if len(h) == 32 else h
+
+
 def magnet_name(magnet: str) -> str | None:
     from urllib.parse import parse_qs, urlparse
     q = parse_qs(urlparse(magnet).query)

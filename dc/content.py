@@ -56,6 +56,47 @@ def classify(name: str, explicit: str | None = None) -> str | None:
     return None  # ambíguo -> bot pergunta
 
 
+def _setor(f, n: int, tam: int, desloc: int) -> bytes:
+    f.seek(n * tam + desloc)
+    return f.read(2048)
+
+
+def console_do_disco(arq: Path) -> str | None:
+    """PS1 ou PS2 pelo próprio disco: o SYSTEM.CNF do PS2 tem "BOOT2", o do PS1 tem "BOOT".
+    Lê imagem de 2048 bytes por setor (.iso) e de 2352 (.bin/.img de CD, modo 1 ou 2). None = não sei."""
+    try:
+        with open(arq, "rb") as f:
+            for tam, desloc in ((2048, 0), (2352, 24), (2352, 16)):
+                pvd = _setor(f, 16, tam, desloc)
+                if pvd[:6] != b"\x01CD001":
+                    continue
+                raiz_lba = int.from_bytes(pvd[156 + 2:156 + 6], "little")
+                raiz_tam = int.from_bytes(pvd[156 + 10:156 + 14], "little")
+                pos = 0
+                dados = b"".join(_setor(f, raiz_lba + i, tam, desloc) for i in range(min(8, (raiz_tam + 2047) // 2048)))
+                while pos < len(dados):
+                    n = dados[pos]
+                    if n == 0:  # fim do setor: pula para o próximo
+                        pos = (pos // 2048 + 1) * 2048
+                        continue
+                    nome = dados[pos + 33:pos + 33 + dados[pos + 32]].split(b";")[0].upper()
+                    if nome == b"SYSTEM.CNF":
+                        lba = int.from_bytes(dados[pos + 2:pos + 6], "little")
+                        cnf = _setor(f, lba, tam, desloc).upper()
+                        return "ps2" if b"BOOT2" in cnf else "psx" if b"BOOT" in cnf else None
+                    pos += n
+                return None
+    except (OSError, IndexError):
+        return None
+    return None
+
+
+def _console_pelos_discos(arquivos: list[Path]) -> str | None:
+    vistos = {console_do_disco(f) for f in arquivos if f.suffix.lower() in (".iso", ".bin", ".img")}
+    vistos.discard(None)
+    return vistos.pop() if len(vistos) == 1 else None
+
+
 GAME_EXTS = {e for spec in CONSOLES.values() for e in spec["exts"]} | ARCHIVES | {".bin", ".mdf"}
 
 
@@ -288,6 +329,13 @@ def ingest(content: Path, console: str | None, roms_root: Path, quarantine_root:
         if empty:
             q = quarantine(staging, quarantine_root, f"arquivos vazios: {[e.name for e in empty][:3]}")
             return SyncItem(name, console, "quarantined", note=f"arquivo vazio (em {q.name})", integrity="corrupted")
+        nota_disco = ""
+        if console in ("psx", "ps2"):  # falha real 14/11/2026: jogo de PS2 marcado como PS1 na hora de mandar
+            disco = _console_pelos_discos(collected)
+            if disco and disco != console:
+                rot = {"psx": "PS1", "ps2": "PS2"}
+                nota_disco = f"o disco é de {rot[disco]}, não de {rot[console]} — fui pelo disco"
+                console = disco
         if console == "ps2":  # imagem .mdf de DVD = setores de 2048 bytes = .iso (o PCSX2 abre .iso)
             for i, f in enumerate(collected):
                 if f.suffix.lower() == ".mdf" and f.stat().st_size % 2048 == 0:
@@ -330,6 +378,7 @@ def ingest(content: Path, console: str | None, roms_root: Path, quarantine_root:
         shutil.move(str(staging), str(dest))
         moved = [str(dest / g.relative_to(staging)) for g in games]
         note = "parece tradução/ROM hack — adicionado separado, original intacto" if is_translation(name) else ""
+        note = "; ".join(filter(None, [nota_disco, note]))
         return SyncItem(name, console, "added", files=moved, note=note)
     finally:
         shutil.rmtree(staging, ignore_errors=True)

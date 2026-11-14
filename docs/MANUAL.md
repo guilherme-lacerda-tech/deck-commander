@@ -46,6 +46,16 @@ O caminho de um jogo:
 2. Encaminhe o arquivo `.torrent` ou cole o link `magnet:`. Também vale tudo numa mensagem só: `PS2 magnet:?xt=…`.
 3. Pronto. O bot avisa quando terminar, e o jogo aparece na aba do console, com capa.
 
+**Console errado ou esquecido:**
+- Mandou o arquivo **sem** dizer o console? O bot pergunta na hora. Responda só o nome (ex.: `PS1`): vale para
+  **esse** download. Para o próximo, mande o console de novo antes do link.
+- O nome do próprio download vale mais que o console dito antes. Ex.: você disse `PS1` e encaminhou
+  "(PS2)Darkwatch": o bot baixa como PS2 e avisa.
+- Errou mesmo assim? Cada download mostra "Console errado? `/console <código> <console>`". Funciona enquanto ele
+  ainda está baixando (também pelo nome: `/console darkwatch ps2`).
+- PS1 e PS2 são conferidos pelo próprio disco na hora de ir para a biblioteca: um jogo de PS2 marcado como PS1 vai
+  para a aba do PS2 sozinho, e o aviso diz isso.
+
 | Situação | O que acontece |
 |---|---|
 | Jogo repetido | O bot avisa **antes** de baixar. Quer mesmo assim: `/baixar` |
@@ -53,7 +63,7 @@ O caminho de um jogo:
 | Torrent sem ninguém compartilhando | Depois de 30 min o bot avisa; os outros downloads continuam andando |
 | Disco cheio ou cartão SD fora | O bot avisa; libere espaço ou recoloque o cartão e mande `/resume` |
 | Na bateria | Espera a tomada. Liberar: `/bateria sim` |
-| O bot perguntou o console | Responda `/console <código> <console>` (o código vem na pergunta) |
+| O bot perguntou o console | Responda só o nome do console, ou `/console <código> <console>` (o código vem na pergunta) |
 
 Fila: `/queue` · `/pause` · `/resume` · `/disk` (espaço).
 
@@ -272,7 +282,7 @@ O painel faz o mesmo que os comandos do bot.
 | `Switch` / `PS2` / … + `.torrent` ou magnet | baixar um jogo |
 | `/add [console] <magnet>` | baixar direto |
 | `/sync` · `/sync tudo` | levar downloads prontos para a biblioteca |
-| `/console <código> <console>` | responder qual é o console |
+| `/console <código ou nome> <console>` | responder ou corrigir o console de um download (também baixando) |
 | `/baixar` | baixar mesmo um repetido |
 | `/queue` · `/pause` · `/resume` · `/disk` | downloads |
 | `/bateria sim\|nao` | baixar fora da tomada |

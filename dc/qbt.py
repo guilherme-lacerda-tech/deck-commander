@@ -102,6 +102,10 @@ class Qbt:
         if hashes:
             self._req("torrents/start" if self.v5 else "torrents/resume", {"hashes": "|".join(hashes)})
 
+    def set_category(self, h: str, category: str) -> None:
+        """Troca a categoria (= console) de um download. O lugar dos arquivos não muda (o /sync lê de onde estiver)."""
+        self._req("torrents/setCategory", {"hashes": h, "category": category})
+
     def delete(self, h: str, delete_files: bool = False) -> None:
         """Remove o torrent da lista. Arquivos só são apagados com delete_files=True (pedido explícito)."""
         self._req("torrents/delete", {"hashes": h, "deleteFiles": "true" if delete_files else "false"})
