@@ -43,6 +43,7 @@ class RtsReport:
     translated: int = 0
     flagged: int = 0
     skipped_multiline: int = 0
+    skipped_fragments: int = 0
     audit_left: int | None = None
     provider: str = ""
     output: str = ""
@@ -55,7 +56,8 @@ class RtsReport:
         L = [f"trechos achados: {self.found} · frases de verdade: {self.candidates} · traduzidas e gravadas: "
              f"{self.translated}",
              f"ficaram no original: {self.flagged} (não coube no espaço / IA errou)"
-             + (f" + {self.skipped_multiline} com várias linhas" if self.skipped_multiline else ""),
+             + (f" + {self.skipped_multiline} com várias linhas" if self.skipped_multiline else "")
+             + (f" + {self.skipped_fragments} pedaço(s) de frase" if self.skipped_fragments else ""),
              f"IA: {self.provider or '-'}"
              + (f" · idioma original: {self.source_lang}" if self.source_lang else "")
              + (f" · codificação: {self.encoding}" if self.encoding and self.encoding != "padrão" else "")]
@@ -157,6 +159,76 @@ def _pick(entries: list[dict]) -> list[dict]:
     return [e for e in entries if e.get("sourceText") and is_sentence(e["sourceText"]) and e.get("status") != "not_text"]
 
 
+DISC_SUFFIXES = {".cue", ".iso", ".bin", ".img", ".gcm", ".gdi"}
+
+
+def codec_de(enc: str) -> str:
+    """Codificação Python em que a frase será gravada (decide tamanho em bytes e o espaço de preenchimento)."""
+    enc = (enc or "").lower().replace("-", "").replace("_", "")
+    if "utf16" in enc:
+        return "utf-16-le"
+    if enc in NO_ACCENT_ENCODINGS or not enc:
+        return "ascii"
+    return "utf-8"
+
+
+def espaco_original(e: dict, codec: str) -> int:
+    """Bytes que a frase original ocupa. Nunca passa disso: o byte seguinte é o terminador (0x00) e, em listas
+    que o jogo lê em sequência, logo depois começa a próxima frase. `maxBytes` às vezes vem vazio (aí o limite
+    era 10**9) ou maior que a frase."""
+    try:
+        n = len(bytes.fromhex(e.get("originalBytes") or ""))
+    except ValueError:
+        n = 0
+    if not n:
+        n = len((e.get("sourceText") or "").encode(codec, "replace"))
+    mx = int(e.get("maxBytes") or 0)
+    return min(n, mx) if mx else n
+
+
+def ajustar(texto: str, espaco: int, codec: str) -> str | None:
+    """Tradução pronta para gravar no lugar da original, ou None se não serve.
+    Falha real 14/11/2026 (NES): frase menor era completada com 0x00 pelo RomTranslate; no menu, cujas opções
+    ficam uma atrás da outra ("Opção 1\\0Opção 2\\0"), os zeros a mais viravam opções vazias e o jogo ficava em
+    tela branca depois do Start. Agora completamos com espaços até o tamanho exato da original, e o terminador
+    continua no mesmo byte."""
+    if "\x00" in texto or "\t" in texto or "\n" in texto:
+        return None
+    try:
+        n = len(texto.encode(codec))
+    except UnicodeEncodeError:
+        return None
+    unidade = len(" ".encode(codec))
+    falta = espaco - n
+    if falta < 0 or falta % unidade:
+        return None
+    return texto + " " * (falta // unidade)
+
+
+def fragmento(e: dict, rom_bytes: bytes | None = None) -> bool:
+    """Trecho que começa no meio de uma frase: a varredura pegou só o fim (o começo está codificado/comprimido,
+    ex. "\\xd7al level," onde \\xd7 é uma palavra do dicionário do jogo), ou continua uma linha anterior.
+    Traduzir o pedaço sozinho estraga a frase. Sinais: começa com letra minúscula, ou o byte antes dele na ROM
+    é letra/número (a palavra foi cortada)."""
+    s = (e.get("sourceText") or "").lstrip()
+    if s[:1].isalpha() and s[:1].islower():
+        return True
+    off = e.get("offset")
+    if rom_bytes is not None and isinstance(off, int) and 0 < off <= len(rom_bytes):
+        antes = rom_bytes[off - 1]
+        if 0x30 <= antes <= 0x39 or 0x41 <= antes <= 0x5A or 0x61 <= antes <= 0x7A:
+            return True
+    return False
+
+
+def _rom_bytes(rom: Path) -> bytes | None:
+    """Bytes do cartucho (o offset do RomTranslate é a posição no próprio arquivo). Disco: None (lá o offset é
+    de dentro de um arquivo do disco)."""
+    if rom.suffix.lower() in DISC_SUFFIXES or not rom.is_file() or rom.stat().st_size > 64 * 2**20:
+        return None
+    return rom.read_bytes()
+
+
 def _best_extraction(paths: Paths, rom: Path, log=lambda s: None) -> tuple[Path, list, list, str]:
     """Extração estruturada do RomTranslate; se achar pouca frase, tenta outras codificações (UTF-8, UTF-16 e
     tabelas cirílicas CP1251/CP866/KOI8-R — versões russas de jogos de PlayStation costumam usar uma delas),
@@ -202,6 +274,10 @@ def translate_rom(paths: Paths, rom: Path, console: str, title: str = "", chain=
     rep.found = len(entries)
     multi = [e for e in picked if "\n" in e["sourceText"]]
     picked = [e for e in picked if "\n" not in e["sourceText"]]  # o "apply" do RomTranslate é uma frase por linha
+    rb = _rom_bytes(rom)
+    inteiras = [e for e in picked if not fragmento(e, rb)]
+    rep.skipped_fragments = len(picked) - len(inteiras)
+    picked = inteiras
     rep.skipped_multiline = len(multi)
     rep.candidates = len(picked)
     if rep.candidates < MIN_SENTENCES:
@@ -235,8 +311,9 @@ def translate_rom(paths: Paths, rom: Path, console: str, title: str = "", chain=
         t = ia.restore(t, codes[e["id"]])
         if enc[e["id"]] in NO_ACCENT_ENCODINGS or not enc[e["id"]]:
             t = strip_accents(t)
-        if len(t.encode("utf-8" if enc[e["id"]] not in NO_ACCENT_ENCODINGS else "ascii", "replace")) > int(
-                e.get("maxBytes") or 10**9) or "\t" in t or "\n" in t:
+        codec = codec_de(enc[e["id"]])
+        t = ajustar(t, espaco_original(e, codec), codec)
+        if t is None:
             rep.flagged += 1
             continue
         lines.append(f"{e['id']}\t{t}")
