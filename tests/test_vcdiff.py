@@ -136,3 +136,18 @@ def test_sem_xdelta3_explica_como_instalar(tmp_path, monkeypatch):
     monkeypatch.setattr(V, "programa_xdelta3", lambda: None)
     with pytest.raises(V.ErroVcdiff, match="pacman -S xdelta3"):
         V.recodificar(tmp_path / "p", tmp_path / "q")
+
+
+def test_patch_sem_soma_nao_e_chamado_de_exato(tmp_path):
+    """NFS Most Wanted BE (14/11/2026): patch sem a soma de cada pedaço aplicado num disco russo refeito parecia
+    "exato". Agora o modo é "sem_conferencia" e diz quanto veio do disco do usuário."""
+    from dc import patches
+    jogo, alvo, dados, inst, ends = _exemplo()
+    (tmp_path / "jogo.iso").write_bytes(jogo)
+    (tmp_path / "t.xdelta").write_bytes(_patch(_janela((len(jogo), 0), alvo, dados, inst, ends, soma=False)))
+    patches.apply_file(tmp_path / "jogo.iso", tmp_path / "t.xdelta", tmp_path / "s.iso")
+    assert patches.ULTIMO_XDELTA["modo"] == "sem_conferencia"
+    assert patches.ULTIMO_XDELTA["do_disco"] == round(30 / len(alvo), 3)  # 20+10 bytes vieram do jogo (os 6 "z" vêm do próprio resultado)
+    (tmp_path / "t2.xdelta").write_bytes(_patch(_janela((len(jogo), 0), alvo, dados, inst, ends)))
+    patches.apply_file(tmp_path / "jogo.iso", tmp_path / "t2.xdelta", tmp_path / "s2.iso")
+    assert patches.ULTIMO_XDELTA["modo"] == "exato"

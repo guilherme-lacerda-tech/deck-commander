@@ -252,7 +252,9 @@ def _remendos_vizinhos(iso: Path, resultado: Path, copias: list, inicios: list, 
 # ------------------------------------------------------------------------------------------------ fluxo
 def aplicar(iso: Path, patch: Path, saida: Path, trabalho: Path, receita: dict | None = None, log=print) -> dict:
     """Aplica o patch; se o disco não é o original que ele pede, leva só os arquivos da receita para a ISO do usuário.
-    Devolve {"modo": "exato"|"transplante", "arquivos": n, "saida": caminho}."""
+    Devolve {"modo": "exato"|"sem_conferencia"|"transplante", "arquivos": n, "saida": caminho, "do_disco": fração}.
+    "sem_conferencia" (14/11/2026, NFS Most Wanted BE do João13): o patch não traz a soma de cada pedaço (xdelta3 -n),
+    então não dá para saber se o disco é o original — `do_disco` diz quanto do resultado veio do disco do usuário."""
     from .. import vcdiff
     trabalho.mkdir(parents=True, exist_ok=True)
     resultado = trabalho / "resultado-do-patch.iso"
@@ -262,7 +264,9 @@ def aplicar(iso: Path, patch: Path, saida: Path, trabalho: Path, receita: dict |
     try:
         if not rel["bytes_errados"]:
             os.replace(resultado, saida)
-            return {"modo": "exato", "arquivos": 0, "saida": str(saida)}
+            do_disco = sum(c[2] for c in copias) / max(1, rel["tamanho"])
+            return {"modo": "exato" if not rel["sem_soma"] else "sem_conferencia", "arquivos": 0,
+                    "saida": str(saida), "do_disco": round(do_disco, 3)}
         cod = codigo_disco(iso)
         receita = receita or RECEITAS.get(cod or "")
         log(f"o disco não é o original que o patch pede ({len(rel['errados'])} de {rel['janelas']} pedaços não "

@@ -205,7 +205,9 @@ def aplicar(paths, gid: str, patch: Path, disco: Path | None = None, store=None)
     if alvo.suffix.lower() in (".m3u", ".cue"):
         raise ValueError("jogo de disco em .m3u/.cue: diga qual arquivo do disco recebe o patch (.bin/.iso)")
     saida = alvo.with_name(f"{alvo.stem} (PT-BR){alvo.suffix}")
+    patches.ULTIMO_XDELTA.clear()
     feito = patches.apply_file(alvo, Path(patch), saida)
+    rel = dict(patches.ULTIMO_XDELTA)
     publicado = _montar_discos(rom_lib, alvo, Path(feito))
     store = store or Store(paths.db)
     op = store.enqueue("library-add", {"from": f"comunidade:{gid}"})
@@ -214,7 +216,14 @@ def aplicar(paths, gid: str, patch: Path, disco: Path | None = None, store=None)
     store.finish(op, True)
     hide(paths, gid, "substituído pela tradução da comunidade (PT-BR)")
     run._herdar_detonado(paths, gid, publicado)
-    return marcar(paths, gid, "aplicado", f"Jogo novo: {publicado.stem}", store=store)
+    nota = f"Jogo novo: {publicado.stem}"
+    if rel.get("modo") == "sem_conferencia":
+        nota += (f". Atenção: este patch não traz conferência, e {rel.get('do_disco', 0):.0%} do resultado veio do seu "
+                 "disco; se o seu disco não é o original que a tradução pede, alguma parte pode sair errada. "
+                 "Jogue um pouco para conferir.")
+    elif rel.get("modo") == "transplante":
+        nota += ". O seu disco é de outra versão: levei só os arquivos traduzidos para ele."
+    return marcar(paths, gid, "aplicado", nota, store=store)
 
 
 def _montar_discos(rom_lib: Path, alvo: Path, feito: Path) -> Path:

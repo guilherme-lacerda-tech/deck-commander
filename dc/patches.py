@@ -20,6 +20,9 @@ class PatchError(ValueError):
     pass
 
 
+ULTIMO_XDELTA: dict = {}  # relatório do último .xdelta aplicado (modo exato / sem_conferencia / transplante)
+
+
 def detect(data: bytes) -> str:
     if data.startswith(b"PATCH"):
         return "ips"
@@ -245,7 +248,8 @@ def _apply_xdelta(rom: Path, patch: Path, out: Path | None) -> Path:
             trabalho.mkdir(exist_ok=True)
             recodificado = vcdiff.recodificar(Path(patch), trabalho / "patch-sem-compressao.xdelta")
             patch = recodificado
-        transplante.aplicar(rom, patch, out, trabalho, log=lambda s: None)
+        ULTIMO_XDELTA.clear()
+        ULTIMO_XDELTA.update(transplante.aplicar(rom, patch, out, trabalho, log=lambda s: None))
     except (vcdiff.ErroVcdiff, transplante.ErroTransplante) as e:
         raise PatchError(f"xdelta: {e}") from e
     finally:
