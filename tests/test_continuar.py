@@ -137,3 +137,10 @@ def test_medidor_de_desempenho_na_frente_nao_confunde(tmp_path, monkeypatch):
     from dc import versao_emulador as V
     com_medidor = ["/usr/bin/env", "MANGOHUD=1", "MANGOHUD_CONFIG=a=0"] + DUCK
     assert V._sem_env(com_medidor)[0] == "/x/DuckStation-x64.AppImage" and C.qual(com_medidor) == "duckstation"
+
+
+def test_flatpak_com_opcoes_do_medidor():
+    """Falha no Deck 13/11/2026: o MangoHud põe --env/--filesystem entre "run" e o app; o PCSX2 não era reconhecido."""
+    cmd = ["flatpak", "run", "--env=MANGOHUD=1", "--filesystem=/x", "--env=VK_ADD_LAYER_PATH=/y", "net.pcsx2.PCSX2",
+           "-fullscreen", "-batch", "--", "/roms/ps2/Dolphin (Retroarch).iso"]
+    assert C.qual(cmd) == "pcsx2" and C.qual(["/x/Ryujinx", "/roms/ps2/duckstation.iso"]) is None

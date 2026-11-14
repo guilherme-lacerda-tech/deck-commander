@@ -69,9 +69,16 @@ ATALHOS = {
 
 
 def qual(cmd: list[str]) -> str | None:
+    """Qual emulador o comando abre. Flatpak: o nome do app (o medidor de desempenho põe opções entre "run" e o app —
+    falha vista no Deck 13/11/2026 com o PCSX2); senão o programa depois dos "/usr/bin/env VAR=x"."""
     from .versao_emulador import _sem_env
-    texto = " ".join(str(c) for c in _sem_env(list(cmd))[:4]).lower()
-    return next((k for k in EMUS if k in texto), None)
+    c = _sem_env(list(cmd))
+    if c and Path(c[0]).name == "flatpak":
+        alvo = next((a for a in c[2:] if not a.startswith("-")), "")
+    else:
+        alvo = Path(c[0]).name if c else ""
+    alvo = alvo.lower()
+    return next((k for k in EMUS if k in alvo), None)
 
 
 def ligado(paths) -> bool:
