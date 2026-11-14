@@ -374,8 +374,9 @@ const Bt = (label, onClick, opts, key) => Row(h(D.ButtonItem, Object.assign({ la
 const Toggle = (label, checked, onChange, description) => Row(h(D.ToggleField, { label, checked: !!checked, onChange, description }));
 const Campo = (label, value, onChange, opts) => Row(h(D.TextField, Object.assign({ label, value: value || "",
     onChange: (e) => onChange(e.target.value) }, opts || {})));
+// Lista embaixo do rótulo e com a largura toda: ao lado, o painel cortava o nome ("God of …", visto no Deck 14/11/2026)
 const Lista = (label, opcoes, sel, onChange) => Row(h(D.DropdownItem, { label, rgOptions: opcoes, selectedOption: sel,
-    strDefaultLabel: "Escolha…", onChange: (o) => onChange(o.data) }));
+    strDefaultLabel: "Escolha…", onChange: (o) => onChange(o.data), childrenLayout: "below", childrenContainerWidth: "max" }));
 // Barra de progresso própria: o texto aparece inteiro (a do Steam corta com "…")
 const Barra = (pct, texto, resto, key) => {
     const tem = pct !== null && pct !== undefined;
