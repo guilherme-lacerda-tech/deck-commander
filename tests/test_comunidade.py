@@ -246,3 +246,15 @@ def test_jogo_com_pouco_texto_nao_vira_falha_da_ia(P, monkeypatch):
     assert C.conferir(P)["ia_falhou"] == ["psx-h"]
     portugues.mark(P.data, "psx-h", pouco_texto=True)
     assert C.conferir(P)["ia_falhou"] == []
+
+
+def test_jogo_que_o_autor_pediu_para_nao_usar_ia_fica_fora(P, monkeypatch):
+    from dc.traducao import portugues
+    (P.data / "launch-map.json").write_text(json.dumps({"nes-n": {"title": "N", "console": "nes"}}))
+    C.registrar(P, "nes-n", {"title": "N", "console": "nes"})
+    monkeypatch.setattr(run, "auto_queue", lambda *a: [])
+    C.marcar(P, "nes-n", "nao_existe", store=object())
+    monkeypatch.setattr(run, "all_jobs", lambda paths: [{"game_id": "nes-n", "status": "falhou"}])
+    portugues.mark(P.data, "nes-n", nao_traduzir=True)
+    assert C.conferir(P)["ia_falhou"] == []
+    assert run.translator_for(P, None, "nes-n", {"console": "nes"}, portugues.load_idiomas(P.data), [])[0] == "sem"

@@ -206,6 +206,8 @@ def conferir(paths, agora: float | None = None, intervalo: float = 0) -> dict | 
     for gid, e in dados.items():
         if e["situacao"] not in LIBERA_IA or lm.get(gid, {}).get("removed"):
             continue
+        if idi.get(gid, {}).get("nao_traduzir"):
+            continue  # pedido do autor (ex.: Nova the Squirrel: "Do not involve this game with AI-assisted projects")
         if idi.get(gid, {}).get("pouco_texto"):
             continue  # analisado: quase tudo é imagem (ex.: Hercules PS1, 14/11/2026) — nada a traduzir
         meus = jobs.get(gid, [])

@@ -165,6 +165,8 @@ def translator_for(paths: Paths, store: Store, gid: str, g: dict, idi: dict, job
         kind = "translate_retro"
     from . import motor
     mark = idi.get(gid, {})
+    if mark.get("nao_traduzir"):  # o autor do jogo pediu para não usar IA nele (Nova the Squirrel, 14/11/2026)
+        return "sem", ""
     if mark.get("pouco_texto") or (mark.get("formato") == "fechado" and not motor.stale(mark)):
         return "sem", ""
     mine = [j for j in jobs if j.get("game_id") == gid]
