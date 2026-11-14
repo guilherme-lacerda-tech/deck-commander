@@ -122,12 +122,19 @@ def main(argv: list[str]) -> None:
         say(f"versão do emulador: não conferi ({e})")
     from . import quality
     try:
+        from .tdp import em_dock
+        na_dock = em_dock()
+    except Exception:  # noqa: BLE001
+        na_dock = False
+    try:
         msg = quality.restore(paths)  # sobra de um jogo anterior fechado à força
         if msg:
             say(f"qualidade: {msg}")
         from . import autotune
         autotune.ensure(paths, game_id, launch_map[game_id]["console"])  # jogo novo: começa no nível "OK"
-        rec = quality.apply_for_launch(paths, game_id, launch_map[game_id]["console"])
+        rec = quality.apply_for_launch(paths, game_id, launch_map[game_id]["console"], dock=na_dock)
+        if na_dock:
+            say("monitor/TV ligado: modo dock (resolução maior e energia no máximo)")
     except Exception as e:  # noqa: BLE001 — ajuste de qualidade nunca impede o jogo de abrir
         say(f"qualidade: ignorado ({e})"); rec = None
     from . import perf
@@ -148,7 +155,7 @@ def main(argv: list[str]) -> None:
         from . import tdp
         tdp_ctl = tdp.Tdp(paths.state / "tdp-anterior.json")
         if not (paths.config / "tdp-desligado").exists():
-            say(f"energia: {tdp_ctl.aplicar_console(console, tdp.em_dock())}")
+            say(f"energia: {tdp_ctl.aplicar_console(console, na_dock)}")
         else:
             tdp_ctl = None
     except Exception as e:  # noqa: BLE001 — energia nunca impede o jogo de abrir
@@ -209,7 +216,8 @@ def main(argv: list[str]) -> None:
                 say(f"desempenho: {res}")
                 from . import autotune
                 v = json.loads(res).get("verdict") if res.startswith("{") else None
-                change = autotune.record(paths, game_id, console, v)
+                # na dock a energia e a resolução são outras: a partida não ensina nada para o modo portátil
+                change = None if na_dock else autotune.record(paths, game_id, console, v)
                 if change:
                     say(f"auto-ajuste: {change}")
             except Exception as e:  # noqa: BLE001

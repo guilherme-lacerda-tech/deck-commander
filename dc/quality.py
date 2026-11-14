@@ -39,6 +39,10 @@ TARGETS = {
                         H / ".var/app/io.github.ryubing.Ryujinx/config/Ryujinx/Config.json"], None, "res_scale"),
 }
 MAX = {"switch": 4, "psp": 5, "psx": 5}
+# Monitor/TV ligado (dock): resolução mínima para a imagem ficar nítida numa tela grande (~1080p). Só SOBE;
+# se o jogo já está acima disso, fica como está. Switch não entra: o Ryujinx já roda em modo dock (1080p).
+# Desligar: criar ~/.config/deck-commander/dock-desligado.
+DOCK_RES = {"psx": 4, "psp": 3, "n3ds": 3, "gc": 2, "wii": 2, "ps2": 2}
 
 
 def supported(console: str) -> bool:
@@ -150,9 +154,15 @@ def set_language(paths: Paths, game_id: str, lang: str | None, why: str = "") ->
     _save(_overrides_path(paths), ov)
 
 
-def _plan(paths: Paths, game_id: str, console: str) -> list[tuple]:
+def dock_ligado(paths: Paths, dock: bool) -> bool:
+    return dock and not (paths.config / "dock-desligado").exists()
+
+
+def _plan(paths: Paths, game_id: str, console: str, dock: bool = False) -> list[tuple]:
     out = []
     n = get_override(paths, game_id)
+    if dock_ligado(paths, dock) and console in DOCK_RES:
+        n = min(max(n or 0, DOCK_RES[console]), MAX.get(console, 4))
     if n and supported(console):
         t = _target(console)
         if t:
@@ -166,13 +176,25 @@ def _plan(paths: Paths, game_id: str, console: str) -> list[tuple]:
     return out
 
 
-def apply_for_launch(paths: Paths, game_id: str, console: str) -> dict | None:
-    """Aplica os ajustes do jogo (resolução, idioma). Devolve o registro de devolução (já em disco) ou None."""
+def _num(v) -> float | None:
+    try:
+        return float(str(v).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def apply_for_launch(paths: Paths, game_id: str, console: str, dock: bool = False) -> dict | None:
+    """Aplica os ajustes do jogo (resolução, idioma). Devolve o registro de devolução (já em disco) ou None.
+    dock=True (monitor/TV ligado): a resolução sobe até DOCK_RES, nunca desce."""
     recs = []
-    for fmt, f, sec, key, new in _plan(paths, game_id, console):
+    own = get_override(paths, game_id)
+    for fmt, f, sec, key, new in _plan(paths, game_id, console, dock):
         old = _read(fmt, f, sec, key)
         if old is not None and old.strip() in (new, f"{new}.0", f"{new}.000000"):
             continue
+        if (dock_ligado(paths, dock) and key == TARGETS.get(console, (0, 0, 0, None))[3] and not own
+                and _num(old) is not None and _num(old) >= float(new)):
+            continue  # o padrão do console já é igual ou maior que o da dock
         recs.append({"game_id": game_id, "fmt": fmt, "file": str(f), "section": sec, "key": key, "old": old, "new": new})
     if not recs:
         return None
