@@ -115,7 +115,7 @@ Ligue uma vez no painel: **Deck Commander → Retrô → Ligar**.
 |---|---|
 | **L4** | salva o estado (save rápido); ficam os 10 últimos |
 | **R4** | carrega o save rápido mais novo |
-| **L5** (segurando) | volta no tempo |
+| **L5** (segurando) | volta no tempo (RetroArch, DuckStation e PSP) |
 | **R5** | liga/desliga o turbo (2x, 3x ou 4x, escolhido no painel) |
 
 - **Save rápido x save do jogo:**
@@ -129,13 +129,49 @@ Ligue uma vez no painel: **Deck Commander → Retrô → Ligar**.
 - **Seu layout:** se você trocar o layout de controle de um jogo no Steam, o Deck Commander não mexe mais nele.
 - **Conquistas:** crie uma conta em retroachievements.org e entre nela dentro de cada emulador.
 
+### Continuar de onde parou
+- **Descanso (todos os jogos, inclusive Switch e PC):** aperte o botão de ligar. O Deck congela o jogo e, ao apertar
+  de novo, você está no mesmo quadro.
+- **Seguro extra (PS1, PS2, PSP, GameCube/Wii e RetroArch):** o Deck Commander guarda um "ponto de continuar" do jogo
+  quando você aperta o botão Steam ou o "…", quando o Deck vai dormir e a cada 10 minutos. Ao abrir o jogo de novo,
+  ele já começa no ponto — mesmo que a bateria tenha acabado ou que você tenha saído do jogo.
+  - O ponto fica num espaço só dele: os seus saves do L4 nunca são trocados.
+  - Se o emulador mudou de versão desde o ponto, o jogo abre normal (ponto de outra versão pode travar).
+  - Desligar: painel → Retrô → Continuar, ou `/continuar nao`. Abrir um jogo do começo: `/continuar esquecer <jogo>`.
+- Switch, Wii U e Xbox 360 não têm save rápido nos emuladores: neles vale só o descanso. PS3 ficou de fora.
+
+### Voltar no tempo pelo painel
+Com o jogo aberto: painel → Retrô → **Voltar 5 s / 10 s / 30 s** (o mesmo que segurar o L5). Dá até 30 s no
+RetroArch e no PSP e 10 s no DuckStation. PCSX2 (PS2) e Dolphin não têm essa função: neles use o R4.
+
+### Detonado (passo a passo em português)
+Painel → **Detonado**. Com um jogo aberto, ele já vem escolhido. O detonado vem da StrategyWiki, separado em partes
+na ordem do jogo — no Pokémon por insígnia (ginásio), no God of War por capítulo, no Shadow of the Colossus por
+colosso. Escolha a parte em que você está; o painel lembra. A primeira vez mostra o texto original e traduz em segundo
+plano; depois fica em português e funciona sem internet. Se o jogo não for achado, digite o nome dele na StrategyWiki.
+
 ## 8. Qualidade e controles
 - Jogo pesado ou com gráfico estranho: `/qualidade <jogo> nativo|2x|3x|padrão` muda só ele. As exceções aparecem em
   `/qualidade lista`.
 - **Auto-ajuste:** no portátil, a qualidade sobe enquanto o jogo roda liso e desce um nível na primeira travada.
 - **Energia:** cada console tem o seu limite de energia (TDP), que volta ao valor anterior quando o jogo fecha.
+- **Perfil de imagem (todos os jogos):** painel → Qualidade → Perfil, ou `/perfil`:
+  - **Beleza:** resolução alta e filtros;
+  - **Desempenho:** resolução nativa, o mais liso possível;
+  - **Retrô:** resolução nativa com filtro de TV antiga;
+  - **Automático** (padrão): o auto-ajuste decide jogo a jogo.
+
+  Vale ao abrir o jogo (os emuladores só leem a resolução ao abrir).
+- **Botões A/B de NES, SNES, Game Boy e GBA:** painel → Qualidade → Botões: "como o controle original" (padrão) ou
+  "A do Deck = A do jogo".
+- **Vibração:** ligada sozinha no Switch (Ryujinx) e no GameCube/Wii (Dolphin), que vinham com ela desligada.
 - **Controles:** `/controles` mostra o que falta. Azahar (3DS), Cemu (Wii U) e RPCS3 (PS3) pedem que você escolha o
   controle **uma vez**: modo Desktop → abra o emulador → Controles.
+
+### Modo repouso (baixar e traduzir com a tela apagada)
+Na tomada, com download ou tradução andando, o Deck não dorme até terminar; depois volta a dormir sozinho. Precisa de
+uma permissão de administrador, **uma vez**: no Deck (Konsole), digite com a sua senha
+`sudo bash ~/deck-commander/tools/deck/permitir-repouso.sh`. Ligar/desligar: `/repouso sim|nao`.
 
 ## 9. Jogos do PC no Deck (aba "Computador")
 1. Escolha o jogo na aba **Computador**.
@@ -237,6 +273,9 @@ O painel faz o mesmo que os comandos do bot.
 | `/pc status\|acordar\|sincronizar\|listar\|tv` | jogos do PC |
 | `/transferir <jogo>` · `/trazer <jogo>` · `fila` | levar jogos entre Deck e PC |
 | `/saves <jogo>` · `/saves copias <jogo>` · `/saves voltar <jogo> <n>` | saves |
+| `/continuar sim\|nao` · `/continuar esquecer <jogo>` | continuar de onde parou |
+| `/perfil [beleza\|desempenho\|retro\|auto]` | perfil de imagem |
+| `/repouso sim\|nao` | baixar/traduzir com o Deck na tomada sem dormir |
 | `/familia` · `/familia puxar <jogo>` | Deck do irmão |
 | `/musica [playlist\|pausar\|proxima]` | Spotify |
 | `/status` · `/diagnostico` · `/sos` · `/sos off` | saúde |

@@ -895,7 +895,7 @@ def _dispatch(paths, store, job, cfg, progress, should_pause) -> tuple[dict, str
                               f"/devolver {g.get('title', '')}")
             _refresh_tabs(paths)
         from .. import backup
-        result = {"traducao_pt_br": ok, "provider": rep.provider, "strings": rep.strings, "translated": rep.translated,
+        result = {"traducao_pt_br": ok, "provider": rep.provider, "strings": getattr(rep, "strings", getattr(rep, "found", 0)), "translated": rep.translated,
                   "flagged": rep.flagged, "patch": rep.patch, "patch_hash": backup.sha256_file(Path(rep.patch))
                   if rep.patch else "", "rom": rep.output, "data": datetime.now(timezone.utc).isoformat()}
         return result, rep.text(), bool(rep.output)

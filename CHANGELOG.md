@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.9.0 — 2026-11-14 — experiência de console
+- **Continuar de onde parou** (PS1, PS2, PSP, GameCube/Wii, RetroArch): ponto salvo ao apertar o botão Steam/"…",
+  antes de dormir e a cada 10 min; o jogo abre nele. Testado no Deck em DuckStation, PCSX2, PPSSPP e RetroArch.
+  Os saves do L4 nunca são trocados; ponto de outra versão do emulador não é carregado.
+- **Voltar no tempo pelo painel** (5/10/30 s) e voltar no tempo também no PSP (L5).
+- **Detonado por capítulo em português** (StrategyWiki, CC BY-SA): por insígnia/capítulo/colosso, lembra onde você
+  está, lê sem internet.
+- **Perfis de imagem**: Beleza / Desempenho / Retrô / Automático (`/perfil`).
+- **Vibração** ligada no Switch (Ryujinx) e no GameCube/Wii (Dolphin) — vinham desligadas.
+- **A/B por console**: NES, SNES, Game Boy e GBA podem usar "A do Deck = A do jogo".
+- **Modo repouso**: na tomada, com download/tradução, o Deck não dorme até terminar (uma permissão de administrador).
+- Corrigido: jogo PAL (50 quadros) era sempre julgado "travando" e ficava preso na resolução nativa; partida de menos
+  de 2 min não ensina mais o auto-ajuste.
+
 ## 0.8.2 — 2026-11-12 — saves que não se perdem
 - **Cópia automática dos saves** de cada jogo (save do jogo e saves rápidos) antes de cada vez que ele abre; ficam as
   5 últimas em `~/Backups/DeckCommander/saves/<jogo>/`. No bot: `/saves copias <jogo>` e `/saves voltar <jogo> <n>`
