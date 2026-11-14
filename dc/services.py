@@ -65,6 +65,20 @@ def power_loop(paths: Paths, interval: float = 30) -> None:
                 pass
         reading = read_power()
         state, why, changed = pol.update(reading)
+        try:  # modo repouso: na tomada, com download/tradução, o Deck não dorme até terminar (dc/repouso.py)
+            from . import repouso
+            if repouso.permitido():
+                trava = getattr(power_loop, "_trava", None) or repouso.Trava()
+                power_loop._trava = trava
+                try:
+                    tors = q.torrents()
+                except QbtError:
+                    tors = []
+                msg = trava.ajustar(repouso.motivo(paths, tors, bool(reading.ac_online)))
+                if msg:
+                    _log(paths, "power", msg)
+        except Exception as e:  # noqa: BLE001 — repouso nunca derruba o serviço de energia
+            _log(paths, "power", f"repouso: {e}")
         if (state, why) != last_written:
             last_written = (state, why)
             try:

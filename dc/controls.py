@@ -88,9 +88,53 @@ def lichii_layout(mode: str, home: Path = H) -> list[str]:
     return log
 
 
+# RetroArch, consoles da Nintendo (pedido 13/11/2026, "controle por console"): por padrão o RetroArch usa a POSIÇÃO
+# do controle original (A do SNES = botão da direita, que no Deck é o B). "xbox" troca por arquivo de remapeamento do
+# núcleo (config/remaps/<núcleo>/<núcleo>.rmp, lido sozinho pelo RetroArch): apertar A no Deck = A no jogo.
+# Números do RetroArch (RETRO_DEVICE_ID_JOYPAD): B=0 Y=1 A=8 X=9; o valor é o botão do jogo que aquele botão aciona.
+NUCLEOS_NINTENDO = ("Snes9x", "Nestopia", "mGBA", "Gambatte")
+_RMP_LETRA = {"input_player1_btn_a": "0", "input_player1_btn_b": "8", "input_player1_btn_x": "1",
+              "input_player1_btn_y": "9"}
+
+
+def _remaps(home: Path) -> Path:
+    return home / ".var/app/org.libretro.RetroArch/config/retroarch/config/remaps"
+
+
+def _retro_nintendo_modo(home: Path) -> str | None:
+    if not (home / ".var/app/org.libretro.RetroArch").exists():
+        return None
+    f = _remaps(home) / "Snes9x" / "Snes9x.rmp"
+    return "xbox" if f.exists() and 'input_player1_btn_b = "8"' in f.read_text("utf-8", "replace") else "switch"
+
+
+def retro_nintendo_layout(mode: str, home: Path = H) -> list[str]:
+    log = []
+    for nucleo in NUCLEOS_NINTENDO:
+        f = _remaps(home) / nucleo / f"{nucleo}.rmp"
+        linhas = [ln for ln in (f.read_text("utf-8", "replace").splitlines() if f.exists() else [])
+                  if ln.split("=")[0].strip() not in _RMP_LETRA]
+        if mode == "xbox":
+            linhas += [f'{k} = "{v}"' for k, v in _RMP_LETRA.items()]
+        if not linhas:
+            if f.exists():
+                f.unlink(); log.append(f"{nucleo}: botões como no controle original")
+            continue
+        f.parent.mkdir(parents=True, exist_ok=True)
+        novo = "\n".join(linhas) + "\n"
+        if not f.exists() or f.read_text("utf-8", "replace") != novo:
+            f.write_text(novo, "utf-8")
+            log.append(f"{nucleo}: " + ("A do Deck = A do jogo" if mode == "xbox" else "botões como no controle original"))
+    return log
+
+
 def layouts(home: Path = H) -> list[dict]:
     """Emuladores em que dá para escolher o layout dos botões: [{id, emulador, atual, opcoes}]."""
     out = []
+    modo = _retro_nintendo_modo(home)
+    if modo is not None:
+        out.append({"id": "retro_nintendo", "emulador": "NES, SNES, Game Boy e GBA (RetroArch)", "atual": modo,
+                    "opcoes": {"xbox": "A do Deck = A do jogo", "switch": "Como o controle original (A na direita)"}})
     for ident, nome, modo in (("ryujinx", "Nintendo Switch (Ryujinx)", _ryu_modo(home)),
                               ("lichii", "Nintendo Switch 2 (Lichii)", _lichii_modo(home))):
         if modo is not None:
@@ -105,6 +149,8 @@ def definir_layout(ident: str, modo: str, home: Path = H) -> list[str]:
         return switch_layout("labels" if modo == "xbox" else "positional", home)
     if ident == "lichii":
         return lichii_layout(modo, home)
+    if ident == "retro_nintendo":
+        return retro_nintendo_layout(modo, home)
     raise ValueError("emulador sem escolha de layout")
 
 

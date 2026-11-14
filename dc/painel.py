@@ -859,6 +859,50 @@ def contexto(p: Ponte, a: dict) -> dict:
     return {"modo": modo, "gid": gid, "titulo": e.get("title", gid), "console": con}
 
 
+def detonado(p: Ponte, a: dict) -> dict:
+    """Lista de jogos (o aberto primeiro) e, com `gid`, o índice do detonado (busca na StrategyWiki na 1ª vez)."""
+    from . import continuar
+    from . import detonado as D
+    mapa = p._map()
+    aberto = (continuar.jogo_aberto(p.paths) or {}).get("game_id")
+    jogos = [{"gid": g, "titulo": e.get("title", g)} for g, e in sorted(mapa.items(), key=lambda kv: (
+        kv[0] != aberto, kv[1].get("title", "").casefold())) if not e.get("removed") and e.get("console") not in ("pc", "steam")]
+    gid = a.get("gid") or aberto
+    if not gid:
+        return {"jogos": jogos, "gid": None}
+    d = D.info(p.paths, gid)
+    if not d or a.get("nome"):
+        try:
+            d = D.preparar(p.paths, gid, mapa.get(gid, {}).get("title", gid), jogo=a.get("nome") or None)
+        except OSError as e:
+            raise Erro(f"Sem internet para achar o detonado agora ({e.__class__.__name__}).")
+    if d.get("erro"):
+        return {"jogos": jogos, "gid": gid, "erro": d["erro"] + " Se souber o nome do jogo lá, digite abaixo."}
+    return {"jogos": jogos, "gid": gid, "jogo": d["jogo"], "fonte": d["fonte"], "atual": d.get("atual", 0),
+            "capitulos": [{"n": i, "label": (c["grupo"] + " · " if c["grupo"] != "Detonado" else "") + c["titulo"]}
+                          for i, c in enumerate(d["capitulos"])]}
+
+
+def detonado_capitulo(p: Ponte, a: dict) -> dict:
+    """Mostra a parte `n` (lembra onde você está). Sem tradução ainda: mostra o original e traduz em segundo plano."""
+    import subprocess
+    from . import detonado as D
+    gid, n = a.get("gid"), int(a.get("n") or 0)
+    D.marcar(p.paths, gid, n)
+    try:
+        c = D.capitulo(p.paths, gid, n, traduzir=False)
+    except OSError as e:
+        raise Erro(f"Sem internet para baixar esta parte agora ({e.__class__.__name__}).")
+    if c.get("erro"):
+        raise Erro(c["erro"])
+    if not c["traduzido"]:
+        unit = "dc-detonado-" + "".join(ch for ch in gid if ch.isalnum())[:40]
+        subprocess.run(["systemd-run", "--user", "--collect", f"--unit={unit}",
+                        f"--working-directory={Path(__file__).resolve().parents[1]}",
+                        "python3", "-m", "dc.detonado", "baixar", gid], capture_output=True)
+    return c
+
+
 def retro(p: Ponte, a: dict) -> dict:
     from . import continuar
     from . import retro as RT
@@ -942,7 +986,7 @@ ACOES = {f.__name__: f for f in (
     transferir_enviar, trazer_preparar, trazer_enviar, qualidade, qualidade_definir, controle_definir,
     downloads_limpar, traducao_limpar, desinstalar_lista, devolver, removido_perguntado, musica, musica_volume,
     musica_midia, musica_playlist, musica_salvar, musica_conectar, pc_tv, espaco_sugestoes, familia, familia_salvar,
-    familia_atualizar, familia_puxar, melhorias, melhorias_definir, contexto, retro, retro_definir, retro_jogos, perfil_definir, continuar_definir, voltar_tempo)}
+    familia_atualizar, familia_puxar, melhorias, melhorias_definir, contexto, retro, retro_definir, retro_jogos, perfil_definir, continuar_definir, voltar_tempo, detonado, detonado_capitulo)}
 ACOES["downloads_pausar"] = lambda p, a: _pausar(p, a, True)
 ACOES["downloads_retomar"] = lambda p, a: _pausar(p, a, False)
 

@@ -443,14 +443,15 @@ function TelaInicio({ ir }) {
     const [ctx] = useDados("contexto", { appid: runningAppId() }, 15000);
     const [tudo, setTudo] = SP_REACT.useState(false);
     const modo = ctx && ctx.ok ? ctx.modo : "nenhum";
-    const UTEIS = { switch: ["traducao", "qualidade", "atalhos", "musica"], retro: ["retro", "traducao", "qualidade", "musica"],
-        emulador: ["retro", "traducao", "qualidade", "musica"], pc: ["pc", "qualidade", "musica"] };
+    const UTEIS = { switch: ["detonado", "traducao", "qualidade", "atalhos", "musica"], retro: ["retro", "detonado", "traducao", "qualidade", "musica"],
+        emulador: ["retro", "detonado", "traducao", "qualidade", "musica"], pc: ["pc", "qualidade", "musica"] };
     const filtro = !tudo && UTEIS[modo];
     const itens = [
         ["telegram", "💬 Telegram"], ["downloads", "⬇️ Downloads"],
         ["traducao", "🈯 Tradução" + (d && d.perguntas ? " (" + d.perguntas + " pergunta" + (d.perguntas > 1 ? "s" : "") + ")" : "")],
         ["pc", "🖥️ PC (jogar os jogos do PC)"], ["transferir", "📦 Transferir jogos (Deck ⇄ PC)"],
-        ["retro", "🕹️ Retrô: botões de trás, cheats e filtros"],
+        ["retro", "🕹️ Retrô: botões de trás, continuar, voltar no tempo e filtros"],
+        ["detonado", "📖 Detonado (passo a passo em português)"],
         ["qualidade", "🎚️ Qualidade e controles"], ["desinstalar", "🗑️ Desinstalar jogos"], ["musica", "🎵 Música"],
         ["familia", "👪 Família"], ["atalhos", "📚 Biblioteca e desempenho"]];
     const menu = Sec(filtro ? "Para " + (ctx.titulo || "este jogo") : "Configurar e usar",
@@ -925,7 +926,42 @@ function TelaRetro() {
             Bt(d.filtros ? "Desligar filtros" : "Ligar filtros", () => fazer("retro_definir", { filtros: !d.filtros, agora: aberto }), { disabled: ocupado }, "flt")));
 }
 
-const TELAS = { telegram: TelaTelegram, downloads: TelaDownloads, traducao: TelaTraducao, pc: TelaPC, musica: TelaMusica, familia: TelaFamilia,
+// ---- Detonado por capítulo (StrategyWiki, traduzido) --------------------------------------------------------------
+function TelaDetonado() {
+    const [d, setD] = SP_REACT.useState(null);
+    const [cap, setCap] = SP_REACT.useState(null);
+    const [nome, setNome] = SP_REACT.useState("");
+    const abrir = async (gid, n) => {
+        const r = await painel("detonado_capitulo", { gid, n });
+        setCap(r.ok ? Object.assign({ n }, r) : { erro: r.erro || "não deu agora" });
+    };
+    const carregar = async (args) => {
+        setD(null); setCap(null);
+        const r = await painel("detonado", args || {});
+        setD(r);
+        if (r.ok && r.capitulos && r.capitulos.length) abrir(r.gid, r.atual || 0);
+    };
+    SP_REACT.useEffect(() => { carregar({}); }, []);
+    if (!d || !d.ok) return Sec("Detonado", Carregando(d));
+    const total = (d.capitulos || []).length;
+    return h("div", null,
+        Sec("Jogo", Lista("Jogo", d.jogos.map((j) => ({ data: j.gid, label: j.titulo })), d.gid, (g) => carregar({ gid: g })),
+            !d.gid ? Txt("Escolha o jogo (com um jogo aberto, ele já vem escolhido).") : null,
+            d.erro ? Txt("⚠️ " + d.erro) : null,
+            d.erro ? Campo("Nome do jogo na StrategyWiki", nome, setNome) : null,
+            d.erro ? Bt("Procurar com esse nome", () => carregar({ gid: d.gid, nome }), { disabled: !nome }, "nm") : null),
+        total ? Sec("Onde você está", Lista("Parte", d.capitulos.map((c) => ({ data: c.n, label: (c.n + 1) + ". " + c.label })),
+            cap ? cap.n : d.atual, (n) => abrir(d.gid, n))) : null,
+        cap && cap.erro ? Sec("Detonado", Txt("⚠️ " + cap.erro)) : null,
+        cap && !cap.erro ? Sec((cap.n + 1) + "/" + total + " · " + cap.titulo,
+            cap.traduzido ? null : Txt("⏳ Traduzindo para o português em segundo plano; por enquanto, o texto original. Abra de novo em alguns minutos.", { opacity: 0.8 }, "tr"),
+            (cap.paragrafos || []).map((t, i) => Txt(t, null, "p" + i)),
+            Bt("◀ Parte anterior", () => abrir(d.gid, Math.max(0, cap.n - 1)), { disabled: cap.n === 0 }, "ant"),
+            Bt("Próxima parte ▶", () => abrir(d.gid, Math.min(total - 1, cap.n + 1)), { disabled: cap.n >= total - 1 }, "prox"),
+            Txt("Fonte: StrategyWiki (" + d.jogo + "), licença CC BY-SA — traduzido pela IA do Deck Commander.", { opacity: 0.6 }, "fonte")) : null);
+}
+
+const TELAS = { detonado: TelaDetonado, telegram: TelaTelegram, downloads: TelaDownloads, traducao: TelaTraducao, pc: TelaPC, musica: TelaMusica, familia: TelaFamilia,
     transferir: TelaTransferir, qualidade: TelaQualidade, desinstalar: TelaDesinstalar, atalhos: AtalhosPanel, retro: TelaRetro };
 
 function Panel() {

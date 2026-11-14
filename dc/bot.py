@@ -361,6 +361,18 @@ class Bot:
             return self._remove(args)
         if cmd == "/qualidade":
             return self._quality(args)
+        if cmd == "/repouso":  # modo repouso: na tomada com download/tradução o Deck não dorme até terminar
+            from . import repouso
+            f = self.paths.config / "repouso-desligado"
+            if args[:1] and args[0].lower() in ("nao", "não"):
+                f.write_text("1")
+            elif args[:1] and args[0].lower() == "sim":
+                f.unlink(missing_ok=True)
+            if not repouso.permitido():
+                return ("🌙 Modo repouso precisa de uma permissão de administrador, UMA vez. No Deck (Konsole), digite com "
+                        "a sua senha:\nsudo bash ~/deck-commander/tools/deck/permitir-repouso.sh")
+            return ("🌙 Modo repouso: " + ("LIGADO" if repouso.ligado(self.paths) else "DESLIGADO") + ". Ligado, na "
+                    "tomada, com download ou tradução andando, o Deck não dorme até terminar.\n/repouso sim|nao")
         if cmd == "/continuar":  # continuar de onde parou: sim | nao | esquecer <jogo>
             from . import continuar
             if args[:1] and args[0].lower() in ("sim", "nao", "não"):

@@ -33,3 +33,17 @@ def test_lichii_switch2(tmp_path):
     assert C.vibracao(tmp_path) == ["Lichii (Switch 2): vibração ligada"]
     t = p.read_text()
     assert "vibration_enabled=true" in t and "player_0_vibration_enabled=true" in t
+
+
+def test_nintendo_retro_a_do_deck_e_a_do_jogo(tmp_path):
+    """Pedido 13/11/2026 (controle por console): SNES/NES/GB/GBA podem usar A do Deck = A do jogo."""
+    (tmp_path / ".var/app/org.libretro.RetroArch").mkdir(parents=True)
+    rmp = C._remaps(tmp_path) / "Snes9x" / "Snes9x.rmp"
+    assert C._retro_nintendo_modo(tmp_path) == "switch"  # padrão: posição do controle original
+    rmp.parent.mkdir(parents=True); rmp.write_text('input_player1_analog_dpad_mode = "1"\n')
+    assert len(C.definir_layout("retro_nintendo", "xbox", tmp_path)) == 4
+    t = rmp.read_text()
+    assert 'input_player1_btn_b = "8"' in t and 'input_player1_analog_dpad_mode = "1"' in t  # o resto fica
+    assert C._retro_nintendo_modo(tmp_path) == "xbox"
+    C.definir_layout("retro_nintendo", "switch", tmp_path)
+    assert "btn_b" not in rmp.read_text() and not (C._remaps(tmp_path) / "mGBA" / "mGBA.rmp").exists()
