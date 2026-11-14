@@ -19,8 +19,10 @@ COM_SAVE_STATE = {"psx", "ps2", "gc", "wii", "nes", "snes", "n64", "gb", "gbc", 
 
 
 def _sem_env(cmd: list[str]) -> list[str]:
-    """Tira o "/usr/bin/env VAR=x" da frente (ex.: DuckStation sem a camada WSI)."""
-    if cmd and Path(cmd[0]).name == "env":
+    """Tira os "/usr/bin/env VAR=x" da frente — podem ser vários: o medidor de desempenho (MangoHud) põe o dele antes
+    do da camada WSI. Falha vista no Deck 13/11/2026: com um só, a versão lida era a do /usr/bin/env e o ponto de
+    continuar era recusado como "emulador de outra versão"."""
+    while cmd and Path(cmd[0]).name == "env":
         cmd = cmd[1:]
         while cmd and "=" in cmd[0] and not cmd[0].startswith("/"):
             cmd = cmd[1:]

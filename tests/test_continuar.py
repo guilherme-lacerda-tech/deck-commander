@@ -130,3 +130,10 @@ def test_meta_de_quadros_pal():
     assert perf.meta_quadros([50.0] * 100) == 50 and perf.meta_quadros([59.9] * 90 + [40.0] * 10) == 60
     assert perf.meta_quadros([30.0] * 50) == 30 and perf.meta_quadros([25.0] * 50) == 25
     assert perf.verdict(49.8, 49, 0.0, perf.meta_quadros([49.8] * 100)) == "liso"
+
+
+def test_medidor_de_desempenho_na_frente_nao_confunde(tmp_path, monkeypatch):
+    """Falha no Deck 13/11/2026: o MangoHud põe outro "/usr/bin/env" na frente; a versão lida era a do env."""
+    from dc import versao_emulador as V
+    com_medidor = ["/usr/bin/env", "MANGOHUD=1", "MANGOHUD_CONFIG=a=0"] + DUCK
+    assert V._sem_env(com_medidor)[0] == "/x/DuckStation-x64.AppImage" and C.qual(com_medidor) == "duckstation"

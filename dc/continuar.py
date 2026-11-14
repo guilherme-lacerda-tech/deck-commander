@@ -69,7 +69,8 @@ ATALHOS = {
 
 
 def qual(cmd: list[str]) -> str | None:
-    texto = " ".join(str(c) for c in cmd[:6]).lower()
+    from .versao_emulador import _sem_env
+    texto = " ".join(str(c) for c in _sem_env(list(cmd))[:4]).lower()
     return next((k for k in EMUS if k in texto), None)
 
 
