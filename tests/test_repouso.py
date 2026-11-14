@@ -41,3 +41,13 @@ def test_trava_liga_e_solta():
 
 def test_sem_a_regra_nao_faz_nada(tmp_path):
     assert R.permitido(tmp_path / "nao-existe.rules") is False
+
+
+def test_permissao_testada_pela_propria_trava(monkeypatch):
+    """No Deck a pasta da regra só o administrador lê: olhar o arquivo dava "sem permissão" com ela instalada."""
+    R._PERMITIDO.clear()
+    assert R.permitido(testar=lambda: True) is True
+    assert R.permitido(testar=lambda: False) is True  # guardado por 10 min (não abre um processo a cada 30 s)
+    R._PERMITIDO.clear()
+    assert R.permitido(testar=lambda: False) is False
+    R._PERMITIDO.clear()

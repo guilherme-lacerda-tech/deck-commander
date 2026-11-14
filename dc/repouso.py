@@ -18,8 +18,27 @@ ATIVOS = ("downloading", "stalledDL", "metaDL", "queuedDL", "forcedDL", "checkin
 TRADUZINDO = ("rodando", "na fila")
 
 
-def permitido(regra: Path = REGRA) -> bool:
-    return regra.exists()
+_PERMITIDO: dict = {}
+
+
+def permitido(regra: Path = REGRA, testar=None) -> bool:
+    """A permissão vale? Testa a própria trava (1 vez a cada 10 min). Olhar o arquivo não serve: a pasta
+    /etc/polkit-1/rules.d só o administrador lê (visto no Deck 14/11/2026: regra instalada e exists() = False)."""
+    import time
+    if regra != REGRA:  # testes
+        return regra.exists()
+    if _PERMITIDO and time.time() - _PERMITIDO["quando"] < 600:
+        return _PERMITIDO["ok"]
+    if testar is None:
+        def testar():
+            return subprocess.run(["systemd-inhibit", "--what=sleep", "--mode=block", "--who=Deck Commander",
+                                   "--why=teste", "true"], capture_output=True, timeout=10).returncode == 0
+    try:
+        ok = bool(testar())
+    except (OSError, subprocess.SubprocessError):
+        ok = False
+    _PERMITIDO.update(ok=ok, quando=time.time())
+    return ok
 
 
 def ligado(paths) -> bool:
