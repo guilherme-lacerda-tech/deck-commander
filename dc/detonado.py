@@ -212,6 +212,20 @@ def capitulo(paths, game_id: str, n: int, traduzir: bool = True, api=_api, tradu
             "fonte": SITE + urllib.parse.quote(cap["pagina"].replace(" ", "_"))}
 
 
+def titulos(paths, game_id: str) -> list[str]:
+    """Título de cada parte para a lista do painel: o traduzido quando a parte já foi traduzida (visto no Deck
+    14/11/2026: a lista mostrava "In Defense of Attica" com o texto já em português)."""
+    d = info(paths, game_id)
+    out = []
+    for i, cap in enumerate(d.get("capitulos", [])):
+        try:
+            pt = json.loads((_pasta(paths, game_id) / f"{i:03d}.json").read_text("utf-8")).get("titulo_pt")
+        except (OSError, ValueError):
+            pt = None
+        out.append(pt or cap["titulo"])
+    return out
+
+
 def _traduzir(paths, game_id: str, textos: list[str]) -> list[str] | None:
     """Pela IA de tradução do projeto (com cache). None se nenhuma IA respondeu — fica o texto original."""
     from .traducao import ia

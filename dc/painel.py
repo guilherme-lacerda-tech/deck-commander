@@ -878,8 +878,9 @@ def detonado(p: Ponte, a: dict) -> dict:
             raise Erro(f"Sem internet para achar o detonado agora ({e.__class__.__name__}).")
     if d.get("erro"):
         return {"jogos": jogos, "gid": gid, "erro": d["erro"] + " Se souber o nome do jogo lá, digite abaixo."}
+    nomes = D.titulos(p.paths, gid)
     return {"jogos": jogos, "gid": gid, "jogo": d["jogo"], "fonte": d["fonte"], "atual": d.get("atual", 0),
-            "capitulos": [{"n": i, "label": (c["grupo"] + " · " if c["grupo"] != "Detonado" else "") + c["titulo"]}
+            "capitulos": [{"n": i, "label": (c["grupo"] + " · " if c["grupo"] != "Detonado" else "") + nomes[i]}
                           for i, c in enumerate(d["capitulos"])]}
 
 

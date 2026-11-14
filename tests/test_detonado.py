@@ -70,6 +70,7 @@ def test_capitulo_traduz_uma_vez_e_lembra_onde_parou(tmp_path):
     assert c["traduzido"] and c["titulo"] == "PT: Route 1" and c["paragrafos"][0] == "PT: Pallet Town"
     D.capitulo(paths, "gba-pokemon", 1, api=lambda p: 1 / 0, tradutor=tradutor)  # 2ª vez: do disco, sem internet
     assert len(chamadas) == 1  # traduziu uma vez só
+    assert D.titulos(paths, "gba-pokemon") == ["Pallet Town", "PT: Route 1", "Mt. Moon"]  # lista do painel
     D.marcar(paths, "gba-pokemon", 2)
     assert D.info(paths, "gba-pokemon")["atual"] == 2
     D.preparar(paths, "gba-pokemon", "Pokemon FireRed (BR)", api=_api)
