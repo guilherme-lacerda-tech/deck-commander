@@ -72,8 +72,9 @@ def motivo(paths, torrents: list[dict], ac: bool) -> str | None:
 class Trava:
     """Segura o descanso com systemd-inhibit enquanto houver motivo. Uma por serviço."""
 
-    def __init__(self, abrir=subprocess.Popen):
+    def __init__(self, abrir=subprocess.Popen, marca: Path | None = None):
         self._abrir = abrir
+        self.marca = marca  # arquivo "segurando agora" (o botão de ligar só apaga a tela se houver trava)
         self.proc = None
         self.porque = None
 
@@ -85,10 +86,89 @@ class Trava:
                                      f"--why=Repouso: {porque} na tomada", "sleep", "infinity"],
                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             self.porque = porque
+            if self.marca:
+                self.marca.write_text(porque, "utf-8")
             return f"repouso: o Deck não dorme enquanto houver {porque} (na tomada)"
         if not porque and vivo:
             self.proc.terminate()
             self.proc = None
+            if self.marca:
+                self.marca.unlink(missing_ok=True)
             antes, self.porque = self.porque, None
             return f"repouso: terminou ({antes}); o Deck pode dormir"
         return None
+
+
+# ------------------------------------------------------------------------------------------------ tela
+# Testado no Deck 14/11/2026: com a trava, o pedido de dormir da Steam é recusado ("BlockedByInhibitorLock") e a TELA
+# FICA ACESA. O brilho (/sys/class/backlight/*/brightness) é gravável pelo usuário deck: o botão de ligar apaga a tela
+# enquanto há trabalho; apertar de novo acende; quando o trabalho acaba com a tela apagada, o Deck dorme sozinho.
+BRILHO = Path("/sys/class/backlight/amdgpu_bl0/brightness")
+
+
+def _ativo_path(paths) -> Path:
+    return paths.state / "repouso-ativo"
+
+
+def _tela_path(paths) -> Path:
+    return paths.state / "repouso-tela.json"
+
+
+def tela_apagada(paths) -> bool:
+    return _tela_path(paths).exists()
+
+
+def apagar(paths, brilho: Path = BRILHO) -> None:
+    antes = int(brilho.read_text().strip() or 0)
+    _tela_path(paths).write_text(json.dumps({"antes": antes}), "utf-8")
+    brilho.write_text("0")
+
+
+def acender(paths, brilho: Path = BRILHO) -> None:
+    try:
+        antes = json.loads(_tela_path(paths).read_text("utf-8")).get("antes") or 30000
+    except (OSError, ValueError):
+        return
+    brilho.write_text(str(antes))
+    _tela_path(paths).unlink(missing_ok=True)
+
+
+def botao(paths, brilho: Path = BRILHO) -> str:
+    """Botão de ligar apertado (o plugin avisa). Com o repouso segurando: apaga/acende a tela."""
+    if not _ativo_path(paths).exists():
+        return "repouso: nada segurando (o Deck dorme normal)"
+    if tela_apagada(paths):
+        acender(paths, brilho)
+        return "repouso: tela acesa"
+    apagar(paths, brilho)
+    return "repouso: tela apagada, trabalho continua"
+
+
+def ao_terminar(paths, dormir=None, brilho: Path = BRILHO) -> str | None:
+    """Trava solta: se a tela foi apagada pelo repouso, acende e põe o Deck para dormir (o que você pediu antes)."""
+    if not tela_apagada(paths):
+        return None
+    acender(paths, brilho)
+    if dormir is None:
+        def dormir():
+            from .steam_cdp import steam
+            steam("SteamClient.System.SuspendPC(), 1")
+    try:
+        dormir()
+        return "repouso: terminou com a tela apagada; o Deck foi dormir"
+    except Exception as e:  # noqa: BLE001
+        return f"repouso: terminou, mas não consegui pôr o Deck para dormir ({e})"
+
+
+def main(argv: list[str]) -> int:
+    from .paths import get_paths
+    if argv[:1] == ["botao"]:
+        print(botao(get_paths()))
+        return 0
+    print("uso: python3 -m dc.repouso botao")
+    return 2
+
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(main(sys.argv[1:]))

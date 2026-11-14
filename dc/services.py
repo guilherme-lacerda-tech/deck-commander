@@ -68,7 +68,10 @@ def power_loop(paths: Paths, interval: float = 30) -> None:
         try:  # modo repouso: na tomada, com download/tradução, o Deck não dorme até terminar (dc/repouso.py)
             from . import repouso
             if repouso.permitido():
-                trava = getattr(power_loop, "_trava", None) or repouso.Trava()
+                trava = getattr(power_loop, "_trava", None)
+                if trava is None:  # serviço (re)começou: marca velha não pode apagar a tela sem trava de verdade
+                    (paths.state / "repouso-ativo").unlink(missing_ok=True)
+                    trava = repouso.Trava(marca=paths.state / "repouso-ativo")
                 power_loop._trava = trava
                 try:
                     tors = q.torrents()
@@ -77,6 +80,10 @@ def power_loop(paths: Paths, interval: float = 30) -> None:
                 msg = trava.ajustar(repouso.motivo(paths, tors, bool(reading.ac_online)))
                 if msg:
                     _log(paths, "power", msg)
+                    if trava.proc is None:  # acabou: se a tela foi apagada pelo botão, o Deck vai dormir
+                        fim = repouso.ao_terminar(paths)
+                        if fim:
+                            _log(paths, "power", fim)
         except Exception as e:  # noqa: BLE001 — repouso nunca derruba o serviço de energia
             _log(paths, "power", f"repouso: {e}")
         if (state, why) != last_written:

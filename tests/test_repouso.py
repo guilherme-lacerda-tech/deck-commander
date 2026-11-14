@@ -51,3 +51,26 @@ def test_permissao_testada_pela_propria_trava(monkeypatch):
     R._PERMITIDO.clear()
     assert R.permitido(testar=lambda: False) is False
     R._PERMITIDO.clear()
+
+
+def test_botao_apaga_e_acende_so_com_trava(tmp_path):
+    p = get_paths(tmp_path).ensure()
+    brilho = tmp_path / "brightness"; brilho.write_text("40000")
+    assert "nada segurando" in R.botao(p, brilho) and brilho.read_text() == "40000"
+    (p.state / "repouso-ativo").write_text("1 download(s)")
+    assert "apagada" in R.botao(p, brilho) and brilho.read_text() == "0"
+    assert "acesa" in R.botao(p, brilho) and brilho.read_text() == "40000"
+    R.botao(p, brilho)  # apaga de novo; o trabalho acaba com a tela apagada:
+    dormiu = []
+    assert "dormir" in R.ao_terminar(p, dormir=lambda: dormiu.append(1), brilho=brilho)
+    assert dormiu == [1] and brilho.read_text() == "40000"  # acorda depois com o brilho de antes
+    assert R.ao_terminar(p, dormir=lambda: dormiu.append(1), brilho=brilho) is None
+
+
+def test_trava_marca_e_desmarca(tmp_path):
+    marca = tmp_path / "repouso-ativo"
+    t = R.Trava(abrir=lambda cmd, **k: _Proc(cmd), marca=marca)
+    t.ajustar("tradução")
+    assert marca.read_text() == "tradução"
+    t.ajustar(None)
+    assert not marca.exists()

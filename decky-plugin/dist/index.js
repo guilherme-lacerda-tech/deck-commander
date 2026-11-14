@@ -998,7 +998,15 @@ function pontoContinuar(motivo) {
 function registrarContinuar() {
     const regs = [];
     try { regs.push(SteamClient.System.UI.RegisterForSystemKeyEvents(() => pontoContinuar("botão Steam"))); } catch (e) { }
-    try { regs.push(SteamClient.User.RegisterForPrepareForSystemSuspendProgress(() => pontoContinuar("descanso"))); } catch (e) { }
+    // Repouso (14/11/2026): com download/tradução na tomada o sistema recusa dormir e a tela ficava acesa; o botão de
+    // ligar apaga/acende a tela enquanto o trabalho continua (dc.repouso).
+    let ultimoBotao = 0;
+    try { regs.push(SteamClient.User.RegisterForPrepareForSystemSuspendProgress(() => {
+        pontoContinuar("descanso");
+        if (Date.now() - ultimoBotao < 3000) return;  // o mesmo aperto pode chegar mais de uma vez
+        ultimoBotao = Date.now();
+        call("repouso_botao").then((r) => note(r)).catch(() => {});
+    })); } catch (e) { }
     return regs;
 }
 
