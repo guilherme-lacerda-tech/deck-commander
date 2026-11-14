@@ -204,6 +204,11 @@ def main(argv: list[str]) -> None:
             ensure_ascii=False), "utf-8")
     except OSError:
         pass
+    try:  # limite de quadros preso em 30 deixava o NES em câmera lenta (Deck 14/11/2026)
+        from . import quadros
+        quadros.em_segundo_plano(paths, console)
+    except Exception:  # noqa: BLE001 — nunca impede o jogo de abrir
+        pass
     if not rec and not measure and not tdp_ctl and not saves_auto and not cont_emu:
         os.execvp(cmd[0], cmd)
     if rec:

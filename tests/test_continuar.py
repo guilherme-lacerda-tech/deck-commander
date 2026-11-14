@@ -185,3 +185,14 @@ def test_voltar_no_ppsspp_toca_varias_vezes(tmp_path, monkeypatch):
     acoes = []
     C.voltar_no_tempo(p, 10, tecla_fn=acoes.append)
     assert acoes.count("keydown") == 5 and acoes.count("keyup") == 5
+
+
+def test_revisao_ao_vivo_acusa_psp_sem_botoes(tmp_path):
+    from dc import revisao_viva as RV
+    sysdir = tmp_path / ".var/app/org.ppsspp.PPSSPP/config/ppsspp/PSP/SYSTEM"
+    assert RV._ppsspp_sem_botoes(tmp_path) == []  # sem PPSSPP: nada a conferir
+    sysdir.mkdir(parents=True)
+    (sysdir / "controls.ini").write_text("﻿[ControlMapping]\nSave State = 1-139\n", "utf-8")
+    assert RV._ppsspp_sem_botoes(tmp_path)
+    (sysdir / "controls.ini").write_text("[ControlMapping]\nCross = 1-54,10-189\nSave State = 1-139\n", "utf-8")
+    assert RV._ppsspp_sem_botoes(tmp_path) == []

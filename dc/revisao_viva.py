@@ -77,7 +77,19 @@ def emuladores():
     ds = H / RT.ARQUIVOS["DuckStation"]
     if ds.exists() and "togglefastforward = keyboard/f12" not in ds.read_text("utf-8", "replace").lower():
         ruins.append("DuckStation sem turbo liga/desliga no F12")
-    return not ruins, "; ".join(ruins) if ruins else "RetroArch, DuckStation, PCSX2 e Dolphin ok"
+    ruins += _ppsspp_sem_botoes(H)
+    return not ruins, "; ".join(ruins) if ruins else "RetroArch, DuckStation, PCSX2, Dolphin e PPSSPP ok"
+
+
+def _ppsspp_sem_botoes(home: Path) -> list[str]:
+    """Falha real 14/11/2026: controls.ini do PPSSPP só com as teclas do ponto de continuar = PSP sem nenhum botão."""
+    ctl = home / ".var/app/org.ppsspp.PPSSPP/config/ppsspp/PSP/SYSTEM/controls.ini"
+    if not ctl.exists():
+        return []
+    t = ctl.read_text("utf-8-sig", "replace")
+    if "[ControlMapping]" in t and not any(ln.split("=")[0].strip() == "Cross" for ln in t.splitlines()):
+        return ["PPSSPP sem os botões do PSP (controls.ini incompleto)"]
+    return []
 
 
 @item("todo jogo retrô com os botões de trás")
