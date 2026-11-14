@@ -376,7 +376,10 @@ const Campo = (label, value, onChange, opts) => Row(h(D.TextField, Object.assign
     onChange: (e) => onChange(e.target.value) }, opts || {})));
 // Rótulo numa linha e a lista embaixo, com a largura toda: ao lado do rótulo o painel cortava o nome ("God of …",
 // visto no Deck 14/11/2026; "childrenLayout" não é aceito pela lista do Decky e espremia o rótulo).
-const Lista = (label, opcoes, sel, onChange) => Row(h("div", null,
+const CSS_LISTA = ".dc-lista .DialogDropDown{max-width:100%;min-width:0}" +
+    ".dc-lista .DialogDropDown_CurrentDisplay{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}";
+const Lista = (label, opcoes, sel, onChange) => Row(h("div", { className: "dc-lista", style: { width: "100%", minWidth: 0 } },
+    h("style", null, CSS_LISTA),
     h("div", { style: { fontSize: "14px", padding: "6px 0 2px" } }, label),
     h(D.DropdownItem, { rgOptions: opcoes, selectedOption: sel, strDefaultLabel: "Escolha…",
         onChange: (o) => onChange(o.data), childrenContainerWidth: "max" })));
