@@ -5,6 +5,10 @@
   (`dc/traducao/comunidade.py`) antes da IA. Uma tarefa agendada no PC procura a tradução de fãs, baixa só o
   patch, confere a versão do disco, aplica (`aplicar`, inclusive jogo de vários CDs) e avisa no Telegram. Sem
   tradução de fã, ou 72 h sem o PC procurar, a IA traduz como antes.
+- **Patch `.xdelta` com compressão secundária** (DJW/LZMA, comum nas traduções do João13 para PS2): o xdelta3 oficial
+  (pacote do Arch) desempacota o patch (`recode -S none`, ~40 s para 2 GB) e o leitor próprio aplica.
+- **Monitoramento da tradução:** `conferir` de hora em hora no Deck (nenhum jogo fica fora da fila) e resumo da tarefa
+  do PC no Telegram (`avisar`).
 - **Patch `.ppf`** (PPF 1/2/3, comum em PS1/PS2): aplicado em cópia do disco; disco de outra versão é recusado
   pelo bloco de conferência do próprio PPF.
 - Corrigido (achado no uso, 14/11): mandar o console **depois** de um download sem console ("Ps1") virava o console

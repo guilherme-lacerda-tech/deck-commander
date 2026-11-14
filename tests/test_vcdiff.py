@@ -1,5 +1,6 @@
 """XDelta (VCDIFF) sem programa de fora (pedido 14/11/2026: tradução da OAleex do God of War PSP vem em .xdelta)."""
 import zlib
+from pathlib import Path
 
 import pytest
 
@@ -103,3 +104,35 @@ def test_patches_xdelta_em_outro_jogo_falha_sem_gravar(tmp_path):
     with pytest.raises(patches.PatchError, match="outra versão"):
         patches.apply_file(tmp_path / "jogo.bin", tmp_path / "t.xdelta", tmp_path / "saida.bin")
     assert sorted(x.name for x in tmp_path.iterdir()) == ["jogo.bin", "t.xdelta"]
+
+
+def test_patch_com_compressao_secundaria_e_desempacotado_pelo_xdelta3(tmp_path, monkeypatch):
+    """Traduções do João13 para PS2 (KH Final Mix, NFS) vêm com DJW (xdelta3 -S): o xdelta3 oficial regrava o patch
+    sem ela (`recode -S none`) e o leitor próprio aplica (14/11/2026)."""
+    from dc import patches
+    jogo, alvo, dados, inst, ends = _exemplo()
+    (tmp_path / "jogo.iso").write_bytes(jogo)
+    limpo = _patch(_janela((len(jogo), 0), alvo, dados, inst, ends))
+    comprimido = limpo[:4] + b"\x01\x01" + limpo[5:]  # cabeçalho diz "DJW" (o conteúdo é o do fake abaixo)
+    (tmp_path / "t.xdelta").write_bytes(comprimido)
+    assert V.compressao_secundaria(tmp_path / "t.xdelta")
+    chamadas = []
+
+    def rodar(cmd, **k):
+        chamadas.append(cmd)
+        Path(cmd[-1]).write_bytes(limpo)
+        return type("R", (), {"returncode": 0, "stderr": ""})()
+    monkeypatch.setattr(V, "programa_xdelta3", lambda: "/bin/xdelta3")
+    orig = V.recodificar
+    monkeypatch.setattr(V, "recodificar", lambda p, d, programa=None, rodar_=None: orig(p, d, programa, rodar))
+    out = patches.apply_file(tmp_path / "jogo.iso", tmp_path / "t.xdelta", tmp_path / "saida.iso")
+    assert out.read_bytes() == alvo
+    assert chamadas[0][:4] == ["/bin/xdelta3", "recode", "-S", "none"]
+    assert not (tmp_path / ".dc-patch").exists()  # o patch temporário sai junto
+
+
+def test_sem_xdelta3_explica_como_instalar(tmp_path, monkeypatch):
+    (tmp_path / "p").write_bytes(b"\xd6\xc3\xc4\x00\x01\x01")
+    monkeypatch.setattr(V, "programa_xdelta3", lambda: None)
+    with pytest.raises(V.ErroVcdiff, match="pacman -S xdelta3"):
+        V.recodificar(tmp_path / "p", tmp_path / "q")

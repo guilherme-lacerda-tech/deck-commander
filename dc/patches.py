@@ -238,13 +238,21 @@ def _apply_xdelta(rom: Path, patch: Path, out: Path | None) -> Path:
     out = Path(out) if out else rom.with_name(f"{rom.stem} (patch){rom.suffix}")
     if out.exists():
         raise FileExistsError(out)
+    trabalho = out.parent / ".dc-patch"
+    recodificado = None
     try:
-        transplante.aplicar(rom, patch, out, out.parent / ".dc-patch", log=lambda s: None)
+        if vcdiff.compressao_secundaria(Path(patch)):  # DJW/LZMA do xdelta3: desempacota antes (vcdiff.recodificar)
+            trabalho.mkdir(exist_ok=True)
+            recodificado = vcdiff.recodificar(Path(patch), trabalho / "patch-sem-compressao.xdelta")
+            patch = recodificado
+        transplante.aplicar(rom, patch, out, trabalho, log=lambda s: None)
     except (vcdiff.ErroVcdiff, transplante.ErroTransplante) as e:
         raise PatchError(f"xdelta: {e}") from e
     finally:
+        if recodificado:
+            recodificado.unlink(missing_ok=True)
         try:
-            (out.parent / ".dc-patch").rmdir()
+            trabalho.rmdir()
         except OSError:
             pass
     return out

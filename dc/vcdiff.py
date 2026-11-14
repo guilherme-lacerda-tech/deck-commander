@@ -8,7 +8,10 @@ original que o patch pede (ex.: uma ISO que já veio modificada por outra tradu�
 saíram certos: `relatorio["errados"]` lista os pedaços cuja soma não bateu. Zero errados = resultado idêntico ao que o
 tradutor gerou.
 
-Não suportado (recusado com motivo): compressão secundária (xdelta3 -S djw/lzma/fgk) e tabela de códigos própria.
+Compressão secundária (xdelta3 -S djw/lzma/fgk): o leitor não decodifica; `recodificar` usa o xdelta3 oficial (pacote
+do Arch, em ~/.local/share/deck-commander/bin) só para regravar o patch SEM ela (`xdelta3 recode -S none`, ~40 s para
+2 GB) e o resto segue por aqui — inclusive o transplante para disco de outra versão (14/11/2026: as traduções do
+João13 para PS2 vêm com DJW). Tabela de códigos própria: recusada com motivo.
 """
 from __future__ import annotations
 
@@ -22,6 +25,34 @@ S_NEAR, S_SAME = 4, 3
 
 class ErroVcdiff(ValueError):
     pass
+
+
+def compressao_secundaria(patch: Path) -> bool:
+    with open(patch, "rb") as f:
+        cab = f.read(5)
+    return cab[:4] == b"\xd6\xc3\xc4\x00" and bool(cab[4] & 0x01)
+
+
+def programa_xdelta3() -> str | None:
+    import shutil
+    p = Path.home() / ".local/share/deck-commander/bin/xdelta3"
+    return shutil.which("xdelta3") or (str(p) if p.exists() else None)
+
+
+def recodificar(patch: Path, destino: Path, programa: str | None = None, rodar=None) -> Path:
+    """Regrava o patch sem compressão secundária (mesmo conteúdo, só desempacotado)."""
+    import subprocess
+    programa = programa or programa_xdelta3()
+    if not programa:
+        raise ErroVcdiff("patch com compressão secundária (xdelta3 -S) e o programa xdelta3 não está instalado "
+                         "(no Deck: distrobox enter dcbuild -- sudo pacman -S xdelta3; depois copie /usr/bin/xdelta3 "
+                         "para ~/.local/share/deck-commander/bin/)")
+    rodar = rodar or subprocess.run
+    r = rodar([programa, "recode", "-S", "none", "-f", str(patch), str(destino)], capture_output=True, text=True,
+              timeout=3600, check=False)
+    if r.returncode != 0 or not Path(destino).exists() or compressao_secundaria(Path(destino)):
+        raise ErroVcdiff(f"não consegui regravar o patch sem a compressão secundária: {(r.stderr or '').strip()[:200]}")
+    return Path(destino)
 
 
 def tabela_padrao() -> list[tuple[int, int, int, int, int, int]]:
