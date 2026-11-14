@@ -80,3 +80,33 @@ def botoes_em_portugues(f_sel: bytes) -> bytes:
         for y, palavra in BOTOES.items():
             escrever(d, 0, folha + y, 128, 32, [letra(d, folha, c) for c in palavra])
     return bytes(d)
+
+
+# ST/SEL/SEL.BIN (engenharia reversa 14/11/2026): a placa "SELECT YOUR DESTINY" e os rótulos dos arquivos ("new
+# game", "no data"…) são TEXTO em minúsculas desenhado letra a letra com o alfabeto gótico acima — só a–z, sem
+# acento. Cada um ocupa um espaço fixo terminado em 0x00. Falha real: o tradutor de texto tratou esses como frases
+# comuns e gravou lixo ("new game" -> "jg novo", "no data" -> "n"). Aqui eles são gravados DEPOIS da tradução de
+# texto, conferindo os bytes originais (só no disco SLES-00524). Os cabeçalhos "| Erase File |" usam a fonte comum.
+BARRA = b"\x81|"
+GOTICO = {  # posição: (original, tamanho do espaço, português)
+    161488: (b"select", 8, b"escolha"), 161496: (b"your", 8, b"seu"), 161504: (b"destiny", 8, b"destino"),
+    161512: (BARRA + b" Erase File " + BARRA, 20, BARRA + b" Apagar " + BARRA),
+    161532: (BARRA + b" Copy File " + BARRA, 16, BARRA + b" Copiar " + BARRA),
+    161548: (BARRA + b" Change Name " + BARRA, 20, BARRA + b" Renomear " + BARRA),
+    161568: (BARRA + b" New Game " + BARRA, 16, BARRA + b" Novo Jogo " + BARRA),
+    161688: (b"new game", 12, b"novo jogo"), 161700: (b"used", 8, b"usado"), 161708: (b"no data", 12, b"vazio"),
+    161720: (b"card", 8, b"cartao"),
+}
+
+
+def textos_goticos(sel_original: bytes, sel_traduzido: bytes) -> bytes:
+    """Regrava os textos góticos/cabeçalhos da tela de arquivos. Recusa (ValueError) se o disco não for o esperado."""
+    for pos, (orig, tam, pt) in GOTICO.items():
+        if sel_original[pos:pos + len(orig) + 1] != orig + b"\x00":
+            raise ValueError(f"SEL.BIN de outra versão do jogo (posição {pos})")
+        if len(pt) >= tam or (pt.islower() and not all(chr(c) in " abcdefghijklmnopqrstuvwxyz&!-.'" for c in pt)):
+            raise ValueError(f"{pt!r} não cabe no espaço de {tam} bytes ou tem letra fora do alfabeto gótico")
+    d = bytearray(sel_traduzido)
+    for pos, (_orig, tam, pt) in GOTICO.items():
+        d[pos:pos + tam] = pt + bytes(tam - len(pt))
+    return bytes(d)

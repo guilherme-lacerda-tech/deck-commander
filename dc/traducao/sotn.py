@@ -384,6 +384,11 @@ def translate_rom(paths: Paths, rom: Path, title: str = "", chain=None, progress
         sotn_imagens,  # botões desenhados da tela de arquivos (File select…) remontados em português
     )
     novos["ST/SEL/F_SEL.BIN"] = sotn_imagens.botoes_em_portugues(disco.ler("ST/SEL/F_SEL.BIN"))
+    try:  # placa "SELECT YOUR DESTINY" e rótulos dos arquivos: texto gótico (só a–z), depois da tradução de texto
+        sel = disco.ler("ST/SEL/SEL.BIN")
+        novos["ST/SEL/SEL.BIN"] = sotn_imagens.textos_goticos(sel, novos.get("ST/SEL/SEL.BIN", sel))
+    except ValueError as e:
+        rep.errors.append(f"tela de arquivos: {e}")
     from . import (
         sotn_falas_fonte,  # falas com acento: tabela de letras novas + rotina de letras com 25 voltas
     )
