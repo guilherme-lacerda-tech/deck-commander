@@ -10,6 +10,8 @@ patch é de outra versão do disco) | sem_resposta (passou ESPERA_MAX_H sem o PC
 Com nao_existe ou sem_resposta, a tradução por IA começa sozinha (como antes desta regra).
 
     python3 -m dc.traducao.comunidade listar                       -> JSON com os jogos esperando busca
+    python3 -m dc.traducao.comunidade conferir                     -> põe na fila o que faltou e lista onde a IA falhou
+    python3 -m dc.traducao.comunidade avisar "<texto>"             -> manda o texto no Telegram (pelo bot)
     python3 -m dc.traducao.comunidade marcar <jogo> <situação> [nota]
     python3 -m dc.traducao.comunidade aplicar <jogo> <patch> [<arquivo do disco>]
 """
@@ -128,13 +130,66 @@ def vencidos(paths, store=None, agora: float | None = None) -> list[str]:
     return out
 
 
+def _avisos_soltos(paths) -> Path:
+    return paths.state / "comunidade-avisos.json"
+
+
+def avisar(paths, texto: str) -> None:
+    """Aviso livre para o Telegram (o resumo da tarefa do PC, por exemplo)."""
+    try:
+        fila = json.loads(_avisos_soltos(paths).read_text("utf-8"))
+    except (OSError, ValueError):
+        fila = []
+    fila.append(texto)
+    _avisos_soltos(paths).write_text(json.dumps(fila, ensure_ascii=False), "utf-8")
+
+
 def avisos(paths) -> list[str]:
     """Mensagens novas para o Telegram (o bot manda e elas saem daqui)."""
     dados = carregar(paths)
     msgs = [e.pop("avisar") for e in dados.values() if e.get("avisar")]
     if msgs:
         salvar(paths, dados)
+    try:
+        msgs += json.loads(_avisos_soltos(paths).read_text("utf-8"))
+        _avisos_soltos(paths).unlink()
+    except (OSError, ValueError):
+        pass
     return msgs
+
+
+_ULTIMA_CONFERENCIA = {"t": 0.0}
+
+
+def conferir(paths, agora: float | None = None, intervalo: float = 0) -> dict | None:
+    """Monitoramento (pedido do usuário 14/11/2026: "garantir que vai traduzir"): todo jogo da biblioteca que não
+    está em português entra na fila (mesmo o que chegou por fora do /sync), e lista onde a IA falhou depois de a
+    comunidade não ter tradução — esses precisam de engenharia reversa. `intervalo`: no máximo 1 vez a cada N s."""
+    agora = agora or time.time()
+    if intervalo and agora - _ULTIMA_CONFERENCIA["t"] < intervalo:
+        return None
+    _ULTIMA_CONFERENCIA["t"] = agora
+    from . import portugues, run
+    try:
+        lm = json.loads((paths.data / "launch-map.json").read_text("utf-8"))
+    except (OSError, ValueError):
+        return {"novos": [], "situacoes": {}, "ia_falhou": []}
+    idi = portugues.load_idiomas(paths.data)
+    novos = []
+    for gid, e in lm.items():
+        if e.get("removed") or e.get("console") in ("pc", "steam") or portugues.status(gid, e, idi):
+            continue
+        if registrar(paths, gid, e):
+            novos.append(gid)
+    dados = carregar(paths)
+    situacoes: dict[str, list[str]] = {}
+    for gid, e in dados.items():
+        situacoes.setdefault(e["situacao"], []).append(gid)
+    ia_falhou = sorted({j["game_id"] for j in run.all_jobs(paths)
+                        if j.get("status") in ("falhou", "aguardando análise")
+                        and dados.get(j.get("game_id"), {}).get("situacao") in LIBERA_IA
+                        and not lm.get(j.get("game_id"), {}).get("removed")})
+    return {"novos": novos, "situacoes": situacoes, "ia_falhou": ia_falhou}
 
 
 def aplicar(paths, gid: str, patch: Path, disco: Path | None = None, store=None) -> str:
@@ -193,6 +248,11 @@ def main(argv: list[str]) -> int:
     paths = get_paths().ensure()
     if argv[:1] == ["listar"]:
         print(json.dumps(pendentes(paths), ensure_ascii=False, indent=1))
+    elif argv[:1] == ["conferir"]:
+        print(json.dumps(conferir(paths), ensure_ascii=False, indent=1))
+    elif argv[:1] == ["avisar"] and len(argv) >= 2:
+        avisar(paths, " ".join(argv[1:]))
+        print("ok")
     elif argv[:1] == ["marcar"] and len(argv) >= 3:
         print(marcar(paths, argv[1], argv[2], " ".join(argv[3:])))
     elif argv[:1] == ["aplicar"] and len(argv) in (3, 4):

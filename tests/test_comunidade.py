@@ -161,3 +161,28 @@ def test_ppf1_e_ppf2(tmp_path):
     p2.write_bytes(b"PPF20\1" + b" " * 50 + len(orig).to_bytes(4, "little") + orig[0x9320:0x9320 + 1024]
                    + (7).to_bytes(4, "little") + b"\x01" + b"Z")
     assert patches.apply_file(disco, p2, tmp_path / "b.bin").read_bytes()[7:8] == b"Z"
+
+
+def test_conferir_poe_na_fila_o_que_faltou_e_aponta_ia_que_falhou(P, monkeypatch):
+    lm = {"ps2-a": {"title": "A", "console": "ps2", "rom": "/x/a.iso"},
+          "ps2-b (PT-BR)": {"title": "B (PT-BR)", "console": "ps2", "rom": "/x/b (PT-BR).iso"},
+          "pc-c": {"title": "C", "console": "pc", "rom": ""},
+          "ps2-d": {"title": "D", "console": "ps2", "rom": "/x/d.iso", "removed": True},
+          "psx-e": {"title": "E", "console": "psx", "rom": "/x/e.cue"}}
+    (P.data / "launch-map.json").write_text(json.dumps(lm))
+    C.registrar(P, "psx-e", lm["psx-e"])
+    monkeypatch.setattr(run, "auto_queue", lambda *a: [])
+    C.marcar(P, "psx-e", "nao_existe", store=object())
+    monkeypatch.setattr(run, "all_jobs", lambda paths: [{"game_id": "psx-e", "status": "falhou"},
+                                                         {"game_id": "ps2-a", "status": "falhou"}])
+    r = C.conferir(P)
+    assert r["novos"] == ["ps2-a"]  # PT, PC e removido ficam fora
+    assert r["ia_falhou"] == ["psx-e"]  # ps2-a ainda espera a comunidade: não é falha da IA
+    assert r["situacoes"] == {"procurar": ["ps2-a"], "nao_existe": ["psx-e"]}
+    assert C.conferir(P, agora=r and 10**10, intervalo=3600) is not None
+    assert C.conferir(P, agora=10**10 + 5, intervalo=3600) is None  # de hora em hora
+
+
+def test_avisar_vai_para_o_telegram_uma_vez(P):
+    C.avisar(P, "Resumo: 2 aplicados")
+    assert C.avisos(P) == ["Resumo: 2 aplicados"] and C.avisos(P) == []

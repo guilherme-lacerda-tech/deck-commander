@@ -166,6 +166,9 @@ def power_loop(paths: Paths, interval: float = 30) -> None:
             from .traducao import comunidade
             for linha in comunidade.vencidos(paths, store):
                 _log(paths, "worker", "comunidade: " + linha.splitlines()[0])
+            conf = comunidade.conferir(paths, intervalo=3600)  # de hora em hora: nenhum jogo fica fora da fila
+            if conf and conf["novos"]:
+                _log(paths, "worker", "comunidade: entraram na fila " + ", ".join(conf["novos"]))
         except Exception as e:  # noqa: BLE001
             _log(paths, "worker", f"comunidade: {e}")
         if not running and not ops.in_safe_mode(paths):
