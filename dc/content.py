@@ -178,15 +178,27 @@ def switch_extras(files: list[Path]) -> list[Path]:
     return [f for f in files if f.suffix.lower() in CONSOLES["switch"]["exts"] and switch_kind(f.name) in ("update", "dlc")]
 
 
-def make_m3u(discs: list[Path], folder: Path) -> Path | None:
-    """PS1 multidisco: (Disc 1)/(Disc 2) -> '<jogo>.m3u' com caminhos relativos, preservando nomes."""
+def make_m3u(discs: list[Path], folder: Path, titulo: str = "") -> Path | None:
+    """PS1 multidisco: (Disc 1)/(Disc 2) -> '<jogo>.m3u' com caminhos relativos a `folder`, preservando nomes.
+    Falha real 14/11/2026 (Metal Gear Solid): os discos estavam numa subpasta e o .m3u listava só o nome do arquivo
+    (caminho errado) -> o jogo virou 3 atalhos ("mgs", "mgs_cd1", "mgs_cd2"). Nome curto do disco ("mgs_") cede
+    lugar ao nome do download."""
     numbered = [(int(m.group(2)), d) for d in discs if (m := _DISC.search(d.stem))]
     if len(numbered) < 2:
         return None
     numbered.sort()
-    base = _DISC.sub("", numbered[0][1].stem).strip()
-    m3u = folder / f"{base}.m3u"
-    m3u.write_text("\n".join(d.name for _, d in numbered) + "\n", "utf-8")
+    base = _DISC.sub("", numbered[0][1].stem).strip(" _-.")
+    # "mgs" (nome de arquivo: minúsculo, sem espaço) cede ao nome do download; "FF7" (sigla de verdade) fica
+    if titulo.strip() and (len(base) < 3 or (base == base.lower() and " " not in base and len(base) < 8)):
+        base = titulo.strip()
+    m3u = folder / f"{base or 'jogo'}.m3u"
+    linhas = []
+    for _, d in numbered:
+        try:
+            linhas.append(d.relative_to(folder).as_posix())
+        except ValueError:
+            linhas.append(d.name)
+    m3u.write_text("\n".join(linhas) + "\n", "utf-8")
     return m3u
 
 
@@ -364,7 +376,7 @@ def ingest(content: Path, console: str | None, roms_root: Path, quarantine_root:
             return SyncItem(name, console, "skipped",
                             note="nenhum arquivo jogável para " + CONSOLES[console].get("label", console))
         if console == "psx":
-            m3u = make_m3u([g for g in games if g.suffix.lower() in (".cue", ".chd", ".pbp")], staging)
+            m3u = make_m3u([g for g in games if g.suffix.lower() in (".cue", ".chd", ".pbp")], staging, title)
             if m3u:
                 games = [m3u]
         if len(games) > 3 and not confirm_many:

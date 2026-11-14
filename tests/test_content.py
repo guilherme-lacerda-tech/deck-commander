@@ -112,3 +112,23 @@ def test_ps2_mdf_becomes_iso(tmp_path):
     (d / "Shadow of the Colossus.mds").write_bytes(b"x")
     it = content.ingest(d, "ps2", tmp_path / "roms", tmp_path / "q", tmp_path / "work")
     assert it.status == "added" and it.files[0].endswith("Shadow of the Colossus.iso")
+
+
+def test_multidisco_em_subpasta_vira_um_jogo_so(tmp_path):
+    """Falha real 14/11/2026: Metal Gear Solid (2 CDs numa subpasta) virou 3 atalhos — o .m3u apontava errado."""
+    from dc import library
+    d = tmp_path / "MetalGearSolidRus"
+    sub = d / "MetalGearSolidRus"
+    sub.mkdir(parents=True)
+    for n in (1, 2):
+        (sub / f"mgs_cd{n}.bin").write_bytes(b"\1" * 4096)
+        (sub / f"mgs_cd{n}.cue").write_text(f'FILE "mgs_cd{n}.bin" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n')
+    it = content.ingest(d, "psx", tmp_path / "roms", tmp_path / "q", tmp_path / "work")
+    assert it.status == "added" and len(it.files) == 1
+    m3u = __import__("pathlib").Path(it.files[0])
+    assert m3u.name == "MetalGearSolidRus.m3u"  # "mgs_" é curto demais: usa o nome do download
+    linhas = m3u.read_text("utf-8").split()
+    assert linhas == ["MetalGearSolidRus/mgs_cd1.cue", "MetalGearSolidRus/mgs_cd2.cue"]
+    assert all((m3u.parent / ln).exists() for ln in linhas)
+    jogos, _ = library.scan([tmp_path / "roms"])
+    assert [g.title for g in jogos if g.console == "psx"] == ["MetalGearSolidRus"]

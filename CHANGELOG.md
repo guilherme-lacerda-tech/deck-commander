@@ -7,6 +7,9 @@
   - o nome de dentro do torrent/magnet vale mais que o console dito antes (com aviso);
   - `/console <código ou nome> <console>` corrige um download que ainda está baixando;
   - no `/sync`, o próprio disco diz se é PS1 ou PS2 (SYSTEM.CNF) e o jogo vai para a aba certa.
+- Corrigido (achado no uso, 14/11): jogo de PS1 com vários CDs numa subpasta (Metal Gear Solid) virava um atalho
+  por CD — o `.m3u` apontava para o lugar errado. Agora o `.m3u` aponta para a subpasta e leva o nome do download
+  quando o nome do disco é curto ("mgs_").
 
 ## 0.9.0 — 2026-11-14 — experiência de console
 - **Continuar de onde parou** (PS1, PS2, PSP, GameCube/Wii, RetroArch): ponto salvo ao apertar o botão Steam/"…",
