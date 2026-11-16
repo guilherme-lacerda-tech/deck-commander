@@ -43,3 +43,13 @@ o plano e o andamento — atualizado a cada etapa (✅ feito e testado · 🔄 e
 - 16/11 03:35 — Castlevania refeito (1.634 frases, antes 1.199) e conferido na tela: placa "ESCOLHA SEU DESTINO" e menu
   ESCOLHER/RENOMEAR/COPIAR/APAGAR em português. Instalador 0.10.0 gerado em Downloads e validado (pacote íntegro,
   964 testes passando a partir dele). Revisão ao vivo com 2 verificações novas: 16/16.
+- 16/11 09:20 — **simulação em VM de verdade**: SteamOS 3.8.14 (imagem oficial da Valve) em QEMU no PC, EmuDeck
+  2.7.1 instalado pela tela como usuário (Easy Mode, armazenamento interno, Steam ROM Manager), depois o instalador do
+  Deck Commander respondido como usuário, 3 vezes (instalação nova e por cima) e a atualização automática de ponta a
+  ponta. As 3.253 configurações do EmuDeck ficaram idênticas (comparação por hash); só entraram os serviços do Deck
+  Commander e o Flycast. Defeitos achados e corrigidos (com teste): o Decky Loader não instalava ("command not
+  found"); TabMaster recém-instalado tem settings.json vazio (as abas nunca apareciam) e gravar antes das abas padrão
+  dele faria Todos/Instalados/Favoritos sumirem; permissão de Flatpak para emuladores que eram AppImage; aviso "instale
+  pelo ZIP" que o próprio instalador já resolvia; revisão ao vivo acusando como falha o que é opcional. Revisão na VM:
+  15/16 (falta só o Steam logado). Pendente: login Steam na VM (o usuário entra) para o Steam ROM Manager do EmuDeck,
+  biblioteca, abas e painel.

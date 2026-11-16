@@ -10,6 +10,10 @@ Instalado no Deck do irmão do usuário (que já usava EmuDeck), o Deck Commande
 - **Atualização automática**: confere 1×/dia, avisa no painel e no Telegram, `/atualizar` ou botão; baixa, testa no
   próprio Deck e só então troca (`/voltar` desfaz). Antes, cada atualização exigia reinstalar.
 - **Abas de console sumiam** ao acordar do descanso (o TabMaster esconde aba vazia): proteção contra lista incompleta.
+- **Simulação em VM (SteamOS + EmuDeck instalados como usuário)**: o instalador agora instala o Decky Loader (dava
+  "command not found"); com TabMaster recém-instalado as abas de console esperam as abas padrão dele (antes não
+  apareciam, e poderiam esconder Todos/Instalados/Favoritos); nenhuma configuração do EmuDeck é alterada (conferido
+  por hash em 3.253 arquivos).
 - **Ports nativos** (jogos da comunidade para PC) e outros jogos não-Steam na aba do console escolhido.
 - **RetroAchievements**: tela Conquistas e `/conquistas` (pontos, progresso por jogo, masterizados).
 - **Instalador de arquivo único no repositório** (`tools/instalador/`): pacote = commit exato do Git + versão
