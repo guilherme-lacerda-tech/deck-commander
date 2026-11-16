@@ -42,3 +42,32 @@ def test_palavra_larga_demais_recusa():
     d = _folha_falsa()
     with pytest.raises(ValueError):
         I.escrever(d, 0, 0, 40, 32, [I.letra(d, 256, c) for c in "ESCOLHER"])
+
+
+def _sel_original() -> bytes:
+    d = bytearray(170000)
+    for pos, (orig, tam, _pt) in I.GOTICO.items():
+        d[pos:pos + len(orig)] = orig
+    return bytes(d)
+
+
+def test_textos_goticos_da_tela_de_arquivos():
+    """Falha real 14/11/2026: o tradutor de texto gravou "jg novo" no lugar de "new game" e "n" no lugar de
+    "no data" (texto desenhado com o alfabeto gótico, que só tem a–z). Agora vão inteiros e só com letras dele."""
+    orig = _sel_original()
+    estragado = bytearray(orig)
+    estragado[161688:161700] = b"jg novo " + bytes(4)
+    novo = I.textos_goticos(orig, bytes(estragado))
+    assert len(novo) == len(orig)
+    assert novo[161688:161700] == b"novo jogo" + bytes(3)
+    assert novo[161488:161512] == b"escolha\x00seu\x00\x00\x00\x00\x00destino\x00"
+    for pos, (_o, tam, pt) in I.GOTICO.items():
+        assert len(pt) < tam and novo[pos + len(pt)] == 0  # sempre termina em 0x00 dentro do espaço
+
+
+def test_textos_goticos_recusam_outra_versao():
+    import pytest
+    orig = bytearray(_sel_original())
+    orig[161488] ^= 1
+    with pytest.raises(ValueError):
+        I.textos_goticos(bytes(orig), bytes(orig))
