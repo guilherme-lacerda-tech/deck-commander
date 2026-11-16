@@ -738,6 +738,25 @@ const BibliotecaOutros = (b, fazer) => {
                 : [Txt("Nenhum jogo de outro programa encontrado.", null, "bn")]));
 };
 
+// Ports nativos (jogos que a comunidade transformou em programa de PC) e outros jogos não-Steam: escolher a aba
+function PortsNativos() {
+    const [d, recarregar] = useDados("ports");
+    const [msg, ocupado, fazer] = useAcao(recarregar);
+    const [nome, setNome] = SP_REACT.useState(null);
+    if (!d || !d.ok) return Sec("Ports nativos e jogos não-Steam", Carregando(d));
+    if (!d.jogos.length) return Sec("Ports nativos e jogos não-Steam",
+        Txt("Nenhum jogo não-Steam além dos do Deck Commander. Port nativo (jogo que a comunidade fez para PC): "
+            + "adicione na Steam como jogo não-Steam e ele aparece aqui para você escolher a aba do console.", { opacity: 0.8 }));
+    const j = d.jogos.find((x) => x.nome === nome);
+    return Sec("Ports nativos e jogos não-Steam",
+        Txt("Escolha o jogo e a aba de console em que ele deve aparecer (ex.: um port nativo de um jogo de Switch).",
+            { opacity: 0.8 }, "ph"),
+        Lista("Jogo", d.jogos.map((x) => ({ data: x.nome, label: x.nome + (x.console ? " — " + x.console : "") })), nome, setNome),
+        j ? Lista("Aba", [{ data: "", label: "(nenhuma)" }].concat(d.consoles.map((c) => ({ data: c.id, label: c.label }))),
+            j.console, (c) => fazer("ports_definir", { nome: j.nome, console: c })) : null,
+        Msg(msg));
+}
+
 function TelaQualidade() {
     const [d, recarregar] = useDados("qualidade");
     const [busca, setBusca] = SP_REACT.useState("");
@@ -759,6 +778,7 @@ function TelaQualidade() {
                         (n) => fazer("emulador_definir", { console: e.console, nome: n }))
                     : Txt(e.label + ": " + e.atual, null, "e" + e.console))).concat([Msg(msg)])) : null,
         BibliotecaOutros(d.biblioteca, fazer),
+        h(PortsNativos, { key: "ports" }),
         Sec("Qualidade por jogo",
             Campo("Buscar jogo", busca, setBusca, { description: achados.length + " jogo(s)" }),
             Lista("Jogo", opcoesJogos(achados), gid, setGid),

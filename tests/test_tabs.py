@@ -86,3 +86,19 @@ def test_protecao_nao_troca_aba_por_colecao_pela_lista_antiga():
     novas = {"dc-psx": {"filters": [{"type": "collection", "params": {"id": "uc-1", "name": "PlayStation"}}]}}
     out = tabs._sem_esvaziar(antigas, novas, {"psx-a": {"console": "psx"}})
     assert out["dc-psx"]["filters"][0]["type"] == "collection"
+
+
+def test_port_nativo_marcado_entra_na_aba_do_console(tmp_path):
+    """Pedido 15/11/2026: port nativo (jogo da comunidade para PC) aparece na aba do console escolhido."""
+    from dc import ports
+    from dc.paths import get_paths
+    P = get_paths(tmp_path / "dc").ensure()
+    sc = [{"appid": 77, "exe": '"/home/deck/Games/MeuPort/port.AppImage"', "AppName": "Meu Port", "LaunchOptions": ""},
+          {"appid": 5, "exe": "dc-launch", "AppName": "GoW", "LaunchOptions": "ps2-gow"},
+          {"appid": 9, "exe": '"/x/unifideck-launcher"', "AppName": "Loja", "LaunchOptions": "epic:1"}]
+    assert [c["nome"] for c in ports.candidatos(sc, P)] == ["Meu Port"]  # nem os do Deck Commander nem os das lojas
+    assert "Nintendo Switch" in ports.marcar(P, "Meu Port", "switch")
+    spec = tabs.write_collections(P.data, sc, {"ps2-gow": {"console": "ps2"}})
+    assert spec["Nintendo Switch"] == [77] and 77 not in spec.get("Emuladores", [])
+    ports.marcar(P, "Meu Port", "")
+    assert tabs.write_collections(P.data, sc, {"ps2-gow": {"console": "ps2"}})["Nintendo Switch"] == []

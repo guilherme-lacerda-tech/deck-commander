@@ -26,6 +26,7 @@ ORDER = ["pc", "ps2", "psx", "ps3", "psp", "switch", "switch2", "n3ds", "nds", "
 COLLECTION_IDS: dict[str, str] = {}  # título -> id da coleção do Steam (preenchido por apply())
 PT_TITLE = "Em português"
 PT_GIDS: set[str] = set()  # jogos em português (preenchido por write_collections a partir de dc.traducao.portugues)
+PORTS: dict[str, str] = {}  # nome do atalho não-Steam (minúsculo) -> console (dc/ports.py; preenchido por write_collections)
 
 
 def _tab(tid: str, title: str, pos: int, appids: list[int]) -> dict:
@@ -57,6 +58,10 @@ def build(tabs: dict, shortcuts: list[dict], launch_map: dict, _ids_only: bool =
     for r in shortcuts:
         appid = (r.get("appid") or 0) & 0xFFFFFFFF
         exe = (r.get("exe") or r.get("Exe") or "").lower()
+        nome = (r.get("AppName") or r.get("appname") or "").casefold()
+        if nome in PORTS and PORTS[nome] in by_console and "dc-launch" not in exe:  # port nativo marcado pelo usuário
+            by_console[PORTS[nome]].append(appid)
+            continue
         if "unifideck" in exe:  # lojas do Unifideck: a etiqueta diz a loja (Epic, Gog...)
             tags = [v for v in (r.get("tags") or {}).values() if v not in ("Installed", "Not Installed")]
             for tg in tags[:1]:
@@ -105,6 +110,11 @@ def write_collections(data_dir: Path, shortcuts: list[dict], launch_map: dict) -
         done = json.loads((data_dir / "plugin-done.json").read_text("utf-8"))
     except (OSError, ValueError):
         done = {}
+    try:
+        PORTS.clear()
+        PORTS.update({k.casefold(): v for k, v in json.loads((data_dir / "ports.json").read_text("utf-8")).items()})
+    except (OSError, ValueError):
+        pass
     try:
         from .traducao import portugues
         PT_GIDS.clear()

@@ -836,6 +836,38 @@ def emulador_definir(p: Ponte, a: dict) -> dict:
         raise Erro(str(e))
 
 
+def ports(p: Ponte, a: dict) -> dict:
+    """Jogos não-Steam (ports nativos da comunidade etc.) e a aba de console de cada um."""
+    from . import ports as P
+    from . import syncer, vdf
+    from .emulators import CONSOLES
+    return {"jogos": P.candidatos(vdf.read_shortcuts(syncer.shortcuts_path()), p.paths),
+            "consoles": [{"id": c, "label": CONSOLES[c]["label"]} for c in CONSOLES if not CONSOLES[c].get("remoto")]}
+
+
+def ports_definir(p: Ponte, a: dict) -> dict:
+    from . import ports as P
+    try:
+        texto = P.marcar(p.paths, a.get("nome", ""), a.get("console", ""))
+    except ValueError as e:
+        raise Erro(str(e))
+    _reabas(p)
+    return {"texto": texto}
+
+
+def _reabas(p: Ponte) -> None:
+    """Refaz as abas/coleções na hora (o serviço também refaz, mas só quando a lista de atalhos muda)."""
+    try:
+        from . import syncer, tabs, vdf
+        sc = syncer.shortcuts_path()
+        if tabs.SETTINGS.exists():
+            tabs.apply(vdf.read_shortcuts(sc), p._map(), sc.parents[1].name, data_dir=p.paths.data)
+        else:
+            tabs.write_collections(p.paths.data, vdf.read_shortcuts(sc), p._map())
+    except Exception:  # noqa: BLE001, S110 — o serviço refaz depois
+        pass
+
+
 def biblioteca_importar(p: Ponte, a: dict) -> dict:
     """Põe (ou tira) da biblioteca os jogos de um console que são de outro programa (EmuDeck/RetroDECK)."""
     from . import biblioteca
@@ -1038,7 +1070,7 @@ ACOES = {f.__name__: f for f in (
     downloads_limpar, traducao_limpar, desinstalar_lista, devolver, removido_perguntado, musica, musica_volume,
     musica_midia, musica_playlist, musica_salvar, musica_conectar, pc_tv, espaco_sugestoes, familia, familia_salvar,
     familia_atualizar, familia_puxar, melhorias, melhorias_definir, contexto, retro, retro_definir, retro_jogos, perfil_definir, continuar_definir, voltar_tempo, detonado, detonado_capitulo,
-    emulador_definir, biblioteca_importar, atualizar)}
+    emulador_definir, biblioteca_importar, atualizar, ports, ports_definir)}
 ACOES["downloads_pausar"] = lambda p, a: _pausar(p, a, True)
 ACOES["downloads_retomar"] = lambda p, a: _pausar(p, a, False)
 
