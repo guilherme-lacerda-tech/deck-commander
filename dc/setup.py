@@ -281,7 +281,7 @@ def install_flatpaks(log: list[str]) -> None:
     found = emulators.detect(check_flatpak=False)
     extra = [a for c, a in emulators.FLATPAK_IF_MISSING.items() if c not in found]
     # console que já tem emulador fora do Flatpak (ex.: AppImage do EmuDeck) não ganha um segundo, vazio
-    dispensaveis = emulators.flatpaks_dispensaveis()
+    dispensaveis = emulators.flatpaks_dispensaveis(fora=set(found))
     missing = [a for a in emulators.FLATPAK_IDS + extra if a not in have and a not in dispensaveis]
     if not missing:
         return

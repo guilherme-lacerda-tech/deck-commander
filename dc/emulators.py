@@ -180,9 +180,11 @@ def detect(home: Path = H, check_flatpak: bool = True) -> dict[str, list[str]]:
     return out
 
 
-def flatpaks_dispensaveis(home: Path = H) -> set[str]:
-    """Flatpaks que NÃO precisam ser instalados: o console já tem emulador fora do Flatpak (ex.: AppImage do EmuDeck)."""
-    fora = {c for c in OPCOES if any(x["origem"] != "flatpak" for x in candidatos(c, home, check_flatpak=False))}
+def flatpaks_dispensaveis(home: Path = H, fora: set[str] | None = None) -> set[str]:
+    """Flatpaks que NÃO precisam ser instalados: o console já tem emulador fora do Flatpak (ex.: AppImage do EmuDeck).
+    `fora`: consoles que já têm emulador fora do Flatpak (o resultado de detect(check_flatpak=False))."""
+    if fora is None:
+        fora = set(detect(home, check_flatpak=False))
     usos: dict[str, set[str]] = {}
     for c, ops in OPCOES.items():
         for o in ops:
