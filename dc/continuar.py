@@ -136,17 +136,21 @@ def qual(cmd: list[str]) -> str | None:
     return next((k for k in EMUS if k in alvo), None)
 
 
-def ligado(paths) -> bool:
-    return not (paths.config / "continuar-desligado").exists()
+def ligado(paths, home: Path | None = None) -> bool:
+    """Ligado por padrão — MENOS num Deck com EmuDeck/RetroDECK: lá a configuração dos emuladores é do outro programa,
+    e o "continuar" só liga se você pedir (falha real 15/11/2026: o Deck Commander mexia na configuração do EmuDeck)."""
+    if (paths.config / "continuar-desligado").exists():
+        return False
+    if (paths.config / "continuar-ligado").exists():
+        return True
+    from .biblioteca import outro_gerenciador
+    return outro_gerenciador(home) is None
 
 
 def definir(paths, ligar: bool) -> None:
-    f = paths.config / "continuar-desligado"
-    if ligar:
-        f.unlink(missing_ok=True)
-    else:
-        f.parent.mkdir(parents=True, exist_ok=True)
-        f.write_text("1")
+    paths.config.mkdir(parents=True, exist_ok=True)
+    (paths.config / ("continuar-desligado" if ligar else "continuar-ligado")).unlink(missing_ok=True)
+    (paths.config / ("continuar-ligado" if ligar else "continuar-desligado")).write_text("1")
 
 
 # ------------------------------------------------------------------------------------------------ configuração

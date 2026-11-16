@@ -196,3 +196,18 @@ def test_revisao_ao_vivo_acusa_psp_sem_botoes(tmp_path):
     assert RV._ppsspp_sem_botoes(tmp_path)
     (sysdir / "controls.ini").write_text("[ControlMapping]\nCross = 1-54,10-189\nSave State = 1-139\n", "utf-8")
     assert RV._ppsspp_sem_botoes(tmp_path) == []
+
+
+def test_continuar_desligado_por_padrao_com_emudeck(tmp_path):
+    """Falha real 15/11/2026: num Deck com EmuDeck o "continuar" mexia na configuração dos emuladores do EmuDeck."""
+    from dc import continuar as C
+    from dc.paths import get_paths
+    P = get_paths(tmp_path / "dc").ensure()
+    casa = tmp_path / "casa"
+    (casa / "emudeck").mkdir(parents=True)
+    assert not C.ligado(P, casa)  # com EmuDeck: só se pedir
+    assert C.ligado(P, tmp_path / "sem-emudeck")  # sem outro programa: ligado como antes
+    C.definir(P, True)
+    assert C.ligado(P, casa)
+    C.definir(P, False)
+    assert not C.ligado(P, tmp_path / "sem-emudeck")
