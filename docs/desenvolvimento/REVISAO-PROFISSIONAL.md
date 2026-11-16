@@ -36,3 +36,10 @@ o plano e o andamento — atualizado a cada etapa (✅ feito e testado · 🔄 e
   Deck, trocou, serviços voltaram, revisão 14/14). Ramos `re/nova` (filtro do RomTranslate) e `melhorias/analise`
   (Castlevania) juntados. Instalador no repositório (`tools/instalador/`), com 3 defeitos corrigidos.
 - Versão 0.10.0: manual, tutorial, changelog e visão geral atualizados.
+- 16/11 03:20 — simulação de Deck com EmuDeck (pasta pessoal falsa no Deck): 401 jogos do EmuDeck ficam fora, PS2
+  abre no PCSX2 do EmuDeck, PCSX2 Flatpak não é instalado, "continuar" desligado. Ela achou mais 2 defeitos, já
+  corrigidos: a instalação ajustava a configuração dos emuladores do EmuDeck e preparava a "primeira vez" antes de
+  instalar os Flatpaks.
+- 16/11 03:35 — Castlevania refeito (1.634 frases, antes 1.199) e conferido na tela: placa "ESCOLHA SEU DESTINO" e menu
+  ESCOLHER/RENOMEAR/COPIAR/APAGAR em português. Instalador 0.10.0 gerado em Downloads e validado (pacote íntegro,
+  964 testes passando a partir dele). Revisão ao vivo com 2 verificações novas: 16/16.
