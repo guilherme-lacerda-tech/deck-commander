@@ -294,7 +294,11 @@ def install_flatpaks(log: list[str]) -> None:
 
 
 def flatpak_overrides(log: list[str]) -> None:
-    for app in emulators.FLATPAK_IDS:
+    # só os Flatpaks instalados: com EmuDeck o PCSX2/RPCS3/Cemu/Azahar são AppImage e a permissão
+    # ficava largada para um app que não existe (simulação EmuDeck, 16/11/2026)
+    have = set(subprocess.run(["flatpak", "list", "--app", "--columns=application"],
+                              capture_output=True, text=True).stdout.split())
+    for app in (a for a in emulators.FLATPAK_IDS if a in have):
         for fs in (str(H / "Emulation"), "/run/media/deck"):
             subprocess.run(["flatpak", "override", "--user", f"--filesystem={fs}", app], capture_output=True)
     log.append("Flatpaks dos emuladores com acesso a ~/Emulation e ao cartão SD")

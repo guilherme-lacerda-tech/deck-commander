@@ -116,7 +116,10 @@ else
     tmp_decky="$(mktemp -d)"
     curl -fsSL -o "$tmp_decky/install_release.sh" \
       https://github.com/SteamDeckHomebrew/decky-installer/releases/latest/download/install_release.sh
-    bash "$tmp_decky/install_release.sh" || aviso "O instalador do Decky reclamou de algo (veja acima)"
+    # o script do Decky se reabre com 'sudo "$0"' quando não é root: sem o bit de execução dava
+    # "command not found" (falha real na simulação EmuDeck, 16/11/2026). Já roda como root.
+    chmod +x "$tmp_decky/install_release.sh"
+    sudo bash "$tmp_decky/install_release.sh" || aviso "O instalador do Decky reclamou de algo (veja acima)"
     rm -rf "$tmp_decky"
     if decky_instalado; then ok "Decky Loader instalado"; else aviso "Decky não ficou instalado — dá para fazer depois em https://decky.xyz"; fi
   else
