@@ -66,9 +66,36 @@ def test_configuracao_inicial_sem_assistente_e_sem_tocar_no_que_existe(tmp_path)
     duck = tmp_path / ".local/share/duckstation/settings.ini"
     duck.parent.mkdir(parents=True)
     duck.write_text("[Main]\nmeu = sim\n")  # já existia (do usuário/EmuDeck): intocado
-    feitos = setup.preparar_primeira_vez(tmp_path)
+    feitos = setup.preparar_primeira_vez(tmp_path, presente=lambda nome, home: True)
     assert feitos == ["PCSX2"] and duck.read_text() == "[Main]\nmeu = sim\n"
     ini = (tmp_path / ".var/app/net.pcsx2.PCSX2/config/PCSX2/inis/PCSX2.ini").read_text()
     assert "SetupWizardIncomplete = false" in ini and f"Bios = {tmp_path / 'Emulation/bios'}" in ini
     assert "Cross = SDL-0/FaceSouth" in ini and "Start = SDL-0/Start" in ini
-    assert setup.preparar_primeira_vez(tmp_path) == []  # idempotente
+    assert setup.preparar_primeira_vez(tmp_path, presente=lambda nome, home: True) == []  # idempotente
+
+
+def test_nao_prepara_emulador_que_nao_esta_instalado(tmp_path):
+    """Num Deck com o PCSX2 do EmuDeck, o PCSX2 Flatpak nem é instalado: não cria a pasta dele."""
+    assert setup.preparar_primeira_vez(tmp_path, presente=lambda nome, home: False) == []
+    assert not (tmp_path / ".var/app/net.pcsx2.PCSX2").exists()
+
+
+def test_instalacao_nao_mexe_na_configuracao_dos_emuladores_do_emudeck(tmp_path, monkeypatch):
+    """Falha real 15/11/2026: a instalação ajustava Dolphin/PPSSPP/RetroArch/melonDS — os mesmos do EmuDeck."""
+    from dc import biblioteca, controls
+    P = get_paths(tmp_path / "dc").ensure()
+    monkeypatch.setattr(biblioteca, "outro_gerenciador", lambda home=None: "EmuDeck")
+
+    def proibido(*a, **k):
+        raise AssertionError("mexeu na configuração do EmuDeck")
+    for alvo in (E, ):
+        monkeypatch.setattr(alvo, "configure", proibido)
+    for f in ("switch_layout", "dolphin_defaults", "melonds_defaults", "vibracao"):
+        monkeypatch.setattr(controls, f, proibido)
+    monkeypatch.setattr(setup.subprocess, "run", lambda *a, **k: type("R", (), {"returncode": 0, "stdout": "",
+                                                                             "stderr": ""})())
+    monkeypatch.setattr(setup, "preparar_primeira_vez", lambda **k: [])
+    monkeypatch.setattr(setup, "write_emulators_json", lambda paths, log: None)
+    monkeypatch.setattr(setup, "write_units", lambda log: None)
+    log = setup.setup(P, ["M3"], downloads=False)
+    assert any("EmuDeck neste Deck" in ln for ln in log)

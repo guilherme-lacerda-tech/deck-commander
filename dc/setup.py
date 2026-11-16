@@ -383,7 +383,14 @@ PAD_DUCKSTATION = "[Pad1]\nType = AnalogController\n" + "".join(f"{k} = SDL-0/{v
     **_SDL, "Triangle": "Y", "Circle": "B", "Cross": "A", "Square": "X"}.items())
 
 
-def preparar_primeira_vez(home: Path = H, log: list[str] | None = None) -> list[str]:
+def _emulador_presente(nome: str, home: Path) -> bool:
+    """Só prepara a configuração do emulador que está instalado (sem criar pasta de programa que não existe)."""
+    if nome == "PCSX2":
+        return emulators._flatpak_installed("net.pcsx2.PCSX2")
+    return any(c["origem"] in ("appimage", "flatpak") for c in emulators.candidatos("psx", home))
+
+
+def preparar_primeira_vez(home: Path = H, log: list[str] | None = None, presente=None) -> list[str]:
     """Falha real 15/11/2026: o PCSX2 abriu pedindo BIOS e jogos ("primeira vez"). Emulador sem configuração ganha uma
     mínima: BIOS em Emulation/bios (a do cartão SD se for lá que estão), pasta de jogos, controle do Deck e sem o
     assistente inicial. Arquivo que já existe NUNCA é tocado (é do usuário ou de outro programa, como o EmuDeck)."""
@@ -401,8 +408,9 @@ def preparar_primeira_vez(home: Path = H, log: list[str] | None = None) -> list[
                         f"[Main]\nSetupWizardIncomplete = false\n\n[BIOS]\nSearchDirectory = {bios}\n\n"
                         f"[GameList]\nRecursivePaths = {home / 'Emulation/roms/psx'}\n\n" + PAD_DUCKSTATION),
     }
+    presente = presente or _emulador_presente
     for nome, (arq, texto) in alvos.items():
-        if arq.exists():
+        if arq.exists() or not presente(nome, home):
             continue
         arq.parent.mkdir(parents=True, exist_ok=True)
         arq.write_text(texto, "utf-8")
@@ -450,9 +458,6 @@ def setup(paths: Paths, modules: list[str], dev: bool = False, downloads: bool =
                     wanted.add(d); frontier.append(d); log.append(f"{m} depende de {d}: incluído")
     write_units(log)
     write_backup_toml(paths)
-    if "M2" in wanted or "M3" in wanted:
-        preparar_primeira_vez(log=log)
-        write_emulators_json(paths, log)
     if "M1" in wanted:
         write_plugins_lock(paths, log)
     if "M3" in wanted:
@@ -462,17 +467,25 @@ def setup(paths: Paths, modules: list[str], dev: bool = False, downloads: bool =
         elif not all((emulators.RA_CORES / c).exists() for c in emulators.RA_CORE_FILES):
             log.append("PENDENTE: cores do RetroArch (rode ./setup-deck.sh --all para baixar)")
         flatpak_overrides(log)
-        for l in emulators.configure(apply=True):
-            log.append("config " + l)
-        from . import controls, syncer
-        for l in controls.switch_layout(syncer._cfg(paths).get("switch_buttons", "labels")):
-            log.append("controle " + l)
-        for l in controls.dolphin_defaults():
-            log.append("controle " + l)
-        for l in controls.melonds_defaults():
-            log.append("controle " + l)
-        for l in controls.vibracao():
-            log.append("controle " + l)
+        from .biblioteca import outro_gerenciador
+        outro = outro_gerenciador()
+        if outro:  # falha real 15/11/2026: a instalação ajustava a configuração dos emuladores do EmuDeck
+            log.append(f"{outro} neste Deck: a configuração dos emuladores dele não foi alterada")
+        else:
+            for l in emulators.configure(apply=True):
+                log.append("config " + l)
+            from . import controls, syncer
+            for l in controls.switch_layout(syncer._cfg(paths).get("switch_buttons", "labels")):
+                log.append("controle " + l)
+            for l in controls.dolphin_defaults():
+                log.append("controle " + l)
+            for l in controls.melonds_defaults():
+                log.append("controle " + l)
+            for l in controls.vibracao():
+                log.append("controle " + l)
+    if "M2" in wanted or "M3" in wanted:  # depois de instalar: só prepara/registra o emulador que existe
+        preparar_primeira_vez(log=log)
+        write_emulators_json(paths, log)
     if "M2" in wanted:
         setup_plugin(log)
     if "M4" in wanted:
