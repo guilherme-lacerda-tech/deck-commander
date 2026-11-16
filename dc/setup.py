@@ -336,6 +336,8 @@ def setup_plugin(log: list[str]) -> None:
                 z.write(f, Path("deck-commander") / f.relative_to(PLUGIN_SRC))
     inst = find_installed_plugin()
     if inst is None:
+        if os.environ.get("DC_INSTALADOR") == "1":  # o instalador de arquivo único instala o plugin no passo seguinte
+            return
         log.append(f"PLUGIN: instale pelo Decky -> Configurações -> Desenvolvedor -> Instalar plugin de ZIP -> {PLUGIN_ZIP}")
         return
     changed = []

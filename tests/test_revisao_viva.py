@@ -54,3 +54,24 @@ def test_abas_de_console_vazias_sao_acusadas():
     assert not ok and "PlayStation 2" in det and "GameCube" not in det
     assert RV._abas_vazias({"usersDict": {"1": {"tabs": {"dc-ps2": cheia}}}}, lm)[0]
     assert RV._abas_vazias({"usersDict": {"1": {"tabs": {"dc-ps2": colecao}}}}, lm)[0]
+
+
+def test_instalacao_nova_sem_opcionais_nao_acusa_falha(monkeypatch, tmp_path):
+    """Simulação EmuDeck 16/11/2026: sem Telegram, IA, Tailscale e capas a revisão dava 8/16 em instalação sã."""
+    monkeypatch.setattr(RV, "H", tmp_path)
+    monkeypatch.setattr(RV, "_habilitado", lambda u: False)
+    ativos = {"deck-commander-power", "deck-commander-qbittorrent"}
+    monkeypatch.setattr(RV, "_ativo", lambda u: u in ativos)
+    assert RV.servicos()[0] and RV.ia()[0] and RV.protetor()[0]
+    monkeypatch.setattr(RV.shutil, "which", lambda n: None)
+    monkeypatch.setattr(RV, "Path", lambda p: tmp_path / "nao-existe")
+    assert RV.tailscale()[0]
+    ativos.discard("deck-commander-power")
+    assert not RV.servicos()[0]
+
+
+def test_com_emudeck_atalhos_dos_emuladores_sao_dele(monkeypatch):
+    from dc import biblioteca
+    monkeypatch.setattr(biblioteca, "outro_gerenciador", lambda *a, **k: "EmuDeck")
+    ok, det = RV.emuladores()
+    assert ok and "EmuDeck" in det

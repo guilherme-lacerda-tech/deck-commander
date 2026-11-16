@@ -33,9 +33,21 @@ def _ativo(unidade: str) -> bool:
 
 @item("serviços do Deck Commander")
 def servicos():
-    fora = [u for u in ("deck-commander-bot", "deck-commander-power", "deck-commander-ollama",
-                        "deck-commander-qbittorrent") if not _ativo(u)]
-    return not fora, "parados: " + ", ".join(fora) if fora else "bot, energia, IA e downloads rodando"
+    # bot só existe com o Telegram configurado; IA local é opcional (só vale se estiver habilitada).
+    # Instalação nova sem os dois acusava falha (simulação EmuDeck 16/11/2026)
+    quer = ["deck-commander-power", "deck-commander-qbittorrent"]
+    if (H / ".config/deck-commander/secrets/telegram").exists():
+        quer.append("deck-commander-bot")
+    if _habilitado("deck-commander-ollama"):
+        quer.append("deck-commander-ollama")
+    fora = [u for u in quer if not _ativo(u)]
+    nomes = ", ".join(u.removeprefix("deck-commander-") for u in quer)
+    return not fora, "parados: " + ", ".join(fora) if fora else f"rodando: {nomes}"
+
+
+def _habilitado(unidade: str) -> bool:
+    r = subprocess.run(["systemctl", "--user", "is-enabled", unidade], capture_output=True, text=True)
+    return r.stdout.strip() == "enabled"
 
 
 @item("painel do Decky = versão implantada")
@@ -62,6 +74,10 @@ def steam_viva():
 def emuladores():
     """Falha 0.8: F13–F16 não chegavam (XF86Tools); turbo segurando em vez de liga/desliga."""
     from . import retro as RT
+    from .biblioteca import outro_gerenciador
+    outro = outro_gerenciador()
+    if outro:  # com EmuDeck a configuração dos emuladores é dele e não é tocada (atalhos são os do EmuDeck)
+        return True, f"{outro}: emuladores com a configuração e os atalhos dele (não alteramos)"
     ruins = []
     # PCSX2 e Dolphin não voltam no tempo: não têm F11
     teclas = {"RetroArch": ("f9", "f10", "f11", "f12"), "DuckStation": ("f9", "f10", "f11", "f12"),
@@ -98,7 +114,7 @@ def abas():
     from . import tabs, transferir
     if not tabs.SETTINGS.exists():
         return True, "TabMaster não instalado"
-    return _abas_vazias(json.loads(tabs.SETTINGS.read_text("utf-8")), transferir.carregar_mapa())
+    return _abas_vazias(tabs.ler_settings(), transferir.carregar_mapa())
 
 
 def _abas_vazias(cfg: dict, lm: dict) -> tuple[bool, str]:
@@ -213,6 +229,8 @@ def castlevania():
 @item("IA de tradução respondendo")
 def ia():
     import urllib.request
+    if not _habilitado("deck-commander-ollama"):
+        return True, "IA local não ligada (opcional; a tradução usa a do PC ou a da comunidade)"
     try:
         with urllib.request.urlopen("http://127.0.0.1:11434/api/tags", timeout=5) as r:
             n = len(json.load(r).get("models", []))
@@ -224,6 +242,8 @@ def ia():
 @item("Tailscale (netplay, família, PC)")
 def tailscale():
     ts = shutil.which("tailscale") or "/opt/tailscale/tailscale"
+    if not Path(ts).exists():
+        return True, "não instalado (opcional: netplay e acesso de fora de casa)"
     r = subprocess.run([ts, "ip", "-4"], capture_output=True, text=True)
     return r.returncode == 0 and r.stdout.strip().startswith("100."), r.stdout.strip() or r.stderr.strip()[:80]
 
@@ -233,6 +253,8 @@ def protetor():
     from . import protetor as P
     pasta = H / ".steam/root/config/uioverrides/screensavers" / P.NOME
     imgs = len(list((pasta / "img").glob("*"))) if (pasta / "img").exists() else 0
+    if not (pasta / "index.html").exists() and not imgs:
+        return True, "ainda não montado (aparece depois das capas: python3 -m dc artwork)"
     return (pasta / "index.html").exists() and imgs > 0 and " " not in P.NOME, f"{imgs} imagem(ns)"
 
 
@@ -240,7 +262,7 @@ def protetor():
 def spotify():
     from . import spotify as S
     from .paths import get_paths
-    return S.instalado(get_paths()), "go-librespot instalado" if S.instalado(get_paths()) else "não instalado"
+    return True, "go-librespot instalado" if S.instalado(get_paths()) else "não instalado (opcional)"
 
 
 @item("espaço em disco")

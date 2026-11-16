@@ -29,3 +29,18 @@ def test_permissao_flatpak_so_para_os_instalados(monkeypatch):
     setup.flatpak_overrides(log)
     apps = {c[-1] for c in chamadas if c[1] == "override"}
     assert apps == {"org.ppsspp.PPSSPP"} and "org.ppsspp.PPSSPP" in emulators.FLATPAK_IDS
+
+
+def test_instalador_nao_manda_instalar_zip_que_ele_mesmo_instala(monkeypatch, tmp_path):
+    """Simulação EmuDeck 16/11/2026: no meio da instalação aparecia 'instale pelo ZIP' e o passo seguinte já instalava."""
+    from dc import setup
+    monkeypatch.setattr(setup, "PLUGIN_ZIP", tmp_path / "p.zip")
+    monkeypatch.setattr(setup, "find_installed_plugin", lambda: None)
+    log = []
+    monkeypatch.setenv("DC_INSTALADOR", "1")
+    setup.setup_plugin(log)
+    assert log == [] and (tmp_path / "p.zip").exists()
+    monkeypatch.delenv("DC_INSTALADOR")
+    setup.setup_plugin(log)
+    assert "ZIP" in log[0]
+    assert "DC_INSTALADOR=1 ./setup-deck.sh" in CAB

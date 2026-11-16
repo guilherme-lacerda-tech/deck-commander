@@ -148,7 +148,7 @@ ok "Código copiado (versão $(cat "$DEST/VERSION"))"
 passo "4/8  Instalando emuladores e serviços (a parte demorada)"
 cd "$DEST"
 EXTRA=(); [ "${DC_SEM_DOWNLOADS:-0}" = 1 ] && EXTRA=(--no-downloads)   # só para testes
-if ./setup-deck.sh --all "${EXTRA[@]}"; then ok "Instalação principal concluída"
+if DC_INSTALADOR=1 ./setup-deck.sh --all "${EXTRA[@]}"; then ok "Instalação principal concluída"
 else erro "A instalação principal falhou (veja as mensagens acima)"; fim 1; fi
 
 # ── 5. Plugins do Decky ──────────────────────────────────────────────────────────────────────

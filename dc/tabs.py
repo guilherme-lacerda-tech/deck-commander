@@ -159,13 +159,25 @@ def _sem_esvaziar(antigas: dict, novas: dict, launch_map: dict) -> dict:
     return out
 
 
+def ler_settings(settings_path: Path = SETTINGS) -> dict:
+    """settings.json do TabMaster. Recém-instalado ele cria o arquivo VAZIO (0 bytes): antes isso dava
+    JSONDecodeError, engolido pelo /sync, e as abas de console nunca apareciam (simulação EmuDeck 16/11/2026).
+    Arquivo com conteúdo inválido continua dando erro: não sobrescrevemos o que não entendemos."""
+    texto = settings_path.read_text("utf-8")
+    return json.loads(texto) if texto.strip() else {}
+
+
 def apply(shortcuts: list[dict], launch_map: dict, user_id: str, settings_path: Path = SETTINGS,
           data_dir: Path | None = None) -> dict:
     if data_dir is not None:
         write_collections(data_dir, shortcuts, launch_map)
         load_collection_ids(data_dir)
-    data = json.loads(settings_path.read_text("utf-8"))
-    user = data.setdefault("usersDict", {}).setdefault(str(user_id), {})
+    data = ler_settings(settings_path)
+    if not ((data.get("usersDict") or {}).get(str(user_id)) or {}).get("tabs"):
+        # TabMaster ainda não criou as abas padrão dele (Todos, Instalados, Favoritos...): gravar agora deixaria
+        # SÓ as abas de console e as do Steam sumiriam. Espera o TabMaster abrir uma vez (próximo /sync aplica).
+        return {}
+    user = data["usersDict"][str(user_id)]
     new = _sem_esvaziar(user.get("tabs", {}), build(user.get("tabs", {}), shortcuts, launch_map), launch_map)
     if new == user.get("tabs"):
         return {}

@@ -102,3 +102,18 @@ def test_port_nativo_marcado_entra_na_aba_do_console(tmp_path):
     assert spec["Nintendo Switch"] == [77] and 77 not in spec.get("Emuladores", [])
     ports.marcar(P, "Meu Port", "")
     assert tabs.write_collections(P.data, sc, {"ps2-gow": {"console": "ps2"}})["Nintendo Switch"] == []
+
+
+def test_tabmaster_recem_instalado_arquivo_vazio_nao_quebra_nem_apaga_abas_padrao(tmp_path):
+    """Simulação EmuDeck 16/11/2026: TabMaster novo cria settings.json VAZIO -> JSONDecodeError engolido pelo /sync.
+    E sem as abas padrão dele, gravar só as de console faria Todos/Instalados/Favoritos sumirem."""
+    p = tmp_path / "settings.json"
+    p.write_text("")
+    sc = [{"appid": 5, "exe": "dc-launch", "LaunchOptions": "psx-fft"}]
+    assert tabs.apply(sc, {"psx-fft": {"console": "psx"}}, "1", p) == {}
+    assert p.read_text() == ""  # não mexeu
+    p.write_text(json.dumps({"usersDict": {}, "tags": []}))
+    assert tabs.apply(sc, {"psx-fft": {"console": "psx"}}, "1", p) == {}
+    p.write_text(json.dumps({"usersDict": {"1": {"tabs": DEFAULT}}, "tags": []}))
+    assert tabs.apply(sc, {"psx-fft": {"console": "psx"}}, "1", p)["dc-psx"] == "whitelist"
+    assert "AllGames" in json.loads(p.read_text())["usersDict"]["1"]["tabs"]
