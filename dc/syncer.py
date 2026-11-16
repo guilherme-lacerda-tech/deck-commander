@@ -74,6 +74,8 @@ def add_to_steam(paths: Paths, store: Store, op: str) -> list[str]:
 def _add_to_steam(paths: Paths, store: Store, op: str) -> list[str]:
     games, _ = library.scan(rom_roots())
     ops.index_files(store, games)
+    from . import biblioteca  # jogos do EmuDeck/RetroDECK não entram sozinhos (falha real 15/11/2026: 400 de Wii)
+    games, _fora = biblioteca.permitidos(paths, games, store)
     sc = shortcuts_path()
     launcher = library.launcher_path(Path.home())
     pl = library.plan(vdf.read_shortcuts(sc), games, launcher)

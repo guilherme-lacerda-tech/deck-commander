@@ -162,6 +162,17 @@ def power_loop(paths: Paths, interval: float = 30) -> None:
                     _log(paths, "worker", f"qualidade: {msg}")
             except Exception as e:  # noqa: BLE001
                 _log(paths, "worker", f"qualidade: {e}")
+        if not getattr(power_loop, "_biblioteca", False):  # uma vez: jogos do EmuDeck saem da Steam (arquivos ficam)
+            power_loop._biblioteca = True
+            try:
+                from . import biblioteca
+                from .traducao import comunidade
+                msg = biblioteca.migrar(paths, store)
+                if msg:
+                    _log(paths, "worker", msg)
+                    comunidade.avisar(paths, msg)
+            except Exception as e:  # noqa: BLE001
+                _log(paths, "worker", f"biblioteca: {e}")
         try:  # busca da comunidade que o PC não fez em 72 h: libera a tradução por IA
             from .traducao import comunidade
             for linha in comunidade.vencidos(paths, store):
