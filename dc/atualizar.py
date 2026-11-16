@@ -77,12 +77,26 @@ def verificar(paths, get_json=_get_json, home: Path | None = None, agora: float 
         _cache(paths).write_text(json.dumps(st, ensure_ascii=False), "utf-8")
         return None
     local = versao_local(home)
-    nova = None if (local and sha.startswith(local)) or (local and local.startswith(sha[:7])) else \
-        {"sha": sha, "data": data, "resumo": resumo}
+    nova = None if not _a_frente(local, sha, get_json) else {"sha": sha, "data": data, "resumo": resumo}
     st = estado(paths)
     st.update(conferido=agora, erro=None, local=local, nova=nova)
     _cache(paths).write_text(json.dumps(st, ensure_ascii=False), "utf-8")
     return nova
+
+
+def _a_frente(local: str, remoto: str, get_json=_get_json) -> bool:
+    """A versão do GitHub está À FRENTE da instalada? (o GitHub compara os dois commits). Falha real 16/11/2026: logo
+    depois de um envio a API ainda respondia o commit anterior e o Deck oferecia "atualizar" para uma versão MAIS
+    VELHA. Instalação sem registro de versão (ou de um commit que o GitHub não conhece): oferece a do GitHub."""
+    if not local:
+        return True
+    if remoto.startswith(local) or local.startswith(remoto[:7]):
+        return False
+    try:
+        cmp = get_json(f"https://api.github.com/repos/{REPO}/compare/{local}...{remoto}")
+    except Exception:  # noqa: BLE001 — commit local desconhecido do GitHub (ex.: 404)
+        return True
+    return cmp.get("status") == "ahead"
 
 
 def avisar_se_nova(paths, get_json=_get_json, home: Path | None = None, agora: float | None = None) -> str | None:

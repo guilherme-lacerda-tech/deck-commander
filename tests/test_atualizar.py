@@ -11,9 +11,13 @@ from dc.paths import get_paths
 SHA = "abcdef1234567890abcdef1234567890abcdef12"
 
 
-def _commit(sha=SHA):
-    return lambda url: {"sha": sha, "commit": {"committer": {"date": "2026-11-16T03:00:00Z"},
-                                              "message": "Biblioteca: jogos do EmuDeck fora\n\ndetalhes"}}
+def _commit(sha=SHA, status="ahead"):
+    def get(url):
+        if "/compare/" in url:
+            return {"status": status}
+        return {"sha": sha, "commit": {"committer": {"date": "2026-11-16T03:00:00Z"},
+                                       "message": "Biblioteca: jogos do EmuDeck fora\n\ndetalhes"}}
+    return get
 
 
 @pytest.fixture
@@ -117,3 +121,11 @@ def test_painel_mostra_atualizacao(P, tmp_path, monkeypatch):
     (P.state / "atualizacao.json").write_text(json.dumps({"nova": {"sha": SHA, "data": "2026-11-16", "resumo": "x"}}))
     pt = painel.Ponte(P, qbt=object())
     assert painel._atualizacao(pt)["sha"] == SHA
+
+
+def test_versao_do_github_mais_velha_nao_e_oferecida(P, tmp_path):
+    """Falha real 16/11/2026: logo depois do envio a API respondia o commit anterior e o Deck oferecia "atualizar"."""
+    _instalado(tmp_path, "24760ac")
+    assert A.verificar(P, _commit(status="behind"), tmp_path) is None
+    assert A.verificar(P, _commit(status="diverged"), tmp_path) is None
+    assert A.verificar(P, _commit(status="ahead"), tmp_path)["sha"] == SHA
