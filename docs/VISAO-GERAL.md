@@ -1,8 +1,8 @@
 # Deck Commander — Visão geral do projeto
 
 Tudo o que o sistema faz hoje, o que foi testado de verdade, os limites conhecidos e ideias do que adicionar.
-Situação em 14/11/2026, versão 0.9.0. São 875 testes automáticos passando, 267 versões salvas no histórico e cerca de
-32 mil linhas de código em 127 módulos. O repositório é público: github.com/guilherme-lacerda-tech/deck-commander.
+Situação em 16/11/2026, versão 0.10.0. São 962 testes automáticos passando, 298 versões salvas no histórico e
+129 módulos. O repositório é público: github.com/guilherme-lacerda-tech/deck-commander.
 
 > **Legenda:**
 > - ✅ funcionando e testado de verdade no Deck ou no PC
@@ -256,6 +256,12 @@ Feito pensando em quem joga retrô a sério (revisão de "retrogamer" em 12/11).
 
 ## 13. Instalação e distribuição
 - ✅ **Instalação em 1 comando** no Deck, com QR para criar o bot do Telegram.
+- 🆕✅ **Instalador de arquivo único** (`Instalar-Deck-Commander.sh`, gerado por `tools/instalador/gerar.sh` a partir
+  do commit exato do Git): dois cliques no modo Desktop.
+- 🆕✅ **Atualização automática:** confere 1×/dia, avisa no painel e no Telegram, atualiza com um toque depois de rodar
+  os testes no próprio Deck; `/voltar` desfaz. Testada de ponta a ponta no Deck em 16/11/2026.
+- 🆕✅ **Convive com o EmuDeck/RetroDECK:** não importa os jogos deles sem pedir, usa os emuladores que já estão no
+  Deck, não mexe na configuração deles sem pedir.
 - ✅ **Documentos e assistente:** tutorial, manual, esta visão geral e o relatório da revisão em PDF, mais o assistente
   gráfico no PC.
 - ✅ **Repositório público:** cada pessoa configura a própria rede.
@@ -267,6 +273,12 @@ Feito pensando em quem joga retrô a sério (revisão de "retrogamer" em 12/11).
 - ✅ **Sem janela piscando:** as tarefas do PC rodam escondidas.
 
 ---
+
+## 14.9 Revisão profissional (15–16/11/2026) — versão 0.10.0
+Instalado no Deck do irmão (com EmuDeck), o Deck Commander pareceu amador: abas sumindo, ~400 jogos de Wii do
+EmuDeck jogados na biblioteca, PS2 abrindo "pela primeira vez", sem atualização automática. Tudo isso foi corrigido
+e testado — a lista completa está em `docs/desenvolvimento/REVISAO-PROFISSIONAL.md` e no CHANGELOG. Novidades da
+revisão: emulador de cada console no painel, ports nativos na aba do console e conquistas do RetroAchievements.
 
 ## 15. O que mudou desde o último relatório (12/11 → 14/11)
 **Versão 0.9.0 — experiência de console**

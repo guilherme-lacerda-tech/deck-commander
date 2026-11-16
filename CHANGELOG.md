@@ -1,6 +1,21 @@
 # Changelog
 
-## Depois da 0.9.0 (ainda não publicado)
+## 0.10.0 — 2026-11-16 — revisão profissional (instalação em outro Deck)
+Instalado no Deck do irmão do usuário (que já usava EmuDeck), o Deck Commander falhou em coisas básicas. Corrigido:
+- **Jogos do EmuDeck não entram sozinhos na biblioteca** (~400 jogos de Wii viraram atalhos): com EmuDeck/RetroDECK,
+  só entram os jogos que o Deck Commander trouxe; os outros, por console, pelo painel. Limpeza única com aviso.
+- **Emulador de cada console, escolhido no painel**: o que já existe no Deck (EmuDeck/`~/Applications`) vem antes do
+  Flatpak; Flatpak dispensável não é instalado; PCSX2/DuckStation instalados saem prontos (BIOS, pasta de jogos,
+  controle, sem assistente de primeira vez). O PS2 abria um PCSX2 vazio pedindo BIOS e jogos.
+- **Atualização automática**: confere 1×/dia, avisa no painel e no Telegram, `/atualizar` ou botão; baixa, testa no
+  próprio Deck e só então troca (`/voltar` desfaz). Antes, cada atualização exigia reinstalar.
+- **Abas de console sumiam** ao acordar do descanso (o TabMaster esconde aba vazia): proteção contra lista incompleta.
+- **Ports nativos** (jogos da comunidade para PC) e outros jogos não-Steam na aba do console escolhido.
+- **RetroAchievements**: tela Conquistas e `/conquistas` (pontos, progresso por jogo, masterizados).
+- **Instalador de arquivo único no repositório** (`tools/instalador/`): pacote = commit exato do Git + versão
+  registrada; plugin conferido por inteiro (tela nova não era instalada) e liberado para a atualização automática.
+- Com EmuDeck, o "continuar" só liga se o usuário pedir (a configuração dos emuladores é do EmuDeck).
+
 - Corrigido (achado no teste, 14/11): a cópia do Nova the Squirrel traduzida pela IA travava depois do Start e
   tinha **substituído** o original. Agora a cópia da IA entra ao lado do original; e a conferência da tradução
   retrô (`romtranslate audit`) quebrava com a lista de trechos (`int(lista)`).

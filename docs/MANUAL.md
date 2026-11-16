@@ -1,6 +1,6 @@
 # Manual do Deck Commander
 
-Versão 0.9.0 · 14/11/2026. Este manual serve para quem usa no dia a dia e para quem vai explicar a outra pessoa.
+Versão 0.10.0 · 16/11/2026. Este manual serve para quem usa no dia a dia e para quem vai explicar a outra pessoa.
 Instalação num Deck novo: [TUTORIAL-INSTALACAO.md](TUTORIAL-INSTALACAO.md).
 Testes que só dão para fazer com o Deck na mão, em 6 sessões curtas: [TESTES-NO-DECK.md](TESTES-NO-DECK.md).
 
@@ -179,6 +179,14 @@ Ligue uma vez no painel: **Deck Commander → Retrô → Ligar**.
 Com o jogo aberto: painel → Retrô → **Voltar 5 s / 10 s / 30 s** (o mesmo que segurar o L5). Dá até 30 s no
 RetroArch e no PSP e 10 s no DuckStation. PCSX2 (PS2) e Dolphin não têm essa função: neles use o R4.
 
+### Conquistas (RetroAchievements)
+Painel → **🏆 Conquistas**, ou `/conquistas` no Telegram: pontos, progresso de cada jogo recente (conquistas feitas /
+total) e quais você já **masterizou** (todas as conquistas no hardcore — o "platinar" do RetroAchievements).
+- **Ligar (uma vez):** no site retroachievements.org → Settings → Keys, copie a **Web API Key** e cole no painel com o
+  seu usuário. Ela só lê o progresso; não entra na sua conta. "Desligar a conta deste Deck" apaga a chave.
+- **Para ganhar conquistas:** entre na sua conta uma vez dentro de cada emulador (modo Desktop): RetroArch →
+  Configurações → Conquistas; DuckStation, PCSX2, PPSSPP e Dolphin → Configurações → Conquistas (Achievements).
+
 ### Detonado (passo a passo em português)
 Painel → **Detonado**. Com um jogo aberto, ele já vem escolhido. O detonado vem da StrategyWiki, separado em partes
 na ordem do jogo — no Pokémon por insígnia (ginásio), no God of War por capítulo, no Shadow of the Colossus por
@@ -205,6 +213,30 @@ plano; depois fica em português e funciona sem internet. Se o jogo não for ach
   seu limite também nos emuladores, crie o arquivo `~/.config/deck-commander/limite-quadros-manter`.
 - **Controles:** `/controles` mostra o que falta. Azahar (3DS), Cemu (Wii U) e RPCS3 (PS3) pedem que você escolha o
   controle **uma vez**: modo Desktop → abra o emulador → Controles.
+
+### Emulador de cada console
+Painel → Qualidade e controles → **Emulador de cada console**. Para cada console aparecem os emuladores que existem
+neste Deck; escolha um e ele vale a partir do próximo jogo. O Switch, por exemplo, pode ter Ryujinx, Citron, Eden…
+- **Ordem automática:** primeiro o emulador que já estava no Deck (o do EmuDeck ou o que você pôs em
+  `~/Applications`), depois o Flatpak, depois o RetroArch. O Deck Commander **não instala** um segundo emulador para
+  um console que já tem um.
+- **Primeira vez:** o PCSX2 e o DuckStation que o Deck Commander instala já saem com a BIOS (`~/Emulation/bios`), a
+  pasta de jogos e o controle do Deck configurados — sem o assistente de "primeira vez".
+
+### Deck com EmuDeck (ou RetroDECK)
+O EmuDeck usa a mesma pasta `Emulation/roms`. Para não misturar as coisas:
+- **Biblioteca:** só entram na Steam os jogos que o Deck Commander trouxe (download pelo bot, jogos soltos que o
+  instalador organizou, cópias "(PT-BR)"). Os jogos que já eram do EmuDeck ficam de fora; no painel → Qualidade e
+  controles → **Jogos do EmuDeck**, traga para a biblioteca só os consoles que você quiser (os arquivos não saem do
+  lugar). Quem já tinha instalado a versão antiga recebe um aviso: os atalhos que vieram do EmuDeck saem uma vez da
+  Steam (os jogos e o EmuDeck continuam funcionando) e o aviso diz como trazer cada console de volta.
+- **Configuração dos emuladores:** é do EmuDeck. O "continuar de onde parou" só liga se você ligar (painel → Retrô).
+
+### Ports nativos e outros jogos não-Steam
+Port nativo é um jogo que a comunidade transformou em programa de PC (não é ROM). Adicione-o na Steam como jogo
+não-Steam (modo Desktop → Steam → "Adicionar jogo não-Steam") e, no painel → Qualidade e controles → **Ports nativos
+e jogos não-Steam**, escolha a aba do console em que ele deve aparecer (ex.: um port de um jogo de Switch na aba
+Nintendo Switch).
 
 ### Modo repouso (baixar e traduzir com a tela apagada)
 Na tomada, com download ou tradução andando, o Deck não dorme até terminar; depois volta a dormir sozinho. Precisa de
@@ -242,7 +274,15 @@ uma permissão de administrador, **uma vez**: no Deck (Konsole), digite com a su
 - `/sos` liga o modo seguro, que desliga as automações sem apagar nada. `/sos off` volta ao normal.
 - Todo dia é feito um backup das configurações e dos saves. Toda semana rodam testes automáticos.
 
-## 13. Depois de atualizar o SteamOS
+## 13. Atualizar o Deck Commander
+Não precisa reinstalar. Uma vez por dia o Deck confere se há versão nova; quando há, aparece **🆕 Atualização
+disponível** no painel (e um aviso no Telegram). Toque em **Atualizar o Deck Commander** (ou mande `/atualizar`).
+- O Deck baixa a versão nova, **roda os testes do Deck Commander no próprio Deck** e só troca se todos passarem.
+- Jogos, saves, traduções e configurações ficam onde estão (fora da pasta do programa).
+- A versão anterior fica guardada: `/voltar` desfaz.
+- Leva 1–2 minutos; o painel e o bot voltam sozinhos já na versão nova.
+
+## 13.1 Depois de atualizar o SteamOS
 A atualização do SteamOS troca o sistema, mas **não toca na sua pasta** (`/home`). Jogos, saves, traduções, o bot, o
 qBittorrent e a IA ficam todos lá e voltam sozinhos. Duas peças ficam fora dessa pasta e podem precisar de atenção:
 
@@ -269,7 +309,8 @@ Telas:
 - Transferências;
 - Música;
 - Família;
-- Qualidade e controles;
+- Qualidade e controles (inclui o emulador de cada console, os jogos do EmuDeck e os ports nativos);
+- Conquistas (RetroAchievements);
 - Retrô;
 - Melhorias;
 - Espaço;
@@ -278,11 +319,12 @@ Telas:
 O painel faz o mesmo que os comandos do bot.
 
 ## 15. Roteiro para instalar e explicar (sábado)
-1. **Deck dele (uns 30 min):** siga a Parte 1 do [tutorial](TUTORIAL-INSTALACAO.md):
-   - senha;
-   - Decky;
-   - `install.sh`;
-   - criar o bot dele no Telegram pelo QR do painel. **Cada pessoa tem o próprio bot.**
+1. **Deck dele (uns 30 min):** copie o arquivo **`Instalar-Deck-Commander.sh`** para o Deck dele (pendrive ou
+   Downloads) e, no modo Desktop, dois cliques → Executar. Ele faz tudo: confere o aparelho, instala o Decky se
+   faltar (pede para criar a senha do Deck), copia o programa, instala emuladores e plugins, organiza jogos soltos e
+   abre o assistente do Telegram. **Cada pessoa tem o próprio bot.** Já tem EmuDeck? Pode instalar por cima: veja
+   "Deck com EmuDeck" na seção 8. Depois disso as atualizações chegam sozinhas (seção 13) — não precisa rodar o
+   instalador de novo.
 2. **Teste com um jogo leve:** mande `GBA` e um magnet. Mostre o aviso de download, a aba do console e a capa.
 3. **Mostre o painel:** **… → Deck Commander**, com status, Downloads e Diagnóstico.
 4. **Explique as três regras:**

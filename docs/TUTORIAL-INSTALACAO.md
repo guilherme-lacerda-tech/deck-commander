@@ -31,7 +31,20 @@ No modo Desktop, abra o navegador, entre em **https://decky.xyz**, clique em **D
 Ele pede a senha que você criou. O Decky é a "loja de plugins" do modo de jogo.
 
 ### 1.3 Instale o Deck Commander
-Ainda no Konsole:
+**Jeito mais fácil — instalador de arquivo único:** copie o `Instalar-Deck-Commander.sh` para o Deck (pendrive ou
+Downloads) e, no modo Desktop, dê dois cliques nele → Executar. Ele confere o aparelho, instala o Decky se faltar,
+copia o programa, instala emuladores, serviços e plugins (Deck Commander e TabMaster), organiza jogos soltos e abre o
+assistente do Telegram. Quem gera o arquivo: `bash tools/instalador/gerar.sh` (no PC ou no Deck, a partir do Git).
+
+**Já usa EmuDeck (ou RetroDECK)?** Pode instalar por cima, sem medo:
+- os jogos do EmuDeck NÃO entram sozinhos na biblioteca da Steam (você escolhe por console no painel → Qualidade e
+  controles → Jogos do EmuDeck);
+- o Deck Commander usa os emuladores que o EmuDeck já instalou (PCSX2, RPCS3, Cemu…) e não instala outro igual;
+- a configuração dos emuladores do EmuDeck não é alterada sem você pedir.
+
+Depois de instalado, **as atualizações chegam sozinhas** (aviso no painel e no Telegram; um toque para atualizar).
+
+Pelo Konsole (alternativa):
 
 - **Se o repositório estiver público**, um comando só:
   ```bash
