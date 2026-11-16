@@ -129,6 +129,25 @@ def load_collection_ids(data_dir: Path) -> None:
         pass
 
 
+def _jogos(tab: dict) -> list:
+    return ((tab.get("filters") or [{}])[0].get("params") or {}).get("games") or []
+
+
+def _sem_esvaziar(antigas: dict, novas: dict, launch_map: dict) -> dict:
+    """Falha real 15/11/2026: ao acordar do descanso o Deck regravou as abas com a lista de atalhos incompleta e TODAS
+    as abas de console ficaram vazias (o TabMaster esconde aba vazia — "sumiram as pastas"). Aba de console que ficaria
+    vazia enquanto a biblioteca ainda tem jogos daquele console mantém a lista anterior."""
+    ativos = {e.get("console") for e in launch_map.values() if not e.get("removed")}
+    out = dict(novas)
+    for k, t in novas.items():
+        if not k.startswith("dc-") or _jogos(t) or not _jogos(antigas.get(k, {})):
+            continue
+        console = k[3:]
+        if console in ativos or k == "dc-portugues":
+            out[k] = {**t, "filters": antigas[k]["filters"]}
+    return out
+
+
 def apply(shortcuts: list[dict], launch_map: dict, user_id: str, settings_path: Path = SETTINGS,
           data_dir: Path | None = None) -> dict:
     if data_dir is not None:
@@ -136,7 +155,7 @@ def apply(shortcuts: list[dict], launch_map: dict, user_id: str, settings_path: 
         load_collection_ids(data_dir)
     data = json.loads(settings_path.read_text("utf-8"))
     user = data.setdefault("usersDict", {}).setdefault(str(user_id), {})
-    new = build(user.get("tabs", {}), shortcuts, launch_map)
+    new = _sem_esvaziar(user.get("tabs", {}), build(user.get("tabs", {}), shortcuts, launch_map), launch_map)
     if new == user.get("tabs"):
         return {}
     bak = settings_path.with_name("settings.json.antes-deck-commander")

@@ -63,3 +63,18 @@ def test_collections_spec_includes_plugin_created_and_switches_filter(tmp_path):
     t = json.loads(p.read_text())["usersDict"]["1"]["tabs"]["dc-switch"]
     assert t["filters"][0]["params"] == {"id": "uc-abc", "name": "Nintendo Switch"}
     tabs.COLLECTION_IDS.clear()
+
+
+def test_aba_de_console_nao_esvazia_com_lista_de_atalhos_incompleta(tmp_path):
+    """Falha real 15/11/2026: ao acordar do descanso a lista de atalhos veio incompleta e todas as abas de console
+    ficaram vazias (o TabMaster esconde aba vazia: "sumiram as pastas")."""
+    p = tmp_path / "settings.json"
+    p.write_text(json.dumps({"usersDict": {"1": {"tabs": DEFAULT}}, "tags": []}))
+    lm = {"ps2-gow": {"console": "ps2"}, "x360-cod": {"console": "x360", "removed": True}}
+    sc = [{"appid": 7, "exe": "dc-launch", "LaunchOptions": "ps2-gow"},
+          {"appid": 9, "exe": "dc-launch", "LaunchOptions": "x360-cod"}]
+    tabs.apply(sc, {**lm, "x360-cod": {"console": "x360"}}, "1", p)
+    tabs.apply([], lm, "1", p)  # leitura incompleta: nenhum atalho do Deck Commander
+    t = json.loads(p.read_text())["usersDict"]["1"]["tabs"]
+    assert t["dc-ps2"]["filters"][0]["params"]["games"] == [7]  # PS2 ainda tem jogo: lista mantida
+    assert t["dc-x360"]["filters"][0]["params"]["games"] == []  # o único jogo foi tirado: pode esvaziar
