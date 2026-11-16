@@ -39,10 +39,16 @@ def backup_sources(paths) -> dict[str, Path]:
 def _library(paths, apply: bool) -> int:
     """Coloca jogos novos no Steam. Com o plugin do Decky: ao vivo; sem ele: grava shortcuts.vdf (+ reiniciar Steam)."""
     from . import library, plugin_bridge, syncer, vdf
+    from . import biblioteca
     games, notes = library.scan(syncer.rom_roots())
+    games, fora = biblioteca.permitidos(paths, games, _store(paths))
     pl = library.plan(vdf.read_shortcuts(syncer.shortcuts_path()), games, library.launcher_path(Path.home()))
     for n in notes:
         print("nota:", n)
+    if fora:
+        print(f"jogos do {biblioteca.outro_gerenciador()} que ficaram de fora da biblioteca: {len(fora)} "
+              "(para trazer um console: painel → Qualidade e controles → Jogos do "
+              f"{biblioteca.outro_gerenciador()})")
     print(f"jogos encontrados: {len(games)} | novos atalhos: {len(pl.add)} | já existem: {len(pl.already)}"
           f" | conflito de nome (não tocados): {pl.name_conflicts or 'nenhum'}")
     for row in pl.add:
