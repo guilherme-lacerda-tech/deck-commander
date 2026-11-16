@@ -153,8 +153,10 @@ def resumo(paths, store=None) -> dict:
     por: dict[str, int] = {}
     for g in fora:
         por[g.console] = por.get(g.console, 0) + 1
-    return {"outro_gerenciador": outro_gerenciador(), "fora_por_console": por,
-            "importar": carregar(paths).get("importar", {})}
+    from .emulators import CONSOLES
+    imp = carregar(paths).get("importar", {})
+    return {"outro_gerenciador": outro_gerenciador(), "fora_por_console": por, "importar": imp,
+            "labels": {c: CONSOLES[c]["label"] for c in set(por) | set(imp) if c in CONSOLES}}
 
 
 def main(argv: list[str]) -> int:

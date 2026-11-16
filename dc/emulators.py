@@ -82,43 +82,113 @@ CONSOLES = {
     "switch2": {"label": "Nintendo Switch 2", "exts": [], "dump": True,
                 "cmd": [str(H / "Emulation/Lichii/lichii-linux-x86_64-pgo.AppImage"), "-f", "-g", "{rom}"]},
 }
-# Emuladores que não são Flatpak fixo: procurados em locais comuns (EmuDeck, ~/Applications, Downloads).
-# Ordem = preferência. Flatpak entra como alternativa. Resultado pode ser sobrescrito em emulators.json.
-SEARCH = {
-    "psx": {"globs": ["Applications/DuckStation*.AppImage", "Applications/duckstation*.AppImage",
-                      "Downloads/DuckStation*.AppImage", "Downloads/*/DuckStation*.AppImage"],
-            "flatpak": "org.duckstation.DuckStation", "args": ["-fullscreen", "-batch", "--"],
+# Emuladores por console, em ordem de preferência. Falha real 15/11/2026 (Deck com EmuDeck): o PS2 abria um PCSX2
+# Flatpak novo e vazio ("primeira vez": pedia BIOS e jogos) em vez do PCSX2 que o EmuDeck já tinha configurado.
+# Regra: 1º o emulador que JÁ EXISTE no Deck (AppImage em ~/Applications, como o EmuDeck instala), 2º Flatpak,
+# 3º núcleo do RetroArch. O usuário escolhe outro no painel (Emuladores) — fica em emulators.json.
+_DUCK = ["Applications/DuckStation*.AppImage", "Applications/duckstation*.AppImage",
+         "Downloads/DuckStation*.AppImage", "Downloads/*/DuckStation*.AppImage"]
+_RYU = ["Applications/publish/Ryujinx", "Applications/Ryujinx*/Ryujinx", "Applications/Ryujinx*.AppImage",
+        "Applications/ryujinx*.AppImage", "Downloads/publish/Ryujinx", "Downloads/*/publish/Ryujinx"]
+_YUZU_ARGS = ["-f", "-g"]
+OPCOES: dict[str, list[dict]] = {
+    "psx": [{"nome": "DuckStation", "globs": _DUCK, "args": ["-fullscreen", "-batch", "--"]},
+            {"nome": "DuckStation (Flatpak)", "flatpak": "org.duckstation.DuckStation",
+             "args": ["-fullscreen", "-batch", "--"]},
             # o DuckStation saiu do Flathub: sem ele, o PS1 abre no RetroArch com o núcleo SwanStation (mesmo código)
-            "retroarch_core": "swanstation_libretro.so"},
-    "switch": {"globs": ["Applications/publish/Ryujinx", "Applications/Ryujinx*/Ryujinx", "Applications/Ryujinx*.AppImage",
-                         "Applications/ryujinx*.AppImage", "Downloads/publish/Ryujinx", "Downloads/*/publish/Ryujinx"],
-               "flatpak": "io.github.ryubing.Ryujinx", "args": ["--fullscreen"]},
-    "switch2": {"globs": ["Emulation/Lichii/lichii-linux-x86_64-pgo.AppImage", "Emulation/Lichii/*.AppImage",
-                          "Applications/*[Ll]ichii*.AppImage"], "flatpak": None, "args": ["-f", "-g"]},
+            {"nome": "SwanStation (RetroArch)", "ra_core": "swanstation_libretro.so"}],
+    "ps2": [{"nome": "PCSX2 (do EmuDeck / ~/Applications)", "globs": ["Applications/pcsx2-Qt.AppImage",
+             "Applications/pcsx2*.AppImage", "Applications/PCSX2*.AppImage"], "args": ["-fullscreen", "-batch", "--"]},
+            {"nome": "PCSX2 (Flatpak)", "flatpak": "net.pcsx2.PCSX2", "args": ["-fullscreen", "-batch", "--"]}],
+    "ps3": [{"nome": "RPCS3 (do EmuDeck / ~/Applications)", "globs": ["Applications/rpcs3.AppImage",
+             "Applications/rpcs3*.AppImage", "Applications/RPCS3*.AppImage"], "args": ["--no-gui", "--fullscreen"]},
+            {"nome": "RPCS3 (Flatpak)", "flatpak": "net.rpcs3.RPCS3", "args": ["--no-gui", "--fullscreen"]}],
+    "psp": [{"nome": "PPSSPP (Flatpak)", "flatpak": "org.ppsspp.PPSSPP", "args": ["--fullscreen"]},
+            {"nome": "PPSSPP (AppImage)", "globs": ["Applications/PPSSPP*.AppImage", "Applications/ppsspp*.AppImage"],
+             "args": ["--fullscreen"]}],
+    "gc": [{"nome": "Dolphin (Flatpak)", "flatpak": "org.DolphinEmu.dolphin-emu", "args": ["-b", "-e"]},
+           {"nome": "Dolphin (AppImage)", "globs": ["Applications/Dolphin*.AppImage", "Applications/dolphin*.AppImage"],
+            "args": ["-b", "-e"]}],
+    "wii": [{"nome": "Dolphin (Flatpak)", "flatpak": "org.DolphinEmu.dolphin-emu", "args": ["-b", "-e"]},
+            {"nome": "Dolphin (AppImage)", "globs": ["Applications/Dolphin*.AppImage", "Applications/dolphin*.AppImage"],
+             "args": ["-b", "-e"]}],
+    "wiiu": [{"nome": "Cemu (do EmuDeck / ~/Applications)", "globs": ["Applications/Cemu.AppImage",
+              "Applications/Cemu*.AppImage", "Applications/cemu*.AppImage"], "args": ["-f", "-g"]},
+             {"nome": "Cemu (Flatpak)", "flatpak": "info.cemu.Cemu", "args": ["-f", "-g"]}],
+    "n3ds": [{"nome": "Azahar (AppImage)", "globs": ["Applications/azahar*.AppImage", "Applications/Azahar*.AppImage"],
+              "args": ["-f"]},
+             {"nome": "Lime3DS / Citra (AppImage)", "globs": ["Applications/lime3ds*.AppImage",
+              "Applications/Lime3DS*.AppImage", "Applications/citra*.AppImage"], "args": ["-f"]},
+             {"nome": "Azahar (Flatpak)", "flatpak": "org.azahar_emu.Azahar", "args": ["-f"]}],
+    "nds": [{"nome": "melonDS (Flatpak)", "flatpak": "net.kuribo64.melonDS", "args": ["-f"]},
+            {"nome": "melonDS (AppImage)", "globs": ["Applications/melonDS*.AppImage"], "args": ["-f"]}],
+    "switch": [{"nome": "Ryujinx", "globs": _RYU, "args": ["--fullscreen"]},
+               {"nome": "Ryujinx (Flatpak)", "flatpak": "io.github.ryubing.Ryujinx", "args": ["--fullscreen"]},
+               {"nome": "Citron", "globs": ["Applications/citron*.AppImage", "Applications/Citron*.AppImage"],
+                "args": _YUZU_ARGS},
+               {"nome": "Eden", "globs": ["Applications/eden*.AppImage", "Applications/Eden*.AppImage"],
+                "args": _YUZU_ARGS},
+               {"nome": "Sudachi", "globs": ["Applications/sudachi*.AppImage", "Applications/Sudachi*.AppImage"],
+                "args": _YUZU_ARGS},
+               {"nome": "Yuzu", "globs": ["Applications/yuzu*.AppImage"], "args": _YUZU_ARGS}],
+    "switch2": [{"nome": "Lichii", "globs": ["Emulation/Lichii/lichii-linux-x86_64-pgo.AppImage",
+                 "Emulation/Lichii/*.AppImage", "Applications/*[Ll]ichii*.AppImage"], "args": ["-f", "-g"]}],
+    "xbox": [{"nome": "xemu (AppImage)", "globs": ["Applications/xemu*.AppImage"], "args": ["-full-screen", "-dvd_path"]},
+             {"nome": "xemu (Flatpak)", "flatpak": "app.xemu.xemu", "args": ["-full-screen", "-dvd_path"]}],
+    "dc": [{"nome": "Flycast (Flatpak)", "flatpak": "org.flycast.Flycast", "args": ["-config", "window:fullscreen=yes"]},
+           {"nome": "Flycast (AppImage)", "globs": ["Applications/flycast*.AppImage", "Applications/Flycast*.AppImage"],
+            "args": ["-config", "window:fullscreen=yes"]}],
 }
+SEARCH = OPCOES  # nome antigo
 
 
 def _flatpak_installed(app_id: str) -> bool:
     import subprocess
     try:
-        return subprocess.run([FLATPAK, "info", app_id], capture_output=True, timeout=10).returncode == 0
+        return subprocess.run([FLATPAK, "info", app_id], capture_output=True, timeout=10, check=False).returncode == 0
     except (OSError, subprocess.SubprocessError):
         return False
 
 
-def detect(home: Path = H, check_flatpak: bool = True) -> dict[str, list[str]]:
-    """Comando de cada console cujo emulador foi encontrado neste Deck."""
+def candidatos(console: str, home: Path = H, check_flatpak: bool = True) -> list[dict]:
+    """Emuladores deste console que existem neste Deck: [{"nome", "cmd", "origem"}], na ordem de preferência."""
     import glob
-    out: dict[str, list[str]] = {}
-    for console, s in SEARCH.items():
-        hits = [h for g in s["globs"] for h in sorted(glob.glob(str(home / g)), reverse=True) if os.access(h, os.X_OK)]
-        if hits:
-            out[console] = [hits[0], *s["args"], "{rom}"]
-        elif s["flatpak"] and check_flatpak and _flatpak_installed(s["flatpak"]):
-            out[console] = [FLATPAK, "run", s["flatpak"], *s["args"], "{rom}"]
-        elif s.get("retroarch_core") and (RA_CORES / s["retroarch_core"]).exists() and                 (not check_flatpak or _flatpak_installed("org.libretro.RetroArch")):
-            out[console] = [FLATPAK, "run", "org.libretro.RetroArch", "-f", "-L", str(RA_CORES / s["retroarch_core"]), "{rom}"]
+    out = []
+    for o in OPCOES.get(console, []):
+        if o.get("globs"):
+            hits = [h for g in o["globs"] for h in sorted(glob.glob(str(home / g)), reverse=True) if os.access(h, os.X_OK)]
+            if hits:
+                out.append({"nome": o["nome"], "cmd": [hits[0], *o["args"], "{rom}"], "origem": "appimage"})
+        elif o.get("flatpak"):
+            if check_flatpak and _flatpak_installed(o["flatpak"]):
+                out.append({"nome": o["nome"], "cmd": [FLATPAK, "run", o["flatpak"], *o["args"], "{rom}"],
+                            "origem": "flatpak"})
+        elif o.get("ra_core"):
+            if (RA_CORES / o["ra_core"]).exists() and (not check_flatpak or _flatpak_installed("org.libretro.RetroArch")):
+                out.append({"nome": o["nome"], "cmd": [FLATPAK, "run", "org.libretro.RetroArch", "-f", "-L",
+                                                        str(RA_CORES / o["ra_core"]), "{rom}"], "origem": "retroarch"})
     return out
+
+
+def detect(home: Path = H, check_flatpak: bool = True) -> dict[str, list[str]]:
+    """Comando do emulador preferido de cada console encontrado neste Deck."""
+    out = {}
+    for console in OPCOES:
+        c = candidatos(console, home, check_flatpak)
+        if c:
+            out[console] = c[0]["cmd"]
+    return out
+
+
+def flatpaks_dispensaveis(home: Path = H) -> set[str]:
+    """Flatpaks que NÃO precisam ser instalados: o console já tem emulador fora do Flatpak (ex.: AppImage do EmuDeck)."""
+    fora = {c for c in OPCOES if any(x["origem"] != "flatpak" for x in candidatos(c, home, check_flatpak=False))}
+    usos: dict[str, set[str]] = {}
+    for c, ops in OPCOES.items():
+        for o in ops:
+            if o.get("flatpak"):
+                usos.setdefault(o["flatpak"], set()).add(c)
+    return {fp for fp, cs in usos.items() if cs <= fora}
 
 
 RA_CORE_FILES = ["snes9x_libretro.so", "mupen64plus_next_libretro.so", "mgba_libretro.so", "nestopia_libretro.so",
@@ -197,3 +267,53 @@ def configure(apply: bool = False) -> list[str]:
         back = CfgDoc.load(cfg)
         assert all(back.get(k) == v for k, v in PROFILE_EQUILIBRADO["retroarch"].items()), "read-back retroarch"
     return log
+
+
+def _cfg(paths) -> Path:
+    return paths.config / "emulators.json"
+
+
+def _ler_cfg(paths) -> dict:
+    import json
+    try:
+        return json.loads(_cfg(paths).read_text("utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def _mesmo(a: list[str], b: list[str]) -> bool:
+    """Mesmo emulador? (Flatpak pelo id; AppImage/binário pelo caminho)."""
+    if not a or not b:
+        return False
+    if a[0] == FLATPAK and b[0] == FLATPAK:
+        return a[2:3] == b[2:3] and ("-L" not in a or a[a.index("-L") + 1:a.index("-L") + 2] ==
+                                     (b[b.index("-L") + 1:b.index("-L") + 2] if "-L" in b else []))
+    return a[0] == b[0]
+
+
+def escolhas(paths, home: Path = H) -> list[dict]:
+    """Para o painel: cada console com emulador encontrado, as opções e qual está valendo."""
+    cfg = _ler_cfg(paths)
+    out = []
+    for console in OPCOES:
+        ops = candidatos(console, home)
+        if not ops:
+            continue
+        atual = cfg.get(console) or ops[0]["cmd"]
+        nome = next((o["nome"] for o in ops if _mesmo(o["cmd"], atual)), ops[0]["nome"])
+        out.append({"console": console, "label": CONSOLES[console]["label"], "opcoes": [o["nome"] for o in ops],
+                    "atual": nome})
+    return out
+
+
+def escolher(paths, console: str, nome: str, home: Path = H) -> str:
+    """Grava o emulador escolhido para o console (vale ao abrir o próximo jogo)."""
+    import json
+    op = next((o for o in candidatos(console, home) if o["nome"] == nome), None)
+    if op is None:
+        raise ValueError(f"{nome} não está instalado neste Deck")
+    cfg = _ler_cfg(paths)
+    cfg[console] = op["cmd"]
+    _cfg(paths).parent.mkdir(parents=True, exist_ok=True)
+    _cfg(paths).write_text(json.dumps(cfg, indent=1, ensure_ascii=False), "utf-8")
+    return f"{CONSOLES[console]['label']}: agora abre no {nome}. Vale a partir do próximo jogo que você abrir."

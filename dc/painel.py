@@ -796,7 +796,39 @@ def qualidade(p: Ponte, a: dict) -> dict:
     except Exception:  # noqa: BLE001
         lay = []
     from . import perfil
-    return {"jogos": jogos, "controles": ctl, "layouts": lay, "perfil": perfil.atual(p.paths), "perfis": perfil.PERFIS}
+    try:  # emulador de cada console (pedido 15/11/2026: escolher; o Switch tem vários)
+        from . import emulators
+        emus = emulators.escolhas(p.paths)
+    except Exception:  # noqa: BLE001 — a tela abre mesmo sem a lista
+        emus = []
+    try:  # jogos de outros programas (EmuDeck/RetroDECK) que ficaram fora da biblioteca
+        from . import biblioteca
+        bib = biblioteca.resumo(p.paths)
+    except Exception:  # noqa: BLE001
+        bib = {}
+    return {"jogos": jogos, "controles": ctl, "layouts": lay, "perfil": perfil.atual(p.paths), "perfis": perfil.PERFIS,
+            "emuladores": emus, "biblioteca": bib}
+
+
+def emulador_definir(p: Ponte, a: dict) -> dict:
+    from . import emulators
+    try:
+        return {"texto": emulators.escolher(p.paths, a.get("console", ""), a.get("nome", ""))}
+    except (ValueError, KeyError) as e:
+        raise Erro(str(e))
+
+
+def biblioteca_importar(p: Ponte, a: dict) -> dict:
+    """Põe (ou tira) da biblioteca os jogos de um console que são de outro programa (EmuDeck/RetroDECK)."""
+    from . import biblioteca
+    from .emulators import CONSOLES
+    console = a.get("console", "")
+    if console not in CONSOLES:
+        raise Erro("Console desconhecido.")
+    texto = biblioteca.importar(p.paths, console, bool(a.get("ligar")))
+    if a.get("ligar"):
+        p.store.enqueue("sync")  # o serviço cria os atalhos quando nenhum jogo estiver aberto
+    return {"texto": texto}
 
 
 def perfil_definir(p: Ponte, a: dict) -> dict:
@@ -987,7 +1019,8 @@ ACOES = {f.__name__: f for f in (
     transferir_enviar, trazer_preparar, trazer_enviar, qualidade, qualidade_definir, controle_definir,
     downloads_limpar, traducao_limpar, desinstalar_lista, devolver, removido_perguntado, musica, musica_volume,
     musica_midia, musica_playlist, musica_salvar, musica_conectar, pc_tv, espaco_sugestoes, familia, familia_salvar,
-    familia_atualizar, familia_puxar, melhorias, melhorias_definir, contexto, retro, retro_definir, retro_jogos, perfil_definir, continuar_definir, voltar_tempo, detonado, detonado_capitulo)}
+    familia_atualizar, familia_puxar, melhorias, melhorias_definir, contexto, retro, retro_definir, retro_jogos, perfil_definir, continuar_definir, voltar_tempo, detonado, detonado_capitulo,
+    emulador_definir, biblioteca_importar)}
 ACOES["downloads_pausar"] = lambda p, a: _pausar(p, a, True)
 ACOES["downloads_retomar"] = lambda p, a: _pausar(p, a, False)
 

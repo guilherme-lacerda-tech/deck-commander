@@ -719,6 +719,20 @@ function Melhorias() {
         Msg(msg));
 }
 
+// Jogos que são de outro programa (EmuDeck/RetroDECK): o usuário escolhe por console o que entra na Steam
+const BibliotecaOutros = (b, fazer) => {
+    if (!b || !b.outro_gerenciador) return null;
+    const fora = b.fora_por_console || {}, imp = b.importar || {}, nomes = b.labels || {};
+    const consoles = Array.from(new Set(Object.keys(fora).concat(Object.keys(imp).filter((c) => imp[c]))));
+    return Sec("Jogos do " + b.outro_gerenciador,
+        [Txt("Os jogos que já estavam no " + b.outro_gerenciador + " não entram sozinhos na biblioteca da Steam "
+            + "(os arquivos continuam onde estão). Escolha os consoles que você quer ver nas abas:", { opacity: 0.8 }, "bh")]
+            .concat(consoles.length ? consoles.map((c) => Bt((imp[c] ? "Tirar da biblioteca: " : "Trazer para a biblioteca: ")
+                + (nomes[c] || c) + (fora[c] ? " (" + fora[c] + " jogos)" : ""),
+                () => fazer("biblioteca_importar", { console: c, ligar: !imp[c] }), {}, "b" + c))
+                : [Txt("Nenhum jogo de outro programa encontrado.", null, "bn")]));
+};
+
 function TelaQualidade() {
     const [d, recarregar] = useDados("qualidade");
     const [busca, setBusca] = SP_REACT.useState("");
@@ -733,6 +747,13 @@ function TelaQualidade() {
             Lista("Perfil", Object.keys(d.perfis || {}).map((k) => ({ data: k, label: d.perfis[k] })), d.perfil,
                 (k) => fazer("perfil_definir", { perfil: k })),
             Txt("Vale ao abrir o jogo (com o jogo aberto, feche e abra de novo).", { opacity: 0.8 })),
+        (d.emuladores || []).length ? Sec("Emulador de cada console",
+            [Txt("Qual emulador abre os jogos de cada console (vale a partir do próximo jogo):", { opacity: 0.8 }, "eh")]
+                .concat(d.emuladores.map((e) => e.opcoes.length > 1
+                    ? Lista(e.label, e.opcoes.map((n) => ({ data: n, label: n })), e.atual,
+                        (n) => fazer("emulador_definir", { console: e.console, nome: n }))
+                    : Txt(e.label + ": " + e.atual, null, "e" + e.console))).concat([Msg(msg)])) : null,
+        BibliotecaOutros(d.biblioteca, fazer),
         Sec("Qualidade por jogo",
             Campo("Buscar jogo", busca, setBusca, { description: achados.length + " jogo(s)" }),
             Lista("Jogo", opcoesJogos(achados), gid, setGid),

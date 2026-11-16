@@ -280,7 +280,9 @@ def install_flatpaks(log: list[str]) -> None:
     have = subprocess.run(["flatpak", "list", "--app", "--columns=application"], capture_output=True, text=True).stdout.split()
     found = emulators.detect(check_flatpak=False)
     extra = [a for c, a in emulators.FLATPAK_IF_MISSING.items() if c not in found]
-    missing = [a for a in emulators.FLATPAK_IDS + extra if a not in have]
+    # console que já tem emulador fora do Flatpak (ex.: AppImage do EmuDeck) não ganha um segundo, vazio
+    dispensaveis = emulators.flatpaks_dispensaveis()
+    missing = [a for a in emulators.FLATPAK_IDS + extra if a not in have and a not in dispensaveis]
     if not missing:
         return
     subprocess.run(["flatpak", "remote-add", "--user", "--if-not-exists", "flathub",
@@ -369,6 +371,47 @@ def write_plugins_lock(paths: Paths, log: list[str]) -> None:
         log.append(f"plugins.lock gerado com as versões atuais ({lock})")
 
 
+_SDL = {"Up": "DPadUp", "Right": "DPadRight", "Down": "DPadDown", "Left": "DPadLeft", "L1": "LeftShoulder",
+        "L2": "+LeftTrigger", "R1": "RightShoulder", "R2": "+RightTrigger", "L3": "LeftStick", "R3": "RightStick",
+        "LUp": "-LeftY", "LRight": "+LeftX", "LDown": "+LeftY", "LLeft": "-LeftX", "RUp": "-RightY",
+        "RRight": "+RightX", "RDown": "+RightY", "RLeft": "-RightX", "Select": "Back", "Start": "Start",
+        "Analog": "Guide", "LargeMotor": "LargeMotor", "SmallMotor": "SmallMotor"}
+# controle do Deck (SDL-0) igual ao que o PCSX2/DuckStation gravam ao configurar à mão (conferido no Deck 15/11/2026)
+PAD_PCSX2 = "[Pad1]\nType = DualShock2\n" + "".join(f"{k} = SDL-0/{v}\n" for k, v in {
+    **_SDL, "Triangle": "FaceNorth", "Circle": "FaceEast", "Cross": "FaceSouth", "Square": "FaceWest"}.items())
+PAD_DUCKSTATION = "[Pad1]\nType = AnalogController\n" + "".join(f"{k} = SDL-0/{v}\n" for k, v in {
+    **_SDL, "Triangle": "Y", "Circle": "B", "Cross": "A", "Square": "X"}.items())
+
+
+def preparar_primeira_vez(home: Path = H, log: list[str] | None = None) -> list[str]:
+    """Falha real 15/11/2026: o PCSX2 abriu pedindo BIOS e jogos ("primeira vez"). Emulador sem configuração ganha uma
+    mínima: BIOS em Emulation/bios (a do cartão SD se for lá que estão), pasta de jogos, controle do Deck e sem o
+    assistente inicial. Arquivo que já existe NUNCA é tocado (é do usuário ou de outro programa, como o EmuDeck)."""
+    import glob as _glob
+    feitos = []
+    bios = home / "Emulation/bios"
+    for sd in sorted(_glob.glob("/run/media/*/*/Emulation/bios")):
+        if not any(bios.glob("*")) and any(Path(sd).glob("*")):
+            bios = Path(sd)
+    alvos = {
+        "PCSX2": (home / ".var/app/net.pcsx2.PCSX2/config/PCSX2/inis/PCSX2.ini",
+                  f"[UI]\nSetupWizardIncomplete = false\n\n[Folders]\nBios = {bios}\n\n"
+                  f"[GameList]\nRecursivePaths = {home / 'Emulation/roms/ps2'}\n\n" + PAD_PCSX2),
+        "DuckStation": (home / ".local/share/duckstation/settings.ini",
+                        f"[Main]\nSetupWizardIncomplete = false\n\n[BIOS]\nSearchDirectory = {bios}\n\n"
+                        f"[GameList]\nRecursivePaths = {home / 'Emulation/roms/psx'}\n\n" + PAD_DUCKSTATION),
+    }
+    for nome, (arq, texto) in alvos.items():
+        if arq.exists():
+            continue
+        arq.parent.mkdir(parents=True, exist_ok=True)
+        arq.write_text(texto, "utf-8")
+        feitos.append(nome)
+    if log is not None and feitos:
+        log.append(f"emuladores prontos para o primeiro uso (BIOS em {bios}): {', '.join(feitos)}")
+    return feitos
+
+
 def write_emulators_json(paths: Paths, log: list[str]) -> None:
     """Grava os emuladores encontrados; mantém o que o usuário já configurou e ainda existe."""
     p = paths.config / "emulators.json"
@@ -408,6 +451,7 @@ def setup(paths: Paths, modules: list[str], dev: bool = False, downloads: bool =
     write_units(log)
     write_backup_toml(paths)
     if "M2" in wanted or "M3" in wanted:
+        preparar_primeira_vez(log=log)
         write_emulators_json(paths, log)
     if "M1" in wanted:
         write_plugins_lock(paths, log)
