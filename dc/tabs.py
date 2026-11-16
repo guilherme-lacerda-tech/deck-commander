@@ -140,8 +140,9 @@ def _sem_esvaziar(antigas: dict, novas: dict, launch_map: dict) -> dict:
     ativos = {e.get("console") for e in launch_map.values() if not e.get("removed")}
     out = dict(novas)
     for k, t in novas.items():
-        if not k.startswith("dc-") or _jogos(t) or not _jogos(antigas.get(k, {})):
-            continue
+        tipo = ((t.get("filters") or [{}])[0]).get("type")
+        if not k.startswith("dc-") or tipo != "whitelist" or _jogos(t) or not _jogos(antigas.get(k, {})):
+            continue  # aba por coleção da Steam não tem lista de jogos: nada a proteger
         console = k[3:]
         if console in ativos or k == "dc-portugues":
             out[k] = {**t, "filters": antigas[k]["filters"]}

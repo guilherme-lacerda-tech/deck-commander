@@ -78,3 +78,11 @@ def test_aba_de_console_nao_esvazia_com_lista_de_atalhos_incompleta(tmp_path):
     t = json.loads(p.read_text())["usersDict"]["1"]["tabs"]
     assert t["dc-ps2"]["filters"][0]["params"]["games"] == [7]  # PS2 ainda tem jogo: lista mantida
     assert t["dc-x360"]["filters"][0]["params"]["games"] == []  # o único jogo foi tirado: pode esvaziar
+
+
+def test_protecao_nao_troca_aba_por_colecao_pela_lista_antiga():
+    """A proteção só vale para aba por lista: aba por coleção não tem lista e não é "vazia"."""
+    antigas = {"dc-psx": {"filters": [{"type": "whitelist", "params": {"games": [5]}}]}}
+    novas = {"dc-psx": {"filters": [{"type": "collection", "params": {"id": "uc-1", "name": "PlayStation"}}]}}
+    out = tabs._sem_esvaziar(antigas, novas, {"psx-a": {"console": "psx"}})
+    assert out["dc-psx"]["filters"][0]["type"] == "collection"
