@@ -120,6 +120,7 @@ Aviso aqui quando o download terminar.
 /nuvem [agora] — saves no Google Drive (ligar pelo PC: tools/pc/nuvem-google.ps1)
 /texturas <jogo> <link> — texturas HD (PS2, GameCube, Wii)
 /netplay <jogo> — jogar em rede com o Deck do par (RetroArch) · /netplay aceitar
+/atualizar — confere se há versão nova do Deck Commander e atualiza
 /voltar — desfaz a última atualização do Deck Commander (se algo parou de funcionar)
 /pause · /resume — downloads
 /quarantine list | review <id> | clear <id>
@@ -360,6 +361,20 @@ class Bot:
             if args[:1] == ["agora"]:
                 return "\n".join(n.sincronizar()) or "Nenhuma pasta de save ainda."
             return "☁️ Saves na nuvem (de hora em hora):\n" + (n.resumo() or "nada sincronizado ainda") + "\n/nuvem agora"
+        if cmd == "/atualizar":  # versão nova do GitHub: baixa, testa no Deck e troca (pedido 15/11/2026)
+            from . import atualizar
+            if args[:1] != ["sim"]:
+                nova = atualizar.verificar(P)
+                if not nova:
+                    return "✅ O Deck Commander já está na versão mais nova."
+                self.next_buttons = [("Atualizar agora", "/atualizar sim")]
+                return (f"🆕 Versão de {nova['data']}: {nova['resumo']}\nAtualizo agora? Jogos, saves e configurações "
+                        "ficam como estão; /voltar desfaz.")
+            import subprocess
+            subprocess.run(["systemd-run", "--user", "--collect", "--unit", "dc-atualizar-bot", "python3", "-m",
+                            "dc.atualizar", "aplicar"], cwd=str(Path(__file__).resolve().parents[1]),
+                           capture_output=True, check=False)
+            return "⏳ Baixando e testando a versão nova (1-2 min). Aviso aqui quando terminar."
         if cmd == "/voltar":  # desfaz a última atualização (troca pela versão anterior guardada)
             from . import versao
             txt, self.next_buttons = versao.comando(args)

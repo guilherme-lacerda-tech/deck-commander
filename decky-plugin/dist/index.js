@@ -477,6 +477,11 @@ function TelaInicio({ ir }) {
             : Txt("⚠️ " + diag.erro, { color: "#ff8a80" });
     }
     return h("div", null,
+        d.atualizacao ? Sec("🆕 Atualização disponível",
+            Txt("Versão de " + d.atualizacao.data + ": " + d.atualizacao.resumo, null, "at"),
+            Bt(ocupado ? "Atualizando…" : "Atualizar o Deck Commander", () => fazer("atualizar"), { disabled: ocupado }, "atb"),
+            Txt("Jogos, saves e configurações ficam como estão. Se algo ficar estranho, /voltar no Telegram desfaz.",
+                { opacity: 0.8 }, "atx"), Msg(msg)) : null,
         Sec("Status",
             d.safe_mode ? Txt("🛑 Modo seguro LIGADO: downloads e automações parados. " + (d.safe_motivo || ""), { color: "#ffb74d" }) : null,
             d.erro_downloads ? Txt("⚠️ " + d.erro_downloads, { color: "#ffb74d" }) : null,

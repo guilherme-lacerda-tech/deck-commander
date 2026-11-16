@@ -136,7 +136,25 @@ def status(p: Ponte, a: dict) -> dict:
     return {"safe_mode": flag.exists(), "safe_motivo": motivo, "downloads": dls, "erro_downloads": erro_dl,
             "traducoes": _traducoes_ativas(p), "perguntas": len(_perguntas(p)), "espaco": _espaco(),
             "bateria": energia.get("battery"), "downloads_pausados_energia": energia.get("state") == "PAUSE",
-            "motivo_energia": energia.get("why", "")}
+            "motivo_energia": energia.get("why", ""), "atualizacao": _atualizacao(p)}
+
+
+def _atualizacao(p: Ponte) -> dict | None:
+    try:
+        from . import atualizar
+        return atualizar.estado(p.paths).get("nova")
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def atualizar(p: Ponte, a: dict) -> dict:
+    """Atualiza o Deck Commander (pedido 15/11/2026). Roda fora do painel: baixar e testar leva ~1-2 min."""
+    import subprocess as _sp
+    from pathlib import Path as _P
+    _sp.run(["systemd-run", "--user", "--collect", "--unit", "dc-atualizar-painel", "python3", "-m", "dc.atualizar",
+             "aplicar"], cwd=str(_P(__file__).resolve().parents[1]), capture_output=True, check=False)
+    return {"texto": "Baixando e testando a versão nova (1-2 min). O painel volta sozinho já atualizado; "
+                     "o resultado chega também no Telegram."}
 
 
 NOMES_DIAG = {"backup": "Backup", "todos-backups": "Backups", "bios": "BIOS", "config": "Atalhos de jogos",
@@ -1020,7 +1038,7 @@ ACOES = {f.__name__: f for f in (
     downloads_limpar, traducao_limpar, desinstalar_lista, devolver, removido_perguntado, musica, musica_volume,
     musica_midia, musica_playlist, musica_salvar, musica_conectar, pc_tv, espaco_sugestoes, familia, familia_salvar,
     familia_atualizar, familia_puxar, melhorias, melhorias_definir, contexto, retro, retro_definir, retro_jogos, perfil_definir, continuar_definir, voltar_tempo, detonado, detonado_capitulo,
-    emulador_definir, biblioteca_importar)}
+    emulador_definir, biblioteca_importar, atualizar)}
 ACOES["downloads_pausar"] = lambda p, a: _pausar(p, a, True)
 ACOES["downloads_retomar"] = lambda p, a: _pausar(p, a, False)
 

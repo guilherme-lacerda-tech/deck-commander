@@ -173,6 +173,14 @@ def power_loop(paths: Paths, interval: float = 30) -> None:
                     comunidade.avisar(paths, msg)
             except Exception as e:  # noqa: BLE001
                 _log(paths, "worker", f"biblioteca: {e}")
+        try:  # versão nova no GitHub (1x/dia): avisa no Telegram e no painel
+            from . import atualizar
+            msg = atualizar.avisar_se_nova(paths)
+            if msg:
+                from .traducao import comunidade
+                comunidade.avisar(paths, msg)
+        except Exception as e:  # noqa: BLE001
+            _log(paths, "worker", f"atualização: {e}")
         try:  # busca da comunidade que o PC não fez em 72 h: libera a tradução por IA
             from .traducao import comunidade
             for linha in comunidade.vencidos(paths, store):
