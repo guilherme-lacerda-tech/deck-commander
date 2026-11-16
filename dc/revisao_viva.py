@@ -92,6 +92,36 @@ def _ppsspp_sem_botoes(home: Path) -> list[str]:
     return []
 
 
+@item("abas de console na biblioteca (TabMaster)")
+def abas():
+    """Falha real 15/11/2026: ao acordar do descanso as abas de console ficaram vazias e sumiram da biblioteca."""
+    from . import tabs, transferir
+    if not tabs.SETTINGS.exists():
+        return True, "TabMaster não instalado"
+    return _abas_vazias(json.loads(tabs.SETTINGS.read_text("utf-8")), transferir.carregar_mapa())
+
+
+def _abas_vazias(cfg: dict, lm: dict) -> tuple[bool, str]:
+    from .emulators import CONSOLES
+    ativos = {e.get("console") for e in lm.values() if not e.get("removed")}
+    vazias = []
+    for u in (cfg.get("usersDict") or {}).values():
+        for k, t in (u.get("tabs") or {}).items():
+            if not k.startswith("dc-") or k[3:] not in ativos:
+                continue
+            f = (t.get("filters") or [{}])[0]
+            if f.get("type") == "whitelist" and not (f.get("params") or {}).get("games"):
+                vazias.append(CONSOLES.get(k[3:], {}).get("label", k))
+    return not vazias, ("vazias (somem da biblioteca): " + ", ".join(sorted(set(vazias)))) if vazias else "ok"
+
+
+@item("versão instalada registrada (atualização automática)")
+def versao_registrada():
+    from . import atualizar
+    v = atualizar.versao_local()
+    return bool(v), f"versão {v}" if v else "sem VERSAO.txt: a atualização automática não sabe a versão"
+
+
 @item("todo jogo retrô com os botões de trás")
 def botoes():
     """Falha real 11/11/2026: a cópia PT-BR do Castlevania (atalho novo) ficou sem L4/R4/L5/R5."""

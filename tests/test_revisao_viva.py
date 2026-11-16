@@ -42,3 +42,15 @@ def test_quadro_mascarado_e_leitura_em_pedacos():
     msg = json.dumps({"id": 1, "result": {"result": {"value": 2}}}).encode()
     dados = _quadro_servidor(msg[:10], fim=False) + _quadro_servidor(msg[10:], op=0)  # mensagem em 2 quadros
     assert json.loads(next(C._mensagens(_Sock(dados), bytearray()))) == json.loads(msg)
+
+
+def test_abas_de_console_vazias_sao_acusadas():
+    """Falha real 15/11/2026: abas de console vazias somem da biblioteca."""
+    lm = {"ps2-a": {"console": "ps2"}, "gc-b": {"console": "gc", "removed": True}}
+    vazia = {"filters": [{"type": "whitelist", "params": {"games": []}}]}
+    cheia = {"filters": [{"type": "whitelist", "params": {"games": [1]}}]}
+    colecao = {"filters": [{"type": "collection", "params": {"id": "uc-1"}}]}
+    ok, det = RV._abas_vazias({"usersDict": {"1": {"tabs": {"dc-ps2": vazia, "dc-gc": vazia}}}}, lm)
+    assert not ok and "PlayStation 2" in det and "GameCube" not in det
+    assert RV._abas_vazias({"usersDict": {"1": {"tabs": {"dc-ps2": cheia}}}}, lm)[0]
+    assert RV._abas_vazias({"usersDict": {"1": {"tabs": {"dc-ps2": colecao}}}}, lm)[0]
