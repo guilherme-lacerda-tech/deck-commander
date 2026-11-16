@@ -461,6 +461,7 @@ function TelaInicio({ ir }) {
         ["retro", "🕹️ Retrô: botões de trás, continuar, voltar no tempo e filtros"],
         ["detonado", "📖 Detonado (passo a passo em português)"],
         ["qualidade", "🎚️ Qualidade e controles"], ["desinstalar", "🗑️ Desinstalar jogos"], ["musica", "🎵 Música"],
+        ["conquistas", "🏆 Conquistas (RetroAchievements)"],
         ["familia", "👪 Família"], ["atalhos", "📚 Biblioteca e desempenho"]];
     const menu = Sec(filtro ? "Para " + (ctx.titulo || "este jogo") : "Configurar e usar",
         itens.filter(([k]) => !filtro || filtro.includes(k)).map(([k, rotulo]) => Bt(rotulo, () => ir(k), null, "m" + k)),
@@ -757,6 +758,42 @@ function PortsNativos() {
         Msg(msg));
 }
 
+// ---- Conquistas (RetroAchievements) -----------------------------------------------------------------
+function TelaConquistas() {
+    const [d, recarregar] = useDados("conquistas");
+    const [msg, ocupado, fazer] = useAcao(recarregar);
+    const [usuario, setUsuario] = SP_REACT.useState("");
+    const [chave, setChave] = SP_REACT.useState("");
+    if (!d || !d.ok) return Sec("Conquistas", Carregando(d));
+    if (!d.ligado) return h("div", null,
+        Sec("Ligar sua conta do RetroAchievements",
+            Txt("Mostra aqui o progresso dos seus jogos retrô e quais você já masterizou (todas as conquistas no "
+                + "hardcore). Precisa do seu usuário e da sua Web API Key: no site retroachievements.org → Settings → "
+                + "Keys → Web API Key. A chave só lê o seu progresso; não entra na sua conta.", { opacity: 0.85 }, "ci"),
+            Campo("Usuário do RetroAchievements", usuario, setUsuario),
+            Campo("Web API Key", chave, setChave, { bIsPassword: true }),
+            Bt(ocupado ? "Conferindo…" : "Ligar", () => fazer("conquistas_salvar", { usuario, chave }),
+                { disabled: ocupado || !usuario || !chave }, "cs"),
+            Msg(msg)),
+        Sec("Para ganhar conquistas",
+            Txt("Entre na sua conta UMA vez dentro de cada emulador (modo Desktop): RetroArch → Configurações → "
+                + "Conquistas; DuckStation, PCSX2, PPSSPP e Dolphin → Configurações → Conquistas (Achievements).",
+                { opacity: 0.85 })));
+    const jogos = d.jogos || [];
+    return h("div", null,
+        Sec("🏆 " + d.usuario,
+            d.erro ? Txt("⚠️ " + d.erro, { color: "#ffb74d" }) : null,
+            d.aviso ? Txt("⚠️ " + d.aviso, { color: "#ffb74d" }) : null,
+            !d.erro ? Txt(d.pontos + " pontos (" + d.pontos_reais + " reais)" + (d.posicao ? " · posição " + d.posicao : "")
+                + " · " + d.masterizados + " jogo(s) masterizado(s)") : null),
+        Sec("Jogos recentes", jogos.length
+            ? jogos.map((j) => Barra(j.pct, (j.masterizado ? "👑 " : j.completo ? "✅ " : "") + j.titulo,
+                j.console + " · " + Math.max(j.feitos, j.hardcore) + "/" + j.total + " conquistas"
+                + (j.hardcore ? " · hardcore " + j.hardcore : "") + (j.ultimo ? " · jogado em " + j.ultimo : ""), "j" + j.id))
+            : Txt("Nenhum jogo com conquistas ainda. Entre na conta dentro do emulador e jogue.")),
+        Sec("Conta", Bt("Desligar a conta deste Deck", () => fazer("conquistas_sair"), { disabled: ocupado }, "cx"), Msg(msg)));
+}
+
 function TelaQualidade() {
     const [d, recarregar] = useDados("qualidade");
     const [busca, setBusca] = SP_REACT.useState("");
@@ -1016,7 +1053,8 @@ function TelaDetonado() {
 }
 
 const TELAS = { detonado: TelaDetonado, telegram: TelaTelegram, downloads: TelaDownloads, traducao: TelaTraducao, pc: TelaPC, musica: TelaMusica, familia: TelaFamilia,
-    transferir: TelaTransferir, qualidade: TelaQualidade, desinstalar: TelaDesinstalar, atalhos: AtalhosPanel, retro: TelaRetro };
+    transferir: TelaTransferir, qualidade: TelaQualidade, desinstalar: TelaDesinstalar, atalhos: AtalhosPanel, retro: TelaRetro,
+    conquistas: TelaConquistas };
 
 function Panel() {
     const [tela, setTela] = SP_REACT.useState(null);

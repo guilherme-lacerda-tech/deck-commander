@@ -120,6 +120,7 @@ Aviso aqui quando o download terminar.
 /nuvem [agora] — saves no Google Drive (ligar pelo PC: tools/pc/nuvem-google.ps1)
 /texturas <jogo> <link> — texturas HD (PS2, GameCube, Wii)
 /netplay <jogo> — jogar em rede com o Deck do par (RetroArch) · /netplay aceitar
+/conquistas — seu progresso no RetroAchievements (jogos recentes, masterizados)
 /atualizar — confere se há versão nova do Deck Commander e atualiza
 /voltar — desfaz a última atualização do Deck Commander (se algo parou de funcionar)
 /pause · /resume — downloads
@@ -361,6 +362,9 @@ class Bot:
             if args[:1] == ["agora"]:
                 return "\n".join(n.sincronizar()) or "Nenhuma pasta de save ainda."
             return "☁️ Saves na nuvem (de hora em hora):\n" + (n.resumo() or "nada sincronizado ainda") + "\n/nuvem agora"
+        if cmd == "/conquistas":  # RetroAchievements: progresso dos jogos recentes (pedido 15/11/2026)
+            from . import conquistas
+            return conquistas.texto(conquistas.resumo(P))
         if cmd == "/atualizar":  # versão nova do GitHub: baixa, testa no Deck e troca (pedido 15/11/2026)
             from . import atualizar
             if args[:1] != ["sim"]:

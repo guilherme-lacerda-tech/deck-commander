@@ -836,6 +836,27 @@ def emulador_definir(p: Ponte, a: dict) -> dict:
         raise Erro(str(e))
 
 
+def conquistas(p: Ponte, a: dict) -> dict:
+    """RetroAchievements: progresso dos jogos recentes (pedido 15/11/2026: "ele gosta de platinar jogos")."""
+    from . import conquistas as C
+    return C.resumo(p.paths)
+
+
+def conquistas_salvar(p: Ponte, a: dict) -> dict:
+    from . import conquistas as C
+    try:
+        return {"texto": C.salvar(p.paths, a.get("usuario", ""), a.get("chave", ""))}
+    except ValueError as e:
+        raise Erro(str(e))
+
+
+def conquistas_sair(p: Ponte, a: dict) -> dict:
+    from . import conquistas as C
+    (p.paths.secrets / C.SEGREDO).unlink(missing_ok=True)
+    (p.paths.state / "conquistas.json").unlink(missing_ok=True)
+    return {"texto": "Conta do RetroAchievements desligada deste Deck (a chave foi apagada)."}
+
+
 def ports(p: Ponte, a: dict) -> dict:
     """Jogos não-Steam (ports nativos da comunidade etc.) e a aba de console de cada um."""
     from . import ports as P
@@ -1070,7 +1091,8 @@ ACOES = {f.__name__: f for f in (
     downloads_limpar, traducao_limpar, desinstalar_lista, devolver, removido_perguntado, musica, musica_volume,
     musica_midia, musica_playlist, musica_salvar, musica_conectar, pc_tv, espaco_sugestoes, familia, familia_salvar,
     familia_atualizar, familia_puxar, melhorias, melhorias_definir, contexto, retro, retro_definir, retro_jogos, perfil_definir, continuar_definir, voltar_tempo, detonado, detonado_capitulo,
-    emulador_definir, biblioteca_importar, atualizar, ports, ports_definir)}
+    emulador_definir, biblioteca_importar, atualizar, ports, ports_definir, conquistas, conquistas_salvar,
+    conquistas_sair)}
 ACOES["downloads_pausar"] = lambda p, a: _pausar(p, a, True)
 ACOES["downloads_retomar"] = lambda p, a: _pausar(p, a, False)
 
