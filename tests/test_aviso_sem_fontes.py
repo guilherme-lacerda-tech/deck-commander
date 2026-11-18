@@ -57,3 +57,15 @@ def test_forgets_deleted_downloads(tmp_path):
     ts.clear()
     b.notify_stalled(NOW)
     assert b.cfg["stalled_notified"] == {}
+
+
+def test_live_performance_alert_is_delivered_once(tmp_path):
+    import json
+    b = _bot(tmp_path, [])
+    (b.paths.data / "perf-live.json").write_text(json.dumps({
+        "game_id": "ps2-dmc3", "message": "⚠️ Devil May Cry 3 está travando agora.", "notified": False
+    }), "utf-8")
+    b.notify_performance()
+    assert b.sent == ["⚠️ Devil May Cry 3 está travando agora."]
+    b.notify_performance()
+    assert len(b.sent) == 1
