@@ -2,7 +2,7 @@
 
 ## Resultado atual
 
-O código passou em **986 testes automatizados** (3 ignorados por dependerem do ambiente) em 50,64 s, executados com
+O código passou em **987 testes automatizados** (3 ignorados por dependerem do ambiente) em 50,84 s, executados com
 `PYTHONPATH=. python -m pytest -q`. A validação de sintaxe de `dc/` e `decky-plugin/` também passou.
 
 Não foi assumido como evidência nenhum teste ou relato de outra conversa. Os resultados abaixo foram executados nesta
@@ -18,7 +18,9 @@ revisão ou são cenários cobertos explicitamente pela suíte do repositório.
    a preparação para a próxima partida.
 3. **CSV em criação:** o intervalo em que o MangoHud já criou o arquivo, mas ainda não escreveu o cabeçalho, não
    derruba o monitor; ele simplesmente tenta de novo.
-4. **Atualização segura:** o pacote baixado agora verifica que cada item está realmente dentro do diretório temporário,
+4. **Medição indisponível:** se o MangoHud não criar ou preencher o CSV após a espera de inicialização, o painel e o
+   bot avisam que não há FPS para detectar travamentos, em vez de parecer que o recurso está funcionando.
+5. **Atualização segura:** o pacote baixado agora verifica que cada item está realmente dentro do diretório temporário,
    inclusive para nomes que apenas parecem compartilhar o mesmo prefixo. Os caminhos do script de troca também são
    citados corretamente para não virarem interpretação de shell se tiverem caracteres especiais.
 
