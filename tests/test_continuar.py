@@ -2,11 +2,20 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from dc import continuar as C
 from dc.paths import get_paths
 
 DUCK = ["/usr/bin/env", "ENABLE_GAMESCOPE_WSI=0", "/x/DuckStation-x64.AppImage", "-fullscreen", "-batch", "--", "/r/j.cue"]
 PSP = ["flatpak", "run", "org.ppsspp.PPSSPP", "/r/jogo.iso"]
+
+
+@pytest.fixture(autouse=True)
+def _sem_emudeck_real(monkeypatch):
+    """O teste controla o gerenciador; nunca herda o EmuDeck do computador que o executa."""
+    from dc import biblioteca
+    monkeypatch.setattr(biblioteca, "outro_gerenciador", lambda home=None: None)
 
 
 def _emus(monkeypatch, tmp_path):
@@ -211,13 +220,16 @@ def test_revisao_ao_vivo_acusa_psp_sem_botoes(tmp_path):
     assert RV._ppsspp_sem_botoes(tmp_path) == []
 
 
-def test_continuar_desligado_por_padrao_com_emudeck(tmp_path):
+def test_continuar_desligado_por_padrao_com_emudeck(tmp_path, monkeypatch):
     """Falha real 15/11/2026: num Deck com EmuDeck o "continuar" mexia na configuração dos emuladores do EmuDeck."""
     from dc import continuar as C
     from dc.paths import get_paths
     P = get_paths(tmp_path / "dc").ensure()
     casa = tmp_path / "casa"
     (casa / "emudeck").mkdir(parents=True)
+    from dc import biblioteca
+    # Simula só este cenário: os demais testes não podem depender do HOME da máquina que roda pytest.
+    monkeypatch.setattr(biblioteca, "outro_gerenciador", lambda home=None: "EmuDeck" if home == casa else None)
     assert not C.ligado(P, casa)  # com EmuDeck: só se pedir
     assert C.ligado(P, tmp_path / "sem-emudeck")  # sem outro programa: ligado como antes
     C.definir(P, True)

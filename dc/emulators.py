@@ -154,6 +154,9 @@ def candidatos(console: str, home: Path = H, check_flatpak: bool = True) -> list
     """Emuladores deste console que existem neste Deck: [{"nome", "cmd", "origem"}], na ordem de preferência."""
     import glob
     out = []
+    # `home` também precisa valer para os núcleos RetroArch. Sem isso, uma inspeção/instalação
+    # isolada acabava enxergando o RetroArch do usuário real e dizia que havia emulador no teste.
+    ra_cores = home / ".var/app/org.libretro.RetroArch/config/retroarch/cores"
     for o in OPCOES.get(console, []):
         if o.get("globs"):
             hits = [h for g in o["globs"] for h in sorted(glob.glob(str(home / g)), reverse=True) if os.access(h, os.X_OK)]
@@ -164,9 +167,9 @@ def candidatos(console: str, home: Path = H, check_flatpak: bool = True) -> list
                 out.append({"nome": o["nome"], "cmd": [FLATPAK, "run", o["flatpak"], *o["args"], "{rom}"],
                             "origem": "flatpak"})
         elif o.get("ra_core"):
-            if (RA_CORES / o["ra_core"]).exists() and (not check_flatpak or _flatpak_installed("org.libretro.RetroArch")):
+            if (ra_cores / o["ra_core"]).exists() and (not check_flatpak or _flatpak_installed("org.libretro.RetroArch")):
                 out.append({"nome": o["nome"], "cmd": [FLATPAK, "run", "org.libretro.RetroArch", "-f", "-L",
-                                                        str(RA_CORES / o["ra_core"]), "{rom}"], "origem": "retroarch"})
+                                                        str(ra_cores / o["ra_core"]), "{rom}"], "origem": "retroarch"})
     return out
 
 

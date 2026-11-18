@@ -70,11 +70,14 @@ def test_write_refuses_unknown_format(tmp_path):
         library.write_shortcuts(p, [])
 
 
-def test_launch_command(tmp_path, roms):
+def test_launch_command(tmp_path, roms, monkeypatch):
     games, _ = library.scan([roms])
     m = tmp_path / "launch-map.json"; library.write_map(m, games)
     import json
     lm = json.loads(m.read_text("utf-8"))
+    # Testa o fallback padrão, não o PCSX2 que por acaso exista na máquina do pytest.
+    from dc import emulators
+    monkeypatch.setattr(emulators, "detect", lambda: {})
     cmd = library.build_command("ps2-ghost-rider-br-dub-ia", lm, {})
     assert cmd[:3] == ["/usr/bin/flatpak", "run", "net.pcsx2.PCSX2"] and cmd[-1].endswith(".iso")
     assert library.build_command("switch-super-mario-galaxy", lm, {"switch": ["/x/ryu", "{rom}"]})[0] == "/x/ryu"
