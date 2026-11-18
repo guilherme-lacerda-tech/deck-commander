@@ -87,6 +87,13 @@ def test_preparar_recusa_pacote_estranho(tmp_path):
     assert (A.preparar(SHA, t3, _baixar(_tar(BOM))) / "setup-deck.sh").exists()
 
 
+def test_atualizacao_recusa_trocar_sem_executor_de_testes(tmp_path, monkeypatch):
+    """Atualização sem pytest não pode alegar que testou a versão nova."""
+    monkeypatch.setattr(A.Path, "home", lambda: tmp_path)
+    ok, resumo = A.testar(tmp_path)
+    assert not ok and "ambiente de testes ausente" in resumo
+
+
 class _R:
     def __init__(self, rc=0, out="10 passed"):
         self.returncode, self.stdout = rc, out

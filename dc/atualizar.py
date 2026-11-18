@@ -141,10 +141,10 @@ def preparar(sha: str, trabalho: Path, baixar=_baixar) -> Path:
 
 
 def testar(pasta: Path, rodar=subprocess.run) -> tuple[bool, str]:
-    """Testes do Deck Commander no próprio Deck. Sem pytest instalado: segue (avisando)."""
+    """Testes do Deck Commander no próprio Deck. Sem executor, a atualização não troca nada."""
     py = Path.home() / ".local/share/deck-commander/venv/bin/python"
     if not py.exists():
-        return True, "testes não rodados (sem o ambiente de testes)"
+        return False, "ambiente de testes ausente — rode o instalador uma vez para preparar atualizações seguras"
     r = rodar([str(py), "-m", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests"], cwd=str(pasta),
               capture_output=True, text=True, timeout=1800, check=False)
     ultima = (r.stdout.strip().splitlines() or ["?"])[-1]

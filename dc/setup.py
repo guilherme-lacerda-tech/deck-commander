@@ -34,6 +34,7 @@ OLLAMA_URLS = ["https://github.com/ollama/ollama/releases/latest/download/ollama
 OLLAMA_MODEL = "translategemma:4b"
 MEOWTH_VENV = DCS / "meowth-venv"
 NSZ_VENV = DCS / "nsz-venv"
+TEST_VENV = DCS / "venv"
 
 UNIT_FILES = {
     "deck-commander-ollama.service": f"""[Unit]
@@ -179,6 +180,11 @@ def _venv_pip(venv: Path, package: str, log: list[str]) -> None:
         subprocess.run([PY, "-m", "venv", str(venv)], check=True)
     r = subprocess.run([str(venv / "bin/pip"), "install", "-q", "--upgrade", package], capture_output=True, text=True)
     log.append(f"{package}: {'instalado em ' + str(venv) if r.returncode == 0 else 'FALHOU ' + r.stderr.strip()[-200:]}")
+
+
+def instalar_executor_de_testes(log: list[str]) -> None:
+    """Prepara a trava que só permite atualizar depois de testar no próprio Deck."""
+    _venv_pip(TEST_VENV, "pytest", log)
 
 
 def install_ai(log: list[str]) -> None:
@@ -517,6 +523,11 @@ def setup(paths: Paths, modules: list[str], dev: bool = False, downloads: bool =
             install_qbittorrent(log)
         elif not QBT_BIN.exists():
             log.append("PENDENTE: qbittorrent-nox (rode ./setup-deck.sh --all para baixar)")
+    if "M10" in wanted:
+        if downloads:
+            instalar_executor_de_testes(log)
+        elif not (TEST_VENV / "bin/python").exists():
+            log.append("PENDENTE: ambiente de testes (rode ./setup-deck.sh --all para preparar atualizações seguras)")
     if wanted & {"A1", "A2"}:
         from .traducao import ia
         log.append(f"configuração da tradução: {ia.write_default_cfg(paths)}")
@@ -530,11 +541,8 @@ def setup(paths: Paths, modules: list[str], dev: bool = False, downloads: bool =
             install_xenia(log)
         elif not (NSZ_VENV / "bin/nsz").exists():
             log.append("PENDENTE: nsz (rode ./setup-deck.sh --modules A3)")
-    if dev:
-        venv = H / ".local/share/deck-commander/venv"
-        if not venv.exists():
-            subprocess.run([PY, "-m", "venv", str(venv)], check=True)
-        subprocess.run([str(venv / "bin/pip"), "install", "-q", "pytest"], check=True)
+    if dev and "M10" not in wanted:
+        instalar_executor_de_testes(log)
         log.append("--dev: venv com pytest")
     for m in sorted(wanted):
         for u in MODULE_UNITS.get(m, []):

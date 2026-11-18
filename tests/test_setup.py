@@ -50,6 +50,14 @@ def test_setup_m4_without_token_does_not_start_bot_and_records_modules(env):
     assert ("enable", "--now", "deck-commander-bot.service") in calls
 
 
+def test_m10_prepares_the_test_executor(env, monkeypatch):
+    paths, _calls = env
+    calls = []
+    monkeypatch.setattr(setup, "instalar_executor_de_testes", lambda log: calls.append("pytest"))
+    setup.setup(paths, ["M10"], downloads=True)
+    assert calls == ["pytest"]
+
+
 def test_setup_plugin_zip_and_in_place_update(env, tmp_path):
     _paths, _calls = env
     log = []
