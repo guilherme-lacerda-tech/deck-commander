@@ -88,6 +88,21 @@ def test_live_monitor_keeps_the_known_target_after_a_sustained_drop(tmp_path):
     assert data["target"] == 60 and data["fps_avg"] == 42 and data["verdict"] == "travando"
 
 
+def test_live_monitor_reports_missing_mangohud_instead_of_staying_silent(tmp_path):
+    """Sem CSV não existe detecção; o painel e o bot precisam poder dizer isso."""
+    from types import SimpleNamespace
+    import time
+    paths = SimpleNamespace(data=tmp_path / "data")
+    paths.data.mkdir()
+    logs = tmp_path / "logs"; logs.mkdir()
+    monitor = perf.LiveMonitor(paths, "ps2-dmc3", "ps2", "Devil May Cry 3", logs, time.time() - 46)
+    data = monitor.check()
+    assert data["verdict"] == "indisponivel" and "MangoHud" in data["message"]
+    assert monitor.check() is None
+    (logs / "game.csv").write_text(_mango_many([60.0] * 80))
+    assert monitor.check() is None and perf.live_status(paths) is None
+
+
 def _bat(root: Path, **vals):
     d = root / "BAT1"
     d.mkdir(parents=True)

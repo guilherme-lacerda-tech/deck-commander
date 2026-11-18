@@ -5,6 +5,7 @@ import json
 import os
 import tempfile
 import threading
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -300,6 +301,7 @@ class LiveMonitor:
         # A primeira janela estável revela a meta do jogo (30/50/60). Não a reduza durante
         # uma queda: uma partida que vinha a 60 e cai para 42 não pode passar a parecer 50 FPS.
         self.reference_target: float | None = None
+        self.missing_reported = False
         self._stop = threading.Event()
         self._t = threading.Thread(target=self._run, daemon=True)
 
@@ -319,6 +321,22 @@ class LiveMonitor:
             return None
         log = newest_log(self.log_dir, self.since)
         stats = live_stats(log) if log else None
+        if not stats:
+            # Sem CSV (ou sem FPS válido) não há como prometer que a detecção está ativa.
+            # Espere a inicialização normal do Flatpak/MangoHud antes de avisar uma única vez.
+            if not self.missing_reported and time.time() - self.since >= 45:
+                self.missing_reported = True
+                data = {"game_id": self.game_id, "console": self.console, "title": self.title,
+                        "verdict": "indisponivel", "message":
+                        "⚠️ A medição de desempenho não recebeu FPS do MangoHud. "
+                        "O jogo continua aberto, mas não posso detectar travamentos nesta partida.",
+                        "notified": False, "at": datetime.now(timezone.utc).isoformat()}
+                _save(_live_path(self.paths), data)
+                return data
+            return None
+        if self.missing_reported:
+            # O aviso era apenas de inicialização; amostras válidas chegaram e a medição está ativa.
+            _live_path(self.paths).unlink(missing_ok=True)
         if stats:
             self.reference_target = max(self.reference_target or 0, stats["target"])
             stats = dict(stats, target=self.reference_target)
