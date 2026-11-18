@@ -2,17 +2,15 @@
 from dc import emulators, setup
 
 
-def test_psx_falls_back_to_retroarch_swanstation(tmp_path, monkeypatch):
-    cores = tmp_path / "cores"; cores.mkdir()
+def test_psx_falls_back_to_retroarch_swanstation(tmp_path):
+    cores = tmp_path / ".var/app/org.libretro.RetroArch/config/retroarch/cores"; cores.mkdir(parents=True)
     (cores / "swanstation_libretro.so").write_bytes(b"x")
-    monkeypatch.setattr(emulators, "RA_CORES", cores)
     got = emulators.detect(tmp_path, check_flatpak=False)
     assert got["psx"][:3] == [emulators.FLATPAK, "run", "org.libretro.RetroArch"]
     assert str(cores / "swanstation_libretro.so") in got["psx"]
 
 
-def test_psx_fallback_needs_the_core(tmp_path, monkeypatch):
-    monkeypatch.setattr(emulators, "RA_CORES", tmp_path / "vazio")
+def test_psx_fallback_needs_the_core(tmp_path):
     assert "psx" not in emulators.detect(tmp_path, check_flatpak=False)
     assert "swanstation_libretro.so" in emulators.RA_CORE_FILES
 
