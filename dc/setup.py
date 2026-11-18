@@ -355,7 +355,16 @@ def setup_plugin(log: list[str]) -> None:
             continue
         rel = src.relative_to(PLUGIN_SRC)
         dst = inst / rel
-        if not dst.exists() or dst.read_bytes() != src.read_bytes():
+        igual = dst.exists() and dst.read_bytes() == src.read_bytes()
+        # O Decky normaliza o JSON do manifesto e o protege como arquivo dele. Comparar os bytes
+        # faria uma atualização funcional já instalada parecer quebrada só pela formatação do JSON.
+        # Mudanças reais no manifesto continuam exigindo a instalação do ZIP pelo próprio Decky.
+        if rel.name == "plugin.json" and dst.exists() and not igual:
+            try:
+                igual = json.loads(dst.read_text("utf-8")) == json.loads(src.read_text("utf-8"))
+            except (OSError, ValueError):
+                pass
+        if not igual:
             # Instalações interrompidas podem ter o manifest e o main.py, mas não a subpasta dist/.
             # Criá-la aqui torna a atualização reparadora, em vez de falhar no primeiro arquivo aninhado.
             dst.parent.mkdir(parents=True, exist_ok=True)

@@ -66,6 +66,20 @@ def test_plugin_matrix_correct_install_is_idempotent(plugin_env):
     assert log == ["plugin já instalado, em dia"]
 
 
+def test_plugin_matrix_normalized_manifest_is_idempotent(plugin_env):
+    """Decky regrava o manifesto; isso não pode gerar falso pedido de reinstalação."""
+    inst = _installed(plugin_env)
+    for rel in _source_files():
+        target = inst / rel; target.parent.mkdir(parents=True, exist_ok=True)
+        if rel.name == "plugin.json":
+            target.write_text(json.dumps(json.loads((setup.PLUGIN_SRC / rel).read_text("utf-8"))), "utf-8")
+        else:
+            target.write_bytes((setup.PLUGIN_SRC / rel).read_bytes())
+    log = []
+    setup.setup_plugin(log)
+    assert log == ["plugin já instalado, em dia"]
+
+
 def test_plugin_matrix_invalid_manifest_is_not_mistaken_for_installed(plugin_env):
     bad = plugin_env / "homebrew/plugins/quebrado"; bad.mkdir(parents=True)
     (bad / "plugin.json").write_text("{não é json", "utf-8")
