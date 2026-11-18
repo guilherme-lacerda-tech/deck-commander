@@ -341,11 +341,20 @@ def setup_plugin(log: list[str]) -> None:
         log.append(f"PLUGIN: instale pelo Decky -> Configurações -> Desenvolvedor -> Instalar plugin de ZIP -> {PLUGIN_ZIP}")
         return
     changed = []
-    for rel in ("dist/index.js", "main.py", "package.json"):
-        src, dst = PLUGIN_SRC / rel, inst / rel
+    # O ZIP sempre leva o plugin inteiro. Uma instalação parcial ou uma versão antiga também deve
+    # ser reparada por inteiro (incluindo manifestos e assets novos), não só pelos três arquivos
+    # que existiam na primeira versão do plugin.
+    for src in sorted(PLUGIN_SRC.rglob("*")):
+        if not src.is_file() or "__pycache__" in src.parts:
+            continue
+        rel = src.relative_to(PLUGIN_SRC)
+        dst = inst / rel
         if not dst.exists() or dst.read_bytes() != src.read_bytes():
+            # Instalações interrompidas podem ter o manifest e o main.py, mas não a subpasta dist/.
+            # Criá-la aqui torna a atualização reparadora, em vez de falhar no primeiro arquivo aninhado.
+            dst.parent.mkdir(parents=True, exist_ok=True)
             try:
-                shutil.copyfile(src, dst); changed.append(rel)
+                shutil.copyfile(src, dst); changed.append(str(rel))
             except PermissionError:
                 log.append(f"PLUGIN: sem permissão para atualizar {dst} — reinstale pelo ZIP {PLUGIN_ZIP}")
                 return
@@ -429,10 +438,19 @@ def preparar_primeira_vez(home: Path = H, log: list[str] | None = None, presente
 def write_emulators_json(paths: Paths, log: list[str]) -> None:
     """Grava os emuladores encontrados; mantém o que o usuário já configurou e ainda existe."""
     p = paths.config / "emulators.json"
-    cur = json.loads(p.read_text("utf-8")) if p.exists() else {}
+    try:
+        cur = json.loads(p.read_text("utf-8")) if p.exists() else {}
+    except (OSError, ValueError):
+        cur = {}
+        log.append("AVISO: configuração de emuladores inválida; recriada com os emuladores encontrados")
+    if not isinstance(cur, dict):
+        cur = {}
+        log.append("AVISO: configuração de emuladores inválida; recriada com os emuladores encontrados")
     found = emulators.detect()
     for console, cmd in found.items():
-        if console not in cur or not Path(cur[console][0]).exists():
+        atual = cur.get(console)
+        valido = isinstance(atual, list) and bool(atual) and isinstance(atual[0], str) and Path(atual[0]).exists()
+        if not valido:
             cur[console] = cmd
             log.append(f"emulador de {console}: {cmd[0] if cmd[0] != emulators.FLATPAK else cmd[2]}")
     for console in emulators.SEARCH:
