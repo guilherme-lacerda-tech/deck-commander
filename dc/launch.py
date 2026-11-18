@@ -148,6 +148,10 @@ def main(argv: list[str]) -> None:
         cmd, cmsg = continuar.ao_abrir(paths, game_id, cmd, launch_map[game_id].get("rom", ""))
         if cmsg:
             say(cmsg)
+            if "não foi aberto automaticamente" in cmsg:
+                (paths.data / "launch-error.json").write_text(json.dumps(
+                    {"at": datetime.now(timezone.utc).isoformat(), "title": "Deck Commander — ponto de continuar",
+                     "message": cmsg}, ensure_ascii=False), "utf-8")
     except Exception as e:  # noqa: BLE001 — nunca impede o jogo de abrir
         say(f"continuar: ignorado ({e})")
     from . import quality
@@ -218,7 +222,7 @@ def main(argv: list[str]) -> None:
     import time
     t0 = time.time()
     child = subprocess.Popen(cmd)
-    if cont_emu:  # ponto de continuar automático a cada 10 min de jogo (seguro se a bateria acabar no descanso)
+    if cont_emu and continuar.INTERVALO > 0:  # opt-in técnico: save state no meio da jogatina pode travar o emulador
         import threading
 
         def _pontos():

@@ -7,7 +7,8 @@ o emulador já começa nele — mesmo que a bateria acabe durante o descanso ou 
 Quando o ponto é salvo (sem tocar nos seus saves do L4):
 - ao apertar o botão Steam com o jogo aberto (o caminho para "Sair do jogo") e antes de o Deck dormir — o plugin chama
   `python3 -m dc.continuar salvar`;
-- a cada 10 minutos de jogo (dc-launch).
+- nunca no meio da jogatina: salvar um state do PCSX2 pausa o emulador por alguns segundos. O ponto vem de uma ação
+  explícita de saída/descanso, onde essa pausa não interrompe uma luta.
 Por que não "na hora de sair": medido no Deck em 13/11/2026, a Steam fecha o emulador 0,2 s depois do "Sair do jogo",
 e o DuckStation ignora o pedido de fechar (SIGTERM) — não dá tempo nem jeito de salvar ali.
 
@@ -33,7 +34,12 @@ from pathlib import Path
 
 H = Path.home()
 TECLA = "ctrl+F9"
-INTERVALO = 600  # s entre pontos automáticos durante o jogo
+# Save states do PCSX2 congelam a emulação durante a gravação. Não os dispare no meio do jogo;
+# Steam/descanso já pedem um ponto em momento seguro pelo plugin.
+INTERVALO = 0
+# Um ponto automático velho é pior que nenhum: ele pode abrir uma partida 20–30 min no passado e esconder o save L4.
+# Após este prazo o arquivo continua guardado, mas não é escolhido sem a pessoa pedir explicitamente pelo emulador.
+IDADE_MAXIMA_AUTO = 5 * 60
 
 
 @dataclass
@@ -344,6 +350,10 @@ def ao_abrir(paths, game_id: str, cmd: list[str], rom: str, versao_fn=None) -> t
     meta = ponto(paths, game_id)
     if not meta or meta.get("emulador") != emu:
         return cmd, None
+    idade = time.time() - float(meta.get("quando") or 0)
+    if idade > IDADE_MAXIMA_AUTO:
+        return cmd, (f"continuar: ponto salvo há {idade / 60:.0f} min não foi aberto automaticamente; "
+                     "o save L4 e o ponto continuam preservados")
     if versao_fn is None:
         from .versao_emulador import identidade as versao_fn
     try:

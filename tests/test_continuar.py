@@ -48,6 +48,19 @@ def test_versao_diferente_abre_normal(tmp_path, monkeypatch):
     assert cmd == DUCK and "mudou de versão" in msg  # estado de outra versão pode travar: não carrega
 
 
+def test_ponto_antigo_nao_sobrepoe_o_save_normal_ao_abrir(tmp_path, monkeypatch):
+    """Um auto-save de 20 min atrás não pode voltar a partida para trás silenciosamente."""
+    p = get_paths(tmp_path / "dc").ensure()
+    pastas = _emus(monkeypatch, tmp_path)
+    monkeypatch.setattr("dc.versao_emulador.identidade", lambda c: "v1")
+    C.salvar_ponto(p, "psx-sotn", DUCK, ":1",
+                   tecla_fn=lambda d, t: (pastas["duckstation"] / "savestate_10.sav").write_bytes(b"x") or True)
+    meta = C._meta_path(p, "psx-sotn")
+    data = json.loads(meta.read_text()); data["quando"] -= C.IDADE_MAXIMA_AUTO + 1; meta.write_text(json.dumps(data))
+    cmd, msg = C.ao_abrir(p, "psx-sotn", DUCK, "/r/j.cue", versao_fn=lambda c: "v1")
+    assert cmd == DUCK and "não foi aberto automaticamente" in msg
+
+
 def test_ppsspp_devolve_o_espaco_que_usou(tmp_path, monkeypatch):
     p = get_paths(tmp_path / "dc").ensure()
     pastas = _emus(monkeypatch, tmp_path)
