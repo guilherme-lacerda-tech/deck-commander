@@ -14,7 +14,7 @@ import zipfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from dc import plugin_bridge, quarantine, remove, syncer  # noqa: E402
+from dc import ops, plugin_bridge, quarantine, remove, syncer  # noqa: E402
 from dc.paths import get_paths  # noqa: E402
 from dc.qbt import DONE_STATES, Qbt  # noqa: E402
 from dc.store import Store  # noqa: E402
@@ -83,6 +83,10 @@ check.failed = False
 
 def main():
     paths = get_paths()
+    # Não crie nem mesmo o torrent artificial se a biblioteca está bloqueada por uma partida.
+    # Sem esta guarda, uma tentativa de auditoria durante o jogo falhava no /sync e deixava lixo dc-e2e para limpar.
+    if ops.game_running():
+        raise SystemExit("BLOQUEADO: há um jogo aberto; o E2E não criou nenhum artefato. Feche o jogo e rode de novo.")
     q, store = Q(), Store(paths.db)
     shutil.rmtree(ROOT, ignore_errors=True)
     (ROOT / "dl").mkdir(parents=True)
