@@ -49,6 +49,13 @@ def test_live_stats_requires_time_and_detects_sustained_slowdown(tmp_path):
     assert s["target"] == 60.0 and s["slow_share"] == 0.5
 
 
+def test_live_stats_ignores_csv_created_before_its_header(tmp_path):
+    """MangoHud cria o arquivo antes de terminar de escrever o cabeçalho de dados."""
+    p = tmp_path / "starting.csv"
+    p.write_text("os,cpu,gpu\nSteamOS,AMD,AMD\n")
+    assert perf.live_stats(p) is None
+
+
 def test_live_monitor_alerts_once_and_exposes_one_notification(tmp_path):
     from types import SimpleNamespace
     paths = SimpleNamespace(data=tmp_path / "data")

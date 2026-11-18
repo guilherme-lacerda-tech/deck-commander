@@ -24,7 +24,9 @@ def _mangohud_samples(path: Path) -> list[tuple[float, float, float, float]]:
             # o log começa com linhas de sistema (os, cpu, gpu...); o cabeçalho de dados é o que tem fps e frametime
             header = next((r for r in reader if 'fps' in r and 'frametime' in r), None)
             if header is None:
-                return None
+                # O monitor ao vivo pode pegar o arquivo entre a criação e a escrita do cabeçalho.
+                # Mantenha o contrato de "sem amostras" para que live_stats() apenas tente de novo.
+                return []
 
             samples = []
 
