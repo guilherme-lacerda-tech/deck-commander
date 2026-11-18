@@ -234,6 +234,18 @@ def main(argv: list[str]) -> None:
                         say(f"continuar: {e}")
         threading.Thread(target=_pontos, daemon=True).start()
     sampler = perf.Sampler().start() if measure else None
+    # O resumo do MangoHud só existia quando o emulador fechava. Este vigia lê o CSV já crescente
+    # durante a partida e prepara, com segurança, o próximo lançamento se a queda for sustentada.
+    def _trava_ao_vivo(_stats):
+        if na_dock:
+            return None
+        from . import autotune, perfil
+        if not perfil.aprende(paths):
+            return None
+        return autotune.record(paths, game_id, console, "travando")
+
+    live = (perf.LiveMonitor(paths, game_id, console, title, log_dir, t0,
+                             on_stutter=_trava_ao_vivo).start() if measure else None)
 
     def _stop(signum, _frame):  # "Sair do jogo" do Steam: fecha o emulador e ainda devolve a qualidade
         child.send_signal(signum)
@@ -263,6 +275,8 @@ def main(argv: list[str]) -> None:
             say(f"emulador caiu ao abrir: código {code}")
     finally:
         (paths.state / "jogo-aberto.json").unlink(missing_ok=True)
+        if live:
+            live.stop()
         if saves_auto:
             try:
                 if saves_sync.pedir_ao_fechar(paths, game_id, title, time.time() - t0):
@@ -279,7 +293,8 @@ def main(argv: list[str]) -> None:
                 from . import perfil  # perfil fixo (Beleza/Desempenho/Retrô) também não ensina o auto-ajuste
                 # partida de menos de 2 min (abriu e fechou) não diz nada sobre o jogo: não ensina (o benchmark sim)
                 curta = secs is None and time.time() - t0 < 120
-                change = (None if na_dock or curta or not perfil.aprende(paths)
+                # Se o vigia já reduziu este jogo, não reduzimos uma segunda vez no encerramento.
+                change = (None if (live and live.adjusted and v == "travando") or na_dock or curta or not perfil.aprende(paths)
                           else autotune.record(paths, game_id, console, v))
                 if change:
                     say(f"auto-ajuste: {change}")

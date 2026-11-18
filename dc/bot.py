@@ -1082,6 +1082,16 @@ class Bot:
             self.save_cfg()
             self.send(chat, "\n\n".join(msgs))
 
+    def notify_performance(self) -> None:
+        """Entrega uma vez o alerta de travamento detectado enquanto a partida ainda está aberta."""
+        chat = self.cfg.get("notify_chat")
+        if not chat:
+            return
+        from . import perf
+        msg = perf.live_message(self.paths)
+        if msg:
+            self.send(chat, msg)
+
     def _retry_stuck(self, chat, ts) -> None:
         """Download concluído que não entrou na biblioteca (ex.: erro corrigido depois): tenta de novo
         a cada hora, em silêncio; avisa só se algum jogo entrar."""
@@ -1168,6 +1178,10 @@ class Bot:
                 self.notify_stalled()
             except Exception as e:  # noqa: BLE001
                 self.log(f"aviso de download parado: {e}")
+            try:
+                self.notify_performance()
+            except Exception as e:  # noqa: BLE001
+                self.log(f"aviso de desempenho: {e}")
             try:
                 from . import transferir
                 transferir.notificar(self)

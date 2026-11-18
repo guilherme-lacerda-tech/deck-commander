@@ -31,6 +31,41 @@ def test_parse_mangohud_missing_or_empty(tmp_path):
     assert perf.parse_mangohud(tmp_path / "v.csv") is None
 
 
+def _mango_many(fps_values):
+    head = "fps,frametime,cpu_load,gpu_load,cpu_temp,gpu_temp,elapsed\n"
+    rows = [f"{fps},16.6,40,70,60,55,{(i + 1) * 250_000_000}" for i, fps in enumerate(fps_values)]
+    return head + "\n".join(rows) + "\n"
+
+
+def test_live_stats_requires_time_and_detects_sustained_slowdown(tmp_path):
+    p = tmp_path / "growing.csv"
+    p.write_text(_mango_many([60.0] * 20 + [36.0] * 80))
+    s = perf.live_stats(p)
+    assert s["samples"] == 80 and s["target"] == 50
+    assert s["fps_avg"] == 36.0 and s["slow_share"] == 1.0
+    # Queda que ainda mantém meta de 60 é travamento, e não um jogo legítimo de 30 FPS.
+    p.write_text(_mango_many([60.0] * 40 + [36.0] * 40))
+    s = perf.live_stats(p)
+    assert s["target"] == 60.0 and s["slow_share"] == 0.5
+
+
+def test_live_monitor_alerts_once_and_exposes_one_notification(tmp_path):
+    from types import SimpleNamespace
+    paths = SimpleNamespace(data=tmp_path / "data")
+    paths.data.mkdir()
+    logs = tmp_path / "logs"; logs.mkdir()
+    (logs / "game.csv").write_text(_mango_many([60.0] * 25 + [36.0] * 75))
+    calls = []
+    monitor = perf.LiveMonitor(paths, "ps2-dmc3", "ps2", "Devil May Cry 3", logs, 0,
+                               on_stutter=lambda stats: calls.append(stats) or "travou em 3x: fixado em 2x")
+    data = monitor.check()
+    assert data["verdict"] == "travando" and data["next_level"] == "2x" and len(calls) == 1
+    assert monitor.adjusted is True
+    assert monitor.check() is None
+    assert "Devil May Cry 3" in perf.live_message(paths)
+    assert perf.live_message(paths) is None
+
+
 def _bat(root: Path, **vals):
     d = root / "BAT1"
     d.mkdir(parents=True)

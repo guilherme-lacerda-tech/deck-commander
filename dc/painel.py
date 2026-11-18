@@ -795,7 +795,7 @@ def trazer_enviar(p: Ponte, a: dict) -> dict:
 
 # ----------------------------------------------------------------------------------------------- qualidade
 def qualidade(p: Ponte, a: dict) -> dict:
-    from . import controls, quality
+    from . import controls, perf, quality
     jogos = []
     for g, e in sorted(p._map().items(), key=lambda kv: kv[1].get("title", "").casefold()):
         c = e.get("console", "")
@@ -825,6 +825,7 @@ def qualidade(p: Ponte, a: dict) -> dict:
     except Exception:  # noqa: BLE001
         bib = {}
     return {"jogos": jogos, "controles": ctl, "layouts": lay, "perfil": perfil.atual(p.paths), "perfis": perfil.PERFIS,
+            "ao_vivo": perf.live_status(p.paths),
             "emuladores": emus, "biblioteca": bib}
 
 

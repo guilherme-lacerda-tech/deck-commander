@@ -283,12 +283,13 @@ function DesempenhoPanel() {
     const [adv, setAdv] = SP_REACT.useState(false);
     const [msg, setMsg] = SP_REACT.useState("");
     const load = async () => setG(await call("panel", runningAppId()));
-    SP_REACT.useEffect(() => { load(); }, []);
+    SP_REACT.useEffect(() => { load(); const t = setInterval(load, 10000); return () => clearInterval(t); }, []);
     const act = async (fn, ...args) => { setMsg(await call(fn, ...args) || ""); await load(); };
     const row = (t, s) => h("div", { style: Object.assign({ padding: "3px 0", fontSize: "12px" }, s || {}) }, t);
     if (!g) return row("carregando…");
     if (!g.game_id) return row("Abra um jogo (ou jogue um) para ajustar a qualidade dele aqui.");
     const out = [h("div", { style: { fontWeight: "bold", fontSize: "13px", padding: "4px 0" } }, g.title || g.game_id)];
+    if (g.live && g.live.message) out.push(row(g.live.message, { color: "#ffb74d", whiteSpace: "pre-wrap" }));
     if (!g.supported) {
         out.push(row("Este console ainda não tem ajuste de qualidade (roda na resolução do emulador)."));
     } else {
@@ -795,7 +796,7 @@ function TelaConquistas() {
 }
 
 function TelaQualidade() {
-    const [d, recarregar] = useDados("qualidade");
+    const [d, recarregar] = useDados("qualidade", {}, 10000);
     const [busca, setBusca] = SP_REACT.useState("");
     const [gid, setGid] = SP_REACT.useState(null);
     const [msg, ocupado, fazer] = useAcao(recarregar);
@@ -804,6 +805,7 @@ function TelaQualidade() {
     const j = d.jogos.find((x) => x.gid === gid);
     const faltam = d.controles.filter((c) => !c.ok);
     return h("div", null,
+        d.ao_vivo && d.ao_vivo.message ? Sec("Alerta de desempenho", Txt(d.ao_vivo.message, { color: "#ffb74d" })) : null,
         Sec("Perfil de imagem (todos os jogos)",
             Lista("Perfil", Object.keys(d.perfis || {}).map((k) => ({ data: k, label: d.perfis[k] })), d.perfil,
                 (k) => fazer("perfil_definir", { perfil: k })),

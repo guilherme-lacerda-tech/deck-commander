@@ -4,12 +4,20 @@ import csv
 import json
 import os
 import tempfile
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .arquivo_json import gravar as _save
+from .arquivo_json import ler as _load
 
-def parse_mangohud(path: Path) -> dict | None:
-    """Analisa o arquivo MangoHUD e extrai estatísticas de desempenho."""
+
+def _mangohud_samples(path: Path) -> list[tuple[float, float, float, float]]:
+    """Lê as amostras que o MangoHud já gravou, inclusive de um CSV ainda aberto.
+
+    O MangoHud acrescenta linhas enquanto o jogo roda. Linhas incompletas no fim são normais e
+    deliberadamente ignoradas, em vez de fazer o monitor de uma partida parar por um erro de leitura.
+    """
     try:
         with open(path, 'r') as f:
             reader = csv.reader(f)
@@ -18,51 +26,62 @@ def parse_mangohud(path: Path) -> dict | None:
             if header is None:
                 return None
 
-            fps_values = []
-            cpu_temp_max = 0
-            gpu_load_sum = 0
-            samples = 0
+            samples = []
 
             for row in reader:
                 if len(row) <= header.index('fps'):
                     continue
                 try:
                     fps = float(row[header.index('fps')])
-                    cpu_temp = float(row[header.index('cpu_temp')])
-                    gpu_load = float(row[header.index('gpu_load')])
+                    cpu_temp = float(row[header.index('cpu_temp')]) if 'cpu_temp' in header else 0.0
+                    gpu_load = float(row[header.index('gpu_load')]) if 'gpu_load' in header else 0.0
 
                     elapsed = float(row[header.index('elapsed')]) / 1e9 if 'elapsed' in header else 0.0
-                    fps_values.append((elapsed, fps))
-                    cpu_temp_max = max(cpu_temp_max, cpu_temp)
-                    gpu_load_sum += gpu_load
-                    samples += 1
+                    samples.append((elapsed, fps, cpu_temp, gpu_load))
                 except (ValueError, IndexError):
                     continue
-
-            if not fps_values:
-                return None
-            # os primeiros 15 s são carregamento/compilação de shaders: não contam como travada do jogo
-            t0 = fps_values[0][0]
-            rest = [f for e, f in fps_values if e - t0 >= 15]
-            fps_values = rest if len(rest) >= 20 else [f for _, f in fps_values]
-
-            fps_avg = sum(fps_values) / len(fps_values)
-            fps_low = sorted(fps_values)[len(fps_values) // 100]  # 1% mais lento (com poucas amostras = mínimo)
-
-            target = meta_quadros(fps_values)
-            slow_share = sum(1 for f in fps_values if f < 0.9 * target) / len(fps_values)
-
-            return {
-                "target": target,
-                "fps_avg": fps_avg,
-                "fps_low": fps_low,
-                "cpu_temp_max": cpu_temp_max,
-                "gpu_load_avg": gpu_load_sum / samples,
-                "slow_share": slow_share,
-                "samples": samples
-            }
     except (OSError, FileNotFoundError):
+        return []
+    return samples
+
+
+def _stats(samples: list[tuple[float, float, float, float]]) -> dict | None:
+    if not samples:
         return None
+    fps_values = [f for _, f, _, _ in samples]
+    target = meta_quadros(fps_values)
+    return {
+        "target": target,
+        "fps_avg": sum(fps_values) / len(fps_values),
+        "fps_low": sorted(fps_values)[len(fps_values) // 100],  # com poucas amostras = mínimo
+        "cpu_temp_max": max(t for _, _, t, _ in samples),
+        "gpu_load_avg": sum(g for _, _, _, g in samples) / len(samples),
+        "slow_share": sum(1 for f in fps_values if f < 0.9 * target) / len(fps_values),
+        "samples": len(samples),
+    }
+
+
+def parse_mangohud(path: Path) -> dict | None:
+    """Analisa o arquivo MangoHUD completo e extrai estatísticas da partida."""
+    samples = _mangohud_samples(path)
+    if not samples:
+        return None
+    # Os primeiros 15 s são carregamento/compilação de shaders: não contam como travada do jogo.
+    t0 = samples[0][0]
+    rest = [s for s in samples if s[0] - t0 >= 15]
+    return _stats(rest if len(rest) >= 20 else samples)
+
+
+def live_stats(path: Path, window: int = 80) -> dict | None:
+    """Mede a janela mais recente de uma partida que ainda está rodando.
+
+    O intervalo padrão do MangoHud é 250 ms; 80 amostras representam cerca de 20 s. Isso evita
+    reduzir qualidade por uma engasgada isolada, mas detecta a queda sustentada como a de 60–70%.
+    """
+    samples = _mangohud_samples(path)
+    if len(samples) < 20 or samples[-1][0] - samples[0][0] < 15:
+        return None
+    return _stats(samples[-window:])
 
 
 def battery(sysfs_root: Path = Path('/sys/class/power_supply')) -> dict | None:
@@ -235,6 +254,101 @@ def enabled(paths) -> bool:
         return bool(json.loads((paths.config / "desempenho.json").read_text("utf-8")).get("medir", True))
     except (OSError, ValueError):
         return True
+
+
+def _live_path(paths) -> Path:
+    return paths.data / "perf-live.json"
+
+
+def live_status(paths, game_id: str | None = None) -> dict | None:
+    """Alerta da partida atual, se houver; nunca devolve alerta de outro jogo."""
+    data = _load(_live_path(paths), None)
+    if not isinstance(data, dict) or not data.get("game_id"):
+        return None
+    if game_id and data.get("game_id") != game_id:
+        return None
+    return data
+
+
+def live_message(paths) -> str | None:
+    """Consome uma única notificação de travamento para o bot do Telegram."""
+    p = _live_path(paths)
+    data = live_status(paths)
+    if not data or data.get("notified", False):
+        return None
+    data["notified"] = True
+    _save(p, data)
+    return data.get("message")
+
+
+class LiveMonitor:
+    """Observa o CSV do MangoHud enquanto o jogo está aberto.
+
+    Não fecha o emulador e não grava no INI em uso. Quando a queda é sustentada, chama a função
+    opcional para deixar a qualidade menor preparada para a próxima abertura e publica um aviso
+    atômico que o painel e o Telegram podem mostrar.
+    """
+
+    def __init__(self, paths, game_id: str, console: str, title: str, log_dir: Path | None,
+                 since: float, every: float = 10.0, on_stutter=None):
+        self.paths, self.game_id, self.console, self.title = paths, game_id, console, title
+        self.log_dir, self.since, self.every, self.on_stutter = log_dir, since, every, on_stutter
+        self.alerted = False
+        self.adjusted = False
+        self._stop = threading.Event()
+        self._t = threading.Thread(target=self._run, daemon=True)
+
+    def start(self):
+        _live_path(self.paths).unlink(missing_ok=True)
+        if self.log_dir:
+            self._t.start()
+        return self
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._t.is_alive():
+            self._t.join(timeout=5)
+
+    def check(self) -> dict | None:
+        if self.alerted or not self.log_dir:
+            return None
+        log = newest_log(self.log_dir, self.since)
+        stats = live_stats(log) if log else None
+        # 25% lento é útil no resumo final; ao vivo só interrompemos o usuário por uma queda bem clara.
+        if not stats or stats["slow_share"] < 0.65 or stats["fps_avg"] >= 0.8 * stats["target"]:
+            return None
+        self.alerted = True
+        action = None
+        if self.on_stutter:
+            try:
+                action = self.on_stutter(stats)
+            except Exception:  # noqa: BLE001 - o aviso não pode derrubar o jogo
+                action = None
+        self.adjusted = action is not None
+        level = None
+        if action:
+            import re
+            m = re.search(r"fixado em (nativo|\d+x)", action)
+            level = m.group(1) if m else None
+        msg = (f"⚠️ {self.title} está travando agora: {stats['fps_avg']:.0f} FPS "
+               f"(meta {stats['target']}, {stats['slow_share']:.0%} da última janela abaixo do ritmo).")
+        if level:
+            msg += f" Próxima abertura preparada em {level}."
+        msg += " O jogo não foi fechado; no PCSX2 a resolução segura entra na próxima abertura."
+        data = {"game_id": self.game_id, "console": self.console, "title": self.title,
+                **{k: round(v, 3) if isinstance(v, float) else v for k, v in stats.items()},
+                "verdict": "travando", "action": action, "next_level": level,
+                "message": msg, "notified": False,
+                "at": datetime.now(timezone.utc).isoformat()}
+        _save(_live_path(self.paths), data)
+        return data
+
+    def _run(self) -> None:
+        while not self._stop.wait(self.every):
+            try:
+                self.check()
+            except Exception:  # noqa: BLE001 - observação nunca interfere no jogo
+                pass
 
 
 class Sampler:

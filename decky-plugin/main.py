@@ -183,6 +183,7 @@ class Plugin:
                "presets": list(tuning.NAMES), "supported": bool(console and tuning.supported(console))}
         if not game_id:
             return out
+        out["live"] = perf.live_status(paths, game_id)
         over = quality.get_override(paths, game_id)
         cl = tuning.console_level(console) if out["supported"] else None
         st = self.autotune.load(paths).get(game_id) or {}
