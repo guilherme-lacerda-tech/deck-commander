@@ -14,6 +14,7 @@ Configurações, jogos, saves e traduções ficam fora da pasta do programa: nad
 from __future__ import annotations
 
 import json
+import shlex
 import shutil
 import subprocess
 import sys
@@ -127,9 +128,10 @@ def preparar(sha: str, trabalho: Path, baixar=_baixar) -> Path:
     arq = trabalho / "nova.tar.gz"
     baixar(TARBALL.format(sha=sha), arq)
     with tarfile.open(arq, "r:gz") as tar:
+        destino = (trabalho / "x").resolve()
         for m in tar.getmembers():  # nada fora da pasta de trabalho (arquivo de fora é dado não confiável)
-            alvo = (trabalho / "x" / m.name).resolve()
-            if not str(alvo).startswith(str((trabalho / "x").resolve())) or m.issym() or m.islnk():
+            alvo = (destino / m.name).resolve()
+            if not alvo.is_relative_to(destino) or m.issym() or m.islnk():
                 raise RuntimeError(f"arquivo estranho no pacote: {m.name}")
         tar.extractall(trabalho / "x", filter="data")  # conferido acima
     pastas = [p for p in (trabalho / "x").iterdir() if p.is_dir()]
@@ -169,9 +171,12 @@ def aplicar(paths, sha: str | None = None, home: Path | None = None, baixar=_bai
         staging = atual.with_name("deck-commander.nova")
         shutil.rmtree(staging, ignore_errors=True)
         shutil.copytree(nova_pasta, staging, symlinks=True)
-        script = (f"set -e; sleep 2; rm -rf '{anterior}'; mv '{atual}' '{anterior}'; mv '{staging}' '{atual}'; "
-                  f"cd '{atual}'; chmod +x ./*.sh; python3 -m dc.atualizar depois >> "
-                  f"'{paths.logs / 'atualizacao.log'}' 2>&1; "
+        # O script roda depois que este processo sai. Quote todos os caminhos: embora os nomes
+        # normais sejam ~/deck-commander, não deixe uma casa ou diretório com apóstrofo virar shell.
+        q = shlex.quote
+        script = (f"set -e; sleep 2; rm -rf {q(str(anterior))}; mv {q(str(atual))} {q(str(anterior))}; "
+                  f"mv {q(str(staging))} {q(str(atual))}; cd {q(str(atual))}; chmod +x ./*.sh; "
+                  f"python3 -m dc.atualizar depois >> {q(str(paths.logs / 'atualizacao.log'))} 2>&1; "
                   "systemctl --user restart deck-commander-bot deck-commander-power")
         rodar(["systemd-run", "--user", "--collect", "--unit", f"dc-atualizar-{int(time.time())}", "bash", "-c", script],
               capture_output=True, text=True, check=False)

@@ -297,6 +297,9 @@ class LiveMonitor:
         self.log_dir, self.since, self.every, self.on_stutter = log_dir, since, every, on_stutter
         self.alerted = False
         self.adjusted = False
+        # A primeira janela estável revela a meta do jogo (30/50/60). Não a reduza durante
+        # uma queda: uma partida que vinha a 60 e cai para 42 não pode passar a parecer 50 FPS.
+        self.reference_target: float | None = None
         self._stop = threading.Event()
         self._t = threading.Thread(target=self._run, daemon=True)
 
@@ -316,6 +319,9 @@ class LiveMonitor:
             return None
         log = newest_log(self.log_dir, self.since)
         stats = live_stats(log) if log else None
+        if stats:
+            self.reference_target = max(self.reference_target or 0, stats["target"])
+            stats = dict(stats, target=self.reference_target)
         # 25% lento é útil no resumo final; ao vivo só interrompemos o usuário por uma queda bem clara.
         if not stats or stats["slow_share"] < 0.65 or stats["fps_avg"] >= 0.8 * stats["target"]:
             return None

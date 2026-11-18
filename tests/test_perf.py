@@ -73,6 +73,21 @@ def test_live_monitor_alerts_once_and_exposes_one_notification(tmp_path):
     assert perf.live_message(paths) is None
 
 
+def test_live_monitor_keeps_the_known_target_after_a_sustained_drop(tmp_path):
+    """42 FPS é 70% de uma partida que vinha a 60; não pode virar meta fictícia de 50."""
+    from types import SimpleNamespace
+    paths = SimpleNamespace(data=tmp_path / "data")
+    paths.data.mkdir()
+    logs = tmp_path / "logs"; logs.mkdir()
+    csv = logs / "game.csv"
+    monitor = perf.LiveMonitor(paths, "ps2-dmc3", "ps2", "Devil May Cry 3", logs, 0)
+    csv.write_text(_mango_many([60.0] * 80))
+    assert monitor.check() is None
+    csv.write_text(_mango_many([60.0] * 80 + [42.0] * 80))
+    data = monitor.check()
+    assert data["target"] == 60 and data["fps_avg"] == 42 and data["verdict"] == "travando"
+
+
 def _bat(root: Path, **vals):
     d = root / "BAT1"
     d.mkdir(parents=True)

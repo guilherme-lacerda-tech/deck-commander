@@ -76,6 +76,10 @@ BOM = {f"deck-commander-{SHA}/dc/__init__.py": b"", f"deck-commander-{SHA}/setup
 def test_preparar_recusa_pacote_estranho(tmp_path):
     with pytest.raises(RuntimeError, match="estranho"):
         A.preparar(SHA, tmp_path, _baixar(_tar({"../fora.txt": b"x"})))
+    # Não basta comparar texto: ../xevil começa com o texto de x, mas fica fora de x/.
+    t_prefixo = tmp_path / "prefixo"; t_prefixo.mkdir()
+    with pytest.raises(RuntimeError, match="estranho"):
+        A.preparar(SHA, t_prefixo, _baixar(_tar({"../xevil/fora.txt": b"x"})))
     t2 = tmp_path / "b"; t2.mkdir()
     with pytest.raises(RuntimeError, match="não é o Deck Commander"):
         A.preparar(SHA, t2, _baixar(_tar({"outra/coisa.txt": b"x"})))
