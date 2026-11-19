@@ -81,6 +81,12 @@ def main(argv: list[str]) -> None:
     except Exception as e:  # noqa: BLE001 — (revisão 11/11/2026: antes um erro aqui dizia "jogo removido")
         say(f"netplay: ignorado ({e})")
     title = launch_map[game_id].get("title", game_id)
+    try:  # se o jogo entrou por instalação antiga, ainda prepara o guia antes de uma próxima sessão offline
+        from . import detonado
+        if detonado.agendar(paths, game_id, title):
+            say(f"detonado: preparação offline iniciada para {game_id}")
+    except Exception as e:  # noqa: BLE001 — guia nunca impede o jogo de abrir
+        say(f"detonado: preparação não iniciada ({e})")
     if not Path(cmd[-1]).exists():
         sd = cmd[-1].startswith("/run/media/")
         fail(f"erro: ROM não encontrada {cmd[-1]} (cartão SD fora?)",
@@ -244,9 +250,13 @@ def main(argv: list[str]) -> None:
         if na_dock:
             return None
         from . import autotune, perfil
+        # Ajuste que realmente vale DURANTE a sessão: energia sobe imediatamente. Resolução de emulador não é
+        # regravada em jogo porque PCSX2/Dolphin podem ignorá-la ou gerar outra travada; ela fica para o próximo boot.
+        agora = tdp_ctl.priorizar_desempenho() if tdp_ctl else None
         if not perfil.aprende(paths):
-            return None
-        return autotune.record(paths, game_id, console, "travando")
+            return agora
+        proximo = autotune.record(paths, game_id, console, "travando")
+        return " · ".join(x for x in (agora, proximo) if x) or None
 
     live = (perf.LiveMonitor(paths, game_id, console, title, log_dir, t0,
                              on_stutter=_trava_ao_vivo).start() if measure else None)

@@ -99,8 +99,9 @@ def test_plug_with_game_open_raises_power_now_and_warns(tmp_path):
     assert _w(P, True) == "dock: conectado · energia 15 W"
     aviso = json.loads((P.data / "launch-error.json").read_text("utf-8"))
     assert aviso["title"].endswith("monitor conectado") and aviso["message"].startswith("Okami:")
-    assert _w(P, False) == "dock: desconectado · energia 12 W"
-    assert FakeTdp.feitos == [15, 12]
+    # Desconectar a TV não pode derrubar energia no meio da partida: fluidez tem prioridade.
+    assert _w(P, False) == "dock: desconectado · energia 15 W"
+    assert FakeTdp.feitos == [15, 15]
     assert _w(P, False) is None  # sem troca, sem aviso repetido
 
 

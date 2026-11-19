@@ -215,6 +215,11 @@ def run_sync(paths: Paths, store: Store, qbt: Qbt | None, confirm_many: bool = F
                 gids = [g for g, e in lm.items() if e.get("rom") in arrived_files]
                 lines += hide_pt_duplicates(paths, lm, gids)
                 lines += trad_run.auto_queue(paths, store, gids)
+                # Guia é preparado quando o jogo chega, não na primeira abertura sem Wi-Fi.
+                from . import detonado
+                agendados = [g for g in gids if detonado.agendar(paths, g, lm[g].get("title", g))]
+                if agendados:
+                    lines.append(f"📖 Detonado: preparando em português para uso offline ({len(agendados)} jogo(s)).")
             except Exception as e:  # noqa: BLE001 — a tradução automática nunca atrapalha o /sync
                 lines.append(f"(tradução automática não começou: {e})")
         head = f"{len(new)} jogo(s) novo(s) no Steam" + (": " + ", ".join(new[:10]) if new else "")

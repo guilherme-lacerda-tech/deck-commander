@@ -274,6 +274,16 @@ def test_quality_list_and_set(P):
     assert run(P, "qualidade")["jogos"][0]["atual"] == "padrão"
 
 
+def test_detonado_prepara_antes_de_exibir_e_nunca_entrega_ingles(P, monkeypatch):
+    _lm(P, {"ps2-jogo": {"title": "Jogo", "console": "ps2", "rom": "/x"}})
+    calls = []
+    monkeypatch.setattr("dc.detonado.agendar", lambda *a: calls.append(a) or True)
+    r = run(P, "detonado", {"gid": "ps2-jogo"})
+    assert r["ok"] and r["preparando"] and "português" in r["texto"] and calls
+    r = run(P, "detonado_capitulo", {"gid": "ps2-jogo", "n": 0})
+    assert r["ok"] and r["preparando"] and "inglês" not in r["texto"]
+
+
 def test_cli_reads_json_from_stdin(P, monkeypatch, capsys):
     import io
     real = painel.Ponte

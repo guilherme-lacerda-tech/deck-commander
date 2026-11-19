@@ -964,7 +964,7 @@ def contexto(p: Ponte, a: dict) -> dict:
 
 
 def detonado(p: Ponte, a: dict) -> dict:
-    """Lista de jogos (o aberto primeiro) e, com `gid`, o índice do detonado (busca na StrategyWiki na 1ª vez)."""
+    """Lista de jogos (o aberto primeiro); o guia é preparado inteiro antes de ser oferecido offline."""
     from . import continuar
     from . import detonado as D
     mapa = p._map()
@@ -975,6 +975,10 @@ def detonado(p: Ponte, a: dict) -> dict:
     if not gid:
         return {"jogos": jogos, "gid": None}
     d = D.info(p.paths, gid)
+    if not d and not a.get("nome"):
+        D.agendar(p.paths, gid, mapa.get(gid, {}).get("title", gid))
+        return {"jogos": jogos, "gid": gid, "preparando": True,
+                "texto": "Preparando o detonado completo em português para usar sem internet. Volte em alguns minutos."}
     if not d or a.get("nome"):
         try:
             d = D.preparar(p.paths, gid, mapa.get(gid, {}).get("title", gid), jogo=a.get("nome") or None)
@@ -982,29 +986,32 @@ def detonado(p: Ponte, a: dict) -> dict:
             raise Erro(f"Sem internet para achar o detonado agora ({e.__class__.__name__}).")
     if d.get("erro"):
         return {"jogos": jogos, "gid": gid, "erro": d["erro"] + " Se souber o nome do jogo lá, digite abaixo."}
+    preparando = not D.pronto(p.paths, gid)
+    if preparando:
+        D.agendar(p.paths, gid, mapa.get(gid, {}).get("title", gid))
     nomes = D.titulos(p.paths, gid)
     return {"jogos": jogos, "gid": gid, "jogo": d["jogo"], "fonte": d["fonte"], "atual": d.get("atual", 0),
+            "preparando": preparando,
             "capitulos": [{"n": i, "label": (c["grupo"] + " · " if c["grupo"] != "Detonado" else "") + nomes[i]}
                           for i, c in enumerate(d["capitulos"])]}
 
 
 def detonado_capitulo(p: Ponte, a: dict) -> dict:
-    """Mostra a parte `n` (lembra onde você está). Sem tradução ainda: mostra o original e traduz em segundo plano."""
-    import subprocess
+    """Mostra só conteúdo pronto em português; nunca usa a primeira abertura para despejar texto em inglês."""
     from . import detonado as D
     gid, n = a.get("gid"), int(a.get("n") or 0)
     D.marcar(p.paths, gid, n)
+    if not D.pronto(p.paths, gid):
+        titulo = p._map().get(gid, {}).get("title", gid)
+        D.agendar(p.paths, gid, titulo)
+        return {"preparando": True,
+                "texto": "O detonado ainda está sendo preparado em português. Ele ficará disponível offline assim que terminar."}
     try:
         c = D.capitulo(p.paths, gid, n, traduzir=False)
     except OSError as e:
         raise Erro(f"Sem internet para baixar esta parte agora ({e.__class__.__name__}).")
     if c.get("erro"):
         raise Erro(c["erro"])
-    if not c["traduzido"]:
-        unit = "dc-detonado-" + "".join(ch for ch in gid if ch.isalnum())[:40]
-        subprocess.run(["systemd-run", "--user", "--collect", f"--unit={unit}",
-                        f"--working-directory={Path(__file__).resolve().parents[1]}",
-                        "python3", "-m", "dc.detonado", "baixar", gid], capture_output=True)
     return c
 
 

@@ -1027,12 +1027,14 @@ function TelaDetonado() {
     const abrir = async (gid, n) => {
         const r = await painel("detonado_capitulo", { gid, n });
         setCap(r.ok ? Object.assign({ n }, r) : { erro: r.erro || "não deu agora" });
+        if (r.ok && r.preparando) setTimeout(() => carregar({ gid }), 5000);
     };
     const carregar = async (args) => {
         setD(null); setCap(null);
         const r = await painel("detonado", args || {});
         setD(r);
-        if (r.ok && r.capitulos && r.capitulos.length) abrir(r.gid, r.atual || 0);
+        if (r.ok && r.preparando) setTimeout(() => carregar({ gid: r.gid }), 5000);
+        if (r.ok && !r.preparando && r.capitulos && r.capitulos.length) abrir(r.gid, r.atual || 0);
     };
     SP_REACT.useEffect(() => { carregar({}); }, []);
     if (!d || !d.ok) return Sec("Detonado", Carregando(d));
@@ -1040,14 +1042,15 @@ function TelaDetonado() {
     return h("div", null,
         Sec("Jogo", Lista("Jogo", d.jogos.map((j) => ({ data: j.gid, label: j.titulo })), d.gid, (g) => carregar({ gid: g })),
             !d.gid ? Txt("Escolha o jogo (com um jogo aberto, ele já vem escolhido).") : null,
+            d.preparando ? Txt("⏳ Preparando o detonado completo em português para funcionar sem internet. A tela atualiza sozinha.") : null,
             d.erro ? Txt("⚠️ " + d.erro) : null,
             d.erro ? Campo("Nome do jogo na StrategyWiki", nome, setNome) : null,
             d.erro ? Bt("Procurar com esse nome", () => carregar({ gid: d.gid, nome }), { disabled: !nome }, "nm") : null),
         total ? Sec("Onde você está", Lista("Parte", d.capitulos.map((c) => ({ data: c.n, label: (c.n + 1) + ". " + c.label })),
             cap ? cap.n : d.atual, (n) => abrir(d.gid, n))) : null,
+        cap && cap.preparando ? Sec("Detonado", Txt("⏳ " + cap.texto)) : null,
         cap && cap.erro ? Sec("Detonado", Txt("⚠️ " + cap.erro)) : null,
-        cap && !cap.erro ? Sec((cap.n + 1) + "/" + total + " · " + cap.titulo,
-            cap.traduzido ? null : Txt("⏳ Traduzindo para o português em segundo plano; por enquanto, o texto original. Abra de novo em alguns minutos.", { opacity: 0.8 }, "tr"),
+        cap && !cap.erro && !cap.preparando ? Sec((cap.n + 1) + "/" + total + " · " + cap.titulo,
             (cap.paragrafos || []).map((t, i) => Txt(t, null, "p" + i)),
             Bt("◀ Parte anterior", () => abrir(d.gid, Math.max(0, cap.n - 1)), { disabled: cap.n === 0 }, "ant"),
             Bt("Próxima parte ▶", () => abrir(d.gid, Math.min(total - 1, cap.n + 1)), { disabled: cap.n >= total - 1 }, "prox"),

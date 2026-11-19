@@ -1,6 +1,7 @@
 """Detonado por capítulo (pedido 13/11/2026): índice da StrategyWiki em ordem, texto limpo e traduzido, guardado."""
 from dc import detonado as D
 from dc.paths import get_paths
+from types import SimpleNamespace
 
 TOC = """<noinclude>{{Header Nav|game=Pokémon FireRed and LeafGreen}}</noinclude>
 {{h2|[[Pokémon FireRed and LeafGreen/Gameplay|Gameplay]]}}
@@ -82,6 +83,20 @@ def test_sem_ia_fica_o_original(tmp_path):
     D.preparar(paths, "gba-pokemon", "Pokemon FireRed", api=_api)
     c = D.capitulo(paths, "gba-pokemon", 0, api=_api, tradutor=lambda *a: None)
     assert not c["traduzido"] and c["paragrafos"][0] == "Pallet Town"
+
+
+def test_detonado_so_fica_pronto_quando_tudo_esta_em_portugues_e_pode_ser_agendado(tmp_path):
+    paths = get_paths(tmp_path).ensure()
+    D.preparar(paths, "gba-pokemon", "Pokemon FireRed", api=_api)
+    assert not D.pronto(paths, "gba-pokemon")
+    calls = []
+    assert D.agendar(paths, "gba-pokemon", "Pokemon FireRed",
+                     run=lambda cmd, **kw: calls.append(cmd) or SimpleNamespace(returncode=0))
+    assert calls[0][-3:] == ["dc.detonado", "baixar", "gba-pokemon"]
+    D.baixar_tudo(paths, "gba-pokemon", "Pokemon FireRed", api=_api,
+                   tradutor=lambda _p, _g, textos: ["PT: " + x for x in textos], log=lambda _m: None)
+    assert D.pronto(paths, "gba-pokemon")
+    assert not D.agendar(paths, "gba-pokemon", "Pokemon FireRed", run=lambda *_a, **_k: 1)
 
 
 def test_detonado_vai_junto_para_o_jogo_traduzido(tmp_path):

@@ -19,12 +19,19 @@ class Fake:
 def test_aplica_e_restaura(tmp_path):
     f = Fake()
     t = tdp.Tdp(tmp_path / "st.json", run=f)
-    assert t.aplicar_console("psx") == "TDP 7 W para psx (antes 12 W)"
-    assert t.aplicar_console("snes") == "TDP 5 W para snes (antes 12 W)"  # o anterior original fica
+    assert t.aplicar_console("psx") == "TDP 10 W para psx (antes 12 W)"
+    assert t.aplicar_console("snes") == "TDP 8 W para snes (antes 12 W)"  # o anterior original fica
     assert "12 W" in t.restaurar() and f.atual == 12 and not (tmp_path / "st.json").exists()
     t.aplicar_console("ps2", em_dock=True)
     assert f.atual == 15
     assert "não reconhecido" in t.aplicar_console("zx81")
+
+
+def test_live_stutter_only_raises_tdp(tmp_path):
+    f = Fake(atual=12, maximo=15)
+    t = tdp.Tdp(tmp_path / "st.json", run=f)
+    assert t.priorizar_desempenho() == "TDP elevado agora para 15 W para priorizar fluidez"
+    assert f.atual == 15 and t.priorizar_desempenho() is None  # não fica escrevendo nem reduz em seguida
 
 
 def test_dock(tmp_path):

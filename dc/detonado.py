@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import sys
 import time
 import urllib.parse
@@ -157,6 +158,41 @@ def info(paths, game_id: str) -> dict:
         return json.loads((_pasta(paths, game_id) / "indice.json").read_text("utf-8"))
     except (OSError, ValueError):
         return {}
+
+
+def pronto(paths, game_id: str) -> bool:
+    """O guia só é offline/português quando todas as partes já estão traduzidas no disco."""
+    d = info(paths, game_id)
+    caps = d.get("capitulos") or []
+    if not caps:
+        return False
+    for i in range(len(caps)):
+        try:
+            parte = json.loads((_pasta(paths, game_id) / f"{i:03d}.json").read_text("utf-8"))
+        except (OSError, ValueError):
+            return False
+        if not parte.get("pt") or not parte.get("titulo_pt"):
+            return False
+    return True
+
+
+def agendar(paths, game_id: str, titulo: str, run=subprocess.run) -> bool:
+    """Prepara o guia inteiro fora da abertura do jogo; nunca bloqueia Steam, sync ou o painel.
+
+    A unidade user do systemd impede que a tradução morra quando o painel fecha. Um nome de unidade estável faz
+    chamadas repetidas (sync, abrir jogo e painel) reaproveitarem a mesma preparação.
+    """
+    if not game_id or pronto(paths, game_id):
+        return False
+    unidade = "dc-detonado-" + "".join(ch for ch in game_id if ch.isalnum())[:40]
+    repo = Path(__file__).resolve().parents[1]
+    try:
+        r = run(["systemd-run", "--user", "--collect", f"--unit={unidade}", f"--working-directory={repo}",
+                 sys.executable, "-m", "dc.detonado", "baixar", game_id],
+                capture_output=True, text=True, timeout=10)
+        return getattr(r, "returncode", 0) == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
 
 
 def _gravar(f: Path, dados) -> None:
