@@ -99,6 +99,23 @@ def test_detonado_so_fica_pronto_quando_tudo_esta_em_portugues_e_pode_ser_agenda
     assert not D.agendar(paths, "gba-pokemon", "Pokemon FireRed", run=lambda *_a, **_k: 1)
 
 
+def test_existing_library_gets_one_offline_guide_at_a_time_and_retries_later(tmp_path, monkeypatch):
+    """Jogo que já existia antes do recurso entra na fila; uma falha não vira martelada na rede."""
+    paths = get_paths(tmp_path).ensure()
+    (paths.data / "launch-map.json").write_text(__import__("json").dumps({
+        "ps2-dmc": {"title": "Devil May Cry 3", "console": "ps2"},
+        "psp-pronto": {"title": "God of War", "console": "psp"},
+        "pc-x": {"title": "PC", "console": "pc"},
+    }))
+    monkeypatch.setattr(D, "pronto", lambda _p, gid: gid == "psp-pronto")
+    chamadas = []
+    monkeypatch.setattr(D, "agendar", lambda _p, gid, titulo, run=None: chamadas.append((gid, titulo)) or True)
+    assert D.agendar_proximo(paths, now=1000) == "detonado: preparando em português Devil May Cry 3"
+    assert chamadas == [("ps2-dmc", "Devil May Cry 3")]
+    assert D.agendar_proximo(paths, now=1001) is None  # não repete enquanto está em preparação
+    assert D.agendar_proximo(paths, now=1000 + D.FILA_ESPERA + 1)
+
+
 def test_detonado_vai_junto_para_o_jogo_traduzido(tmp_path):
     """God of War do PSP (14/11/2026): a versão (PT-BR) substitui a russa; os 9 capítulos traduzidos vão junto."""
     paths = get_paths(tmp_path).ensure()

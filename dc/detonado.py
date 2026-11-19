@@ -195,6 +195,49 @@ def agendar(paths, game_id: str, titulo: str, run=subprocess.run) -> bool:
         return False
 
 
+FILA_ESPERA = 6 * 3600
+
+
+def _fila(paths) -> Path:
+    return paths.state / "detonado-fila.json"
+
+
+def agendar_proximo(paths, now: float | None = None, run=subprocess.run) -> str | None:
+    """Põe um guia já existente na biblioteca em preparação, sem disputar recursos com uma partida.
+
+    Jogos instalados antes do recurso de detonados não passam pelo ``syncer``; esta fila preenche
+    essa lacuna. Ela inicia apenas um guia por vez e espera seis horas antes de tentar o mesmo de
+    novo, inclusive se a StrategyWiki ou a IA estiver temporariamente indisponível.
+    """
+    now = time.time() if now is None else now
+    try:
+        mapa = json.loads((paths.data / "launch-map.json").read_text("utf-8"))
+    except (OSError, ValueError):
+        return None
+    try:
+        estado = json.loads(_fila(paths).read_text("utf-8"))
+    except (OSError, ValueError):
+        estado = {}
+    tentados = estado.get("tentados", {})
+    candidatos = [
+        (gid, e) for gid, e in mapa.items()
+        if not e.get("removed") and e.get("console") not in ("pc", "steam")
+        and e.get("title") and not pronto(paths, gid)
+        and (gid not in tentados or now - float(tentados[gid]) >= FILA_ESPERA)
+    ]
+    # Um guia já parcialmente baixado vem antes de um novo: é a forma mais rápida de consertar
+    # uma abertura anterior que ficou sem Internet, como o DMC3.
+    candidatos.sort(key=lambda item: (not bool(info(paths, item[0])), item[1]["title"].casefold()))
+    if not candidatos:
+        return None
+    gid, jogo = candidatos[0]
+    if not agendar(paths, gid, jogo["title"], run=run):
+        return None
+    tentados[gid] = now
+    _gravar(_fila(paths), {"tentados": tentados, "ultimo": gid, "em": now})
+    return f"detonado: preparando em português {jogo['title']}"
+
+
 def _gravar(f: Path, dados) -> None:
     f.parent.mkdir(parents=True, exist_ok=True)
     tmp = f.with_name(f.name + ".tmp")

@@ -196,6 +196,17 @@ def power_loop(paths: Paths, interval: float = 30) -> None:
                 if op.type == "sync":
                     store.cancel(op.id)
                     _log(paths, "worker", "sync da fila: " + syncer.run_sync(paths, store, q).splitlines()[0])
+        # Biblioteca instalada antes do recurso de detonados: prepara um guia por vez quando o
+        # Deck está ocioso e na tomada. Nunca concorre com jogo, download ou bateria portátil.
+        if not running and bool(reading.ac_online) and time.time() - getattr(power_loop, "_detonado", 0) >= 900:
+            power_loop._detonado = time.time()
+            try:
+                from . import detonado
+                msg = detonado.agendar_proximo(paths)
+                if msg:
+                    _log(paths, "worker", msg)
+            except Exception as e:  # noqa: BLE001
+                _log(paths, "worker", f"detonado: {e}")
         time.sleep(interval)
 
 
