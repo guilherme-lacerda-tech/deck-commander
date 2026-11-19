@@ -95,6 +95,7 @@ def test_full_download_never_reports_success_with_missing_text(tmp_path):
     out = D.baixar_tudo(paths, "gba-pokemon", "Pokemon FireRed",
                          api=lambda _p: {"parse": {"wikitext": ""}}, tradutor=lambda *_a: None)
     assert out.startswith("detonado não terminou:") and not D.pronto(paths, "gba-pokemon")
+    assert D.erro(paths, "gba-pokemon") == out
 
 
 def test_sem_ia_fica_o_original(tmp_path):

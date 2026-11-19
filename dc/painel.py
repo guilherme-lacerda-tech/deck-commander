@@ -975,6 +975,9 @@ def detonado(p: Ponte, a: dict) -> dict:
     if not gid:
         return {"jogos": jogos, "gid": None}
     d = D.info(p.paths, gid)
+    falha = D.erro(p.paths, gid)
+    if falha and not a.get("nome"):
+        return {"jogos": jogos, "gid": gid, "erro": falha + " Você pode informar o nome exato do jogo na StrategyWiki para tentar outra fonte."}
     if not d and not a.get("nome"):
         D.agendar(p.paths, gid, mapa.get(gid, {}).get("title", gid))
         return {"jogos": jogos, "gid": gid, "preparando": True,

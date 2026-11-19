@@ -176,6 +176,23 @@ def pronto(paths, game_id: str) -> bool:
     return True
 
 
+def erro(paths, game_id: str) -> str | None:
+    """Último impedimento concreto da preparação, para o painel não prometer uma fila infinita."""
+    try:
+        d = json.loads((_pasta(paths, game_id) / "status.json").read_text("utf-8"))
+        return d.get("erro") if isinstance(d, dict) else None
+    except (OSError, ValueError):
+        return None
+
+
+def _status(paths, game_id: str, mensagem: str | None = None) -> None:
+    p = _pasta(paths, game_id) / "status.json"
+    if mensagem:
+        _gravar(p, {"erro": mensagem, "em": time.time()})
+    else:
+        p.unlink(missing_ok=True)
+
+
 def agendar(paths, game_id: str, titulo: str, run=subprocess.run) -> bool:
     """Prepara o guia inteiro fora da abertura do jogo; nunca bloqueia Steam, sync ou o painel.
 
@@ -186,9 +203,11 @@ def agendar(paths, game_id: str, titulo: str, run=subprocess.run) -> bool:
         return False
     unidade = "dc-detonado-" + "".join(ch for ch in game_id if ch.isalnum())[:40]
     repo = Path(__file__).resolve().parents[1]
+    venv = Path.home() / ".local/share/deck-commander/venv/bin/python"
+    python = str(venv) if venv.exists() else sys.executable
     try:
         r = run(["systemd-run", "--user", "--collect", f"--unit={unidade}", f"--working-directory={repo}",
-                 sys.executable, "-m", "dc.detonado", "baixar", game_id],
+                 python, "-m", "dc.detonado", "baixar", game_id],
                 capture_output=True, text=True, timeout=10)
         return getattr(r, "returncode", 0) == 0
     except (OSError, subprocess.SubprocessError):
@@ -336,6 +355,7 @@ def herdar(paths, de: str, para: str) -> bool:
 def baixar_tudo(paths, game_id: str, titulo: str, api=_api, tradutor=None, log=print) -> str:
     d = info(paths, game_id) or preparar(paths, game_id, titulo, api=api)
     if d.get("erro"):
+        _status(paths, game_id, d["erro"])
         return d["erro"]
     n = len(d["capitulos"])
     comeco = d.get("atual", 0)  # começa pela parte em que você está, depois as seguintes
@@ -343,11 +363,16 @@ def baixar_tudo(paths, game_id: str, titulo: str, api=_api, tradutor=None, log=p
         i = (comeco + k) % n
         parte = capitulo(paths, game_id, i, api=api, tradutor=tradutor)
         if parte.get("erro"):
-            return f"detonado não terminou: {parte['erro']}"
+            msg = f"detonado não terminou: {parte['erro']}"
+            _status(paths, game_id, msg)
+            return msg
         if not parte.get("traduzido"):
-            return f"detonado não terminou: a tradução de '{parte['titulo']}' não ficou pronta"
+            msg = f"detonado não terminou: a tradução de '{parte['titulo']}' não ficou pronta"
+            _status(paths, game_id, msg)
+            return msg
         log(f"detonado {game_id}: {k + 1}/{n}")
         time.sleep(0.5)  # gentil com a wiki
+    _status(paths, game_id)
     return f"detonado de {d['jogo']}: {n} parte(s) prontas para ler sem internet"
 
 
@@ -357,8 +382,9 @@ def main(argv: list[str]) -> int:
     if argv[:1] == ["baixar"] and argv[1:]:
         from . import transferir
         e = transferir.carregar_mapa().get(argv[1], {})
-        print(baixar_tudo(paths, argv[1], e.get("title", argv[1])))
-        return 0
+        msg = baixar_tudo(paths, argv[1], e.get("title", argv[1]))
+        print(msg)
+        return 0 if pronto(paths, argv[1]) else 1
     print(__doc__)
     return 2
 

@@ -284,6 +284,14 @@ def test_detonado_prepara_antes_de_exibir_e_nunca_entrega_ingles(P, monkeypatch)
     assert r["ok"] and r["preparando"] and "inglês" not in r["texto"]
 
 
+def test_detonado_shows_preparation_failure_instead_of_waiting_forever(P):
+    _lm(P, {"ps2-jogo": {"title": "Jogo", "console": "ps2", "rom": "/x"}})
+    from dc import detonado as D
+    D._status(P, "ps2-jogo", "detonado não terminou: fonte indisponível")
+    r = run(P, "detonado", {"gid": "ps2-jogo"})
+    assert r["ok"] and "fonte indisponível" in r["erro"] and not r.get("preparando")
+
+
 def test_cli_reads_json_from_stdin(P, monkeypatch, capsys):
     import io
     real = painel.Ponte
