@@ -7,14 +7,14 @@ import subprocess
 from pathlib import Path
 
 TDP_POR_CONSOLE: dict[str, int] = {
-    # Jogo liso vem antes da economia. Estes são pisos de desempenho, não metas de duração de bateria:
-    # reduzir energia depois de abrir um jogo é proibido; o monitor só pode subir até o máximo disponível.
-    "nes": 8, "snes": 8, "gb": 8, "gbc": 8, "gba": 8, "sms": 8, "gg": 8, "genesis": 8, "pce": 8,
-    "arcade": 8, "pc": 10,
-    "psx": 10, "n64": 10, "nds": 10, "segacd": 10, "saturn": 10,
-    "psp": 12, "dc": 12,
-    # DMC3/PCSX2 em 12 W caiu para 70–80%: consoles 3D recebem o teto portátil desde a abertura.
-    "gc": 15, "wii": 15, "ps2": 15, "xbox": 15, "n3ds": 15,
+    # Piso inicial por console. Não é uma regra de "bateria antes do jogo" nem um teto fixo:
+    # o controlador ao vivo sobe um watt por vez se a velocidade nativa cair e só devolve
+    # potência após estabilidade prolongada. Assim uma cena leve não gasta como uma batalha pesada.
+    "nes": 5, "snes": 5, "gb": 5, "gbc": 5, "gba": 5, "sms": 5, "gg": 5, "genesis": 5, "pce": 5,
+    "arcade": 5, "pc": 5,
+    "psx": 7, "n64": 7, "nds": 7, "segacd": 7, "saturn": 7,
+    "psp": 9, "dc": 9,
+    "gc": 12, "wii": 12, "ps2": 12, "xbox": 12, "n3ds": 12,
     "switch": 15, "switch2": 15, "wiiu": 15, "ps3": 15, "x360": 15
 }
 
@@ -22,6 +22,9 @@ class Tdp:
     def __init__(self, estado: Path, run=subprocess.run):
         self.estado = estado
         self.run = run
+        self.piso: int | None = None
+        # Só reduzimos potência que esta execução elevou. Um limite manual maior do usuário é respeitado.
+        self.gerenciado: int | None = None
 
     def ler(self) -> int | None:
         try:
@@ -77,6 +80,7 @@ class Tdp:
             if maximo is None:
                 maximo = 15
             tdp = maximo
+        self.piso = tdp
 
         if not self.estado.exists():  # jogo aberto em cima de outro não perde o valor original
             anterior = self.ler()
@@ -88,19 +92,50 @@ class Tdp:
             anterior = json.loads(self.estado.read_text()).get("anterior")
         except (OSError, ValueError):
             anterior = None
-        if not self.definir(tdp):
+        atual = self.ler()
+        # Se o usuário deixou um valor mais alto, o Commander não o derruba ao abrir o jogo.
+        alvo = max(tdp, atual or tdp)
+        if atual != alvo and not self.definir(alvo):
             return f"Não consegui ajustar o TDP para {console} (SteamOS Manager não respondeu)."
-        return f"TDP {tdp} W para {console}" + (f" (antes {anterior} W)" if anterior is not None else "")
+        if atual is not None and atual < alvo:
+            self.gerenciado = alvo
+        return f"TDP inicial {alvo} W para {console}" + (f" (antes {anterior} W)" if anterior is not None else "")
+
+    def aumentar_passo(self) -> str | None:
+        """Sob demanda, acrescenta somente 1 W ao TDP da partida em curso."""
+        atual = self.ler()
+        maximo = self.maximo() or 15
+        if atual is None:
+            return None
+        alvo = min(maximo, atual + 1)
+        if alvo == atual:
+            return "TDP já estava no máximo"
+        if self.definir(alvo):
+            self.gerenciado = alvo
+            return f"TDP elevado agora de {atual} para {alvo} W"
+        return None
+
+    def usar_piso_portatil(self, console: str) -> None:
+        """Após sair da dock, permite que a redução gradual volte ao piso portátil do console."""
+        if console in TDP_POR_CONSOLE:
+            self.piso = TDP_POR_CONSOLE[console]
+
+    def reduzir_passo(self) -> str | None:
+        """Devolve 1 W apenas depois de estabilidade e nunca abaixo do piso do console."""
+        if self.gerenciado is None or self.piso is None:
+            return None
+        atual = self.ler()
+        if atual is None or atual <= self.piso:
+            return None
+        alvo = max(self.piso, atual - 1)
+        if self.definir(alvo):
+            self.gerenciado = alvo
+            return f"TDP reduzido de {atual} para {alvo} W após estabilidade"
+        return None
 
     def priorizar_desempenho(self) -> str | None:
-        """Durante queda sustentada, sobe o TDP AGORA; nunca reduz qualidade/energia no meio da partida."""
-        maximo = self.maximo() or 15
-        atual = self.ler()
-        if atual is not None and atual >= maximo:
-            return None
-        if self.definir(maximo):
-            return f"TDP elevado agora para {maximo} W para priorizar fluidez"
-        return None
+        """Compatibilidade: novos chamadores devem usar aumentar_passo()."""
+        return self.aumentar_passo()
 
     def restaurar(self) -> str:
         if not self.estado.exists():

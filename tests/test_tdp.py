@@ -19,19 +19,30 @@ class Fake:
 def test_aplica_e_restaura(tmp_path):
     f = Fake()
     t = tdp.Tdp(tmp_path / "st.json", run=f)
-    assert t.aplicar_console("psx") == "TDP 10 W para psx (antes 12 W)"
-    assert t.aplicar_console("snes") == "TDP 8 W para snes (antes 12 W)"  # o anterior original fica
+    # Um limite manual de 12 W não é derrubado ao abrir um console leve.
+    assert t.aplicar_console("psx") == "TDP inicial 12 W para psx (antes 12 W)"
+    assert t.aplicar_console("snes") == "TDP inicial 12 W para snes (antes 12 W)"  # o anterior original fica
     assert "12 W" in t.restaurar() and f.atual == 12 and not (tmp_path / "st.json").exists()
     t.aplicar_console("ps2", em_dock=True)
     assert f.atual == 15
     assert "não reconhecido" in t.aplicar_console("zx81")
 
 
-def test_live_stutter_only_raises_tdp(tmp_path):
+def test_live_stutter_raises_only_one_watt_and_stability_returns_it(tmp_path):
     f = Fake(atual=12, maximo=15)
     t = tdp.Tdp(tmp_path / "st.json", run=f)
-    assert t.priorizar_desempenho() == "TDP elevado agora para 15 W para priorizar fluidez"
-    assert f.atual == 15 and t.priorizar_desempenho() is None  # não fica escrevendo nem reduz em seguida
+    t.aplicar_console("ps2")
+    assert t.aumentar_passo() == "TDP elevado agora de 12 para 13 W"
+    assert f.atual == 13
+    assert t.reduzir_passo() == "TDP reduzido de 13 para 12 W após estabilidade"
+    assert f.atual == 12
+
+
+def test_manual_higher_tdp_is_respected_and_never_reduced(tmp_path):
+    f = Fake(atual=15, maximo=15)
+    t = tdp.Tdp(tmp_path / "st.json", run=f)
+    assert t.aplicar_console("ps2") == "TDP inicial 15 W para ps2 (antes 15 W)"
+    assert t.reduzir_passo() is None and f.atual == 15
 
 
 def test_dock(tmp_path):

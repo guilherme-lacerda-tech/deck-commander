@@ -1,6 +1,7 @@
 """Monitor/TV ligado ou tirado COM O DECK RODANDO: reage na hora (o serviço de energia chama a cada 30 s).
 
-- energia (TDP) do jogo aberto muda na hora: máximo na dock, o do console no portátil;
+- energia (TDP) do jogo aberto sobe na hora ao entrar na dock; ao sair, não cai de uma vez
+  (o controlador adaptativo devolve watts gradualmente quando a partida continuar estável);
 - aviso na tela do Deck (o plugin mostra o launch-error.json com título);
 - a resolução os emuladores só leem ao abrir: entra ao reabrir o jogo (com "continuar de onde parou" ligado,
   reabrir volta no mesmo ponto).
@@ -14,7 +15,7 @@ import os
 from pathlib import Path
 
 from .paths import Paths
-from .tdp import TDP_POR_CONSOLE, Tdp, em_dock
+from .tdp import Tdp, em_dock
 
 
 def _gravar(f: Path, dados: dict) -> None:
@@ -49,7 +50,10 @@ def verificar(paths: Paths, detectar=em_dock, tdp_factory=Tdp) -> str | None:
         if jogo and not (paths.config / "tdp-desligado").exists() and (paths.state / "tdp-anterior.json").exists():
             try:
                 ctl = tdp_factory(paths.state / "tdp-anterior.json")
-                watts = (ctl.maximo() or 15) if atual else TDP_POR_CONSOLE.get(jogo["console"], 15)
+                # Tirar o cabo não pode derrubar energia no meio de uma cena: preserve o máximo
+                # que a dock aplicou. O LiveMonitor, já sem dock, devolve 1 W por vez após
+                # estabilidade real.
+                watts = ctl.maximo() or 15
                 ctl.definir(watts)
                 extra = f" · energia {watts} W"
             except Exception as e:  # noqa: BLE001 — energia nunca derruba o serviço

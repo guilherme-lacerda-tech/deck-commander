@@ -304,15 +304,21 @@ class LiveMonitor:
     """
 
     def __init__(self, paths, game_id: str, console: str, title: str, log_dir: Path | None,
-                 since: float, every: float = 3.0, on_stutter=None):
+                 since: float, every: float = 3.0, on_stutter=None, on_stable=None,
+                 adjustment_cooldown: float = 20.0, recovery_seconds: float = 300.0,
+                 clock=time.monotonic):
         self.paths, self.game_id, self.console, self.title = paths, game_id, console, title
-        self.log_dir, self.since, self.every, self.on_stutter = log_dir, since, every, on_stutter
+        self.log_dir, self.since, self.every = log_dir, since, every
+        self.on_stutter, self.on_stable = on_stutter, on_stable
+        self.adjustment_cooldown, self.recovery_seconds, self.clock = adjustment_cooldown, recovery_seconds, clock
         self.alerted = False
         self.adjusted = False
         # A primeira janela estável revela a meta do jogo (30/50/60). Não a reduza durante
         # uma queda: uma partida que vinha a 60 e cai para 42 não pode passar a parecer 50 FPS.
         self.reference_target: float | None = None
         self.missing_reported = False
+        self.last_adjustment = float("-inf")
+        self.stable_since: float | None = None
         self._stop = threading.Event()
         self._t = threading.Thread(target=self._run, daemon=True)
 
@@ -328,7 +334,7 @@ class LiveMonitor:
             self._t.join(timeout=5)
 
     def check(self) -> dict | None:
-        if self.alerted or not self.log_dir:
+        if not self.log_dir:
             return None
         log = newest_log(self.log_dir, self.since)
         stats = live_stats(log, target=self.reference_target) if log else None
@@ -351,25 +357,47 @@ class LiveMonitor:
         if stats:
             self.reference_target = max(self.reference_target or 0, stats["target"])
             stats = dict(stats, target=self.reference_target)
-        # No relatório final 25% lento ainda é apenas um sinal. Ao vivo, porém, esperar chegar a
-        # 70–80% da velocidade era tarde demais: 35% de uma janela de 12 s abaixo de 90% da meta
-        # já é uma queda sustentada que merece soltar o limitador e elevar a energia AGORA.
-        if not stats or stats["slow_share"] < 0.35 or stats["fps_avg"] >= 0.90 * stats["target"]:
+        now = self.clock()
+        # No relatório final 25% lento ainda é apenas um sinal. Ao vivo, 35% de uma janela de
+        # 12 s abaixo de 90% da meta pede potência extra, mas em degraus: dá tempo para cada watt
+        # surtir efeito antes de gastar o próximo.
+        stuttering = stats and stats["slow_share"] >= 0.35 and stats["fps_avg"] < 0.90 * stats["target"]
+        stable = stats and stats["slow_share"] <= 0.05 and stats["fps_avg"] >= 0.97 * stats["target"]
+        if not stuttering:
+            if stable:
+                self.stable_since = self.stable_since or now
+                if self.on_stable and now - self.stable_since >= self.recovery_seconds and now - self.last_adjustment >= self.adjustment_cooldown:
+                    action = self.on_stable(stats)
+                    if action:
+                        self.last_adjustment = now
+                        self.stable_since = now
+                        return self._publish(stats, action, "estável")
+            else:
+                self.stable_since = None
             return None
-        self.alerted = True
+        self.stable_since = None
+        if now - self.last_adjustment < self.adjustment_cooldown:
+            return None
         action = None
         if self.on_stutter:
             try:
                 action = self.on_stutter(stats)
             except Exception:  # noqa: BLE001 - o aviso não pode derrubar o jogo
                 action = None
+        self.last_adjustment = now
+        self.alerted = True
         self.adjusted = action is not None
+        return self._publish(stats, action, "travando")
+
+    def _publish(self, stats: dict, action: str | None, verdict: str) -> dict:
         level = None
         if action:
             import re
             m = re.search(r"fixado em (nativo|\d+x)", action)
             level = m.group(1) if m else None
-        msg = (f"⚠️ {self.title} caiu de desempenho: {stats['fps_avg']:.0f} FPS "
+        prefix = "⚠️" if verdict == "travando" else "✅"
+        descr = "caiu de desempenho" if verdict == "travando" else "manteve desempenho estável"
+        msg = (f"{prefix} {self.title} {descr}: {stats['fps_avg']:.0f} FPS "
                f"(meta {stats['target']}, {stats['slow_share']:.0%} da última janela abaixo do ritmo).")
         if action:
             msg += f" Ação durante a partida: {action}."
@@ -378,7 +406,7 @@ class LiveMonitor:
         msg += " O jogo continua aberto. A resolução do PCSX2 não é regravada no meio da luta, pois isso pode causar outra travada."
         data = {"game_id": self.game_id, "console": self.console, "title": self.title,
                 **{k: round(v, 3) if isinstance(v, float) else v for k, v in stats.items()},
-                "verdict": "travando", "action": action, "next_level": level,
+                "verdict": verdict, "action": action, "next_level": level,
                 "message": msg, "notified": False,
                 "at": datetime.now(timezone.utc).isoformat()}
         _save(_live_path(self.paths), data)

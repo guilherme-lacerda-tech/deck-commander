@@ -247,14 +247,19 @@ def main(argv: list[str]) -> None:
     # O resumo do MangoHud só existia quando o emulador fechava. Este vigia lê o CSV já crescente
     # durante a partida e prepara, com segurança, o próximo lançamento se a queda for sustentada.
     def _trava_ao_vivo(_stats):
-        if na_dock:
+        try:
+            from .tdp import em_dock
+            na_dock_agora = em_dock()
+        except Exception:  # noqa: BLE001
+            na_dock_agora = na_dock
+        if na_dock_agora:
             return None
         # Correções que valem DURANTE a sessão. Não se escreve a resolução do PCSX2/Dolphin com
         # a ROM aberta: esses emuladores podem ignorar o INI ou introduzir uma segunda travada.
         # Também não se reduz qualidade automaticamente por uma única luta; primeiro se tira todo
         # limitador externo e se prioriza potência, mantendo a partida viva.
         acoes = []
-        agora = tdp_ctl.priorizar_desempenho() if tdp_ctl else None
+        agora = tdp_ctl.aumentar_passo() if tdp_ctl else None
         if agora:
             acoes.append(agora)
         elif tdp_ctl:
@@ -269,8 +274,23 @@ def main(argv: list[str]) -> None:
         # uma queda isolada em uma redução automática de resolução para a próxima sessão.
         return " · ".join(acoes) or "medição registrada; controles de desempenho já estavam liberados"
 
+    def _estavel_ao_vivo(_stats):
+        # A economia só volta depois de cinco minutos lisos e apenas um watt por vez; isso evita
+        # a gangorra que tornaria a próxima cena pesada lenta de novo.
+        if not tdp_ctl:
+            return None
+        try:
+            from .tdp import em_dock
+            if em_dock():
+                return None
+        except Exception:  # noqa: BLE001
+            if na_dock:
+                return None
+        tdp_ctl.usar_piso_portatil(console)
+        return tdp_ctl.reduzir_passo()
+
     live = (perf.LiveMonitor(paths, game_id, console, title, log_dir, t0,
-                             on_stutter=_trava_ao_vivo).start() if measure else None)
+                             on_stutter=_trava_ao_vivo, on_stable=_estavel_ao_vivo).start() if measure else None)
 
     def _stop(signum, _frame):  # "Sair do jogo" do Steam: fecha o emulador e ainda devolve a qualidade
         child.send_signal(signum)

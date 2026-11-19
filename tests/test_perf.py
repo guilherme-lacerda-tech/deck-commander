@@ -107,6 +107,35 @@ def test_live_monitor_reacts_before_the_game_reaches_70_percent(tmp_path):
     assert len(calls) == 1
 
 
+def test_live_monitor_steps_up_then_only_steps_down_after_long_stability(tmp_path):
+    """Controlador adaptativo: sem salto ao máximo, sem devolver energia na primeira janela lisa."""
+    from types import SimpleNamespace
+    now = [0.0]
+    paths = SimpleNamespace(data=tmp_path / "data")
+    paths.data.mkdir()
+    logs = tmp_path / "logs"; logs.mkdir()
+    csv = logs / "game.csv"
+    events = []
+    monitor = perf.LiveMonitor(paths, "ps2-dmc3", "ps2", "Devil May Cry 3", logs, 0,
+                               on_stutter=lambda s: events.append("up") or "TDP elevado de 12 para 13 W",
+                               on_stable=lambda s: events.append("down") or "TDP reduzido de 13 para 12 W",
+                               adjustment_cooldown=20, recovery_seconds=300, clock=lambda: now[0])
+    csv.write_text(_mango_many([60.0] * 80))
+    assert monitor.check() is None  # aprende a meta
+    csv.write_text(_mango_many([60.0] * 80 + [42.0] * 48))
+    assert monitor.check()["action"] == "TDP elevado de 12 para 13 W"
+    now[0] = 10
+    assert monitor.check() is None  # cooldown: não sobe de novo no mesmo instante
+    csv.write_text(_mango_many([60.0] * 200))
+    now[0] = 30
+    assert monitor.check() is None  # primeira janela boa só inicia o relógio de estabilidade
+    now[0] = 329
+    assert monitor.check() is None
+    now[0] = 330
+    assert monitor.check()["action"] == "TDP reduzido de 13 para 12 W"
+    assert events == ["up", "down"]
+
+
 def test_live_monitor_reports_missing_mangohud_instead_of_staying_silent(tmp_path):
     """Sem CSV não existe detecção; o painel e o bot precisam poder dizer isso."""
     from types import SimpleNamespace
