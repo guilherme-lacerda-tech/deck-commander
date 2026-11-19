@@ -75,16 +75,24 @@ def parse_mangohud(path: Path) -> dict | None:
     return _stats(rest if len(rest) >= 20 else samples)
 
 
-def live_stats(path: Path, window: int = 80) -> dict | None:
+def live_stats(path: Path, window: int = 48, target: float | None = None) -> dict | None:
     """Mede a janela mais recente de uma partida que ainda está rodando.
 
-    O intervalo padrão do MangoHud é 250 ms; 80 amostras representam cerca de 20 s. Isso evita
-    reduzir qualidade por uma engasgada isolada, mas detecta a queda sustentada como a de 60–70%.
+    O intervalo padrão do MangoHud é 250 ms; 48 amostras representam cerca de 12 s. Isso evita
+    reagir a uma engasgada isolada, mas permite corrigir uma queda sustentada durante a jogatina,
+    em vez de só acusá-la depois de ela já ter estragado a luta.
     """
     samples = _mangohud_samples(path)
     if len(samples) < 20 or samples[-1][0] - samples[0][0] < 15:
         return None
-    return _stats(samples[-window:])
+    recent = samples[-window:]
+    stats = _stats(recent)
+    # Depois de uma janela estável, a meta conhecida não pode cair junto com os FPS. Sem isso
+    # 50 FPS em uma partida que vinha a 60 poderiam ser confundidos com um jogo PAL de 50.
+    if stats and target and target > stats["target"]:
+        stats["target"] = target
+        stats["slow_share"] = sum(1 for _, fps, _, _ in recent if fps < 0.9 * target) / len(recent)
+    return stats
 
 
 def battery(sysfs_root: Path = Path('/sys/class/power_supply')) -> dict | None:
@@ -169,10 +177,13 @@ def verdict(fps_avg: float, fps_low: float, slow_share: float, target: int) -> s
 
 
 def wrap_command(cmd: list[str], home: Path=Path.home(), seconds: int | None = None) -> tuple[list[str], Path]:
-    """Liga o MangoHud (sem mostrar nada na tela). Ele só grava o arquivo quando o registro termina, então o
-    registro tem duração fixa (benchmark: o tempo do teste; partida: os primeiros 5 minutos) e o arquivo
-    fica pronto mesmo que o jogo seja fechado à força."""
-    seconds = seconds or int(os.environ.get('DC_PERF_SECONDS', '300'))
+    """Liga o MangoHud (sem mostrar nada na tela).
+
+    A partida normal recebe quatro horas de telemetria, não apenas os primeiros cinco minutos. O
+    benchmark ainda pode passar sua duração explícita. Assim uma queda que apareça numa fase tardia
+    continua sendo vista pelo vigia ao vivo e o CSV também termina após uma saída forçada.
+    """
+    seconds = seconds or int(os.environ.get('DC_PERF_SECONDS', '14400'))
     # no_display desliga também o registro; por isso o HUD fica ligado, mas 100% transparente
     mh = f'alpha=0.0,background_alpha=0.0,fps_only=1,autostart_log=3,log_interval=250,log_duration={seconds}'
     if cmd[0].endswith('flatpak') and cmd[1] == 'run':
@@ -293,7 +304,7 @@ class LiveMonitor:
     """
 
     def __init__(self, paths, game_id: str, console: str, title: str, log_dir: Path | None,
-                 since: float, every: float = 10.0, on_stutter=None):
+                 since: float, every: float = 3.0, on_stutter=None):
         self.paths, self.game_id, self.console, self.title = paths, game_id, console, title
         self.log_dir, self.since, self.every, self.on_stutter = log_dir, since, every, on_stutter
         self.alerted = False
@@ -320,7 +331,7 @@ class LiveMonitor:
         if self.alerted or not self.log_dir:
             return None
         log = newest_log(self.log_dir, self.since)
-        stats = live_stats(log) if log else None
+        stats = live_stats(log, target=self.reference_target) if log else None
         if not stats:
             # Sem CSV (ou sem FPS válido) não há como prometer que a detecção está ativa.
             # Espere a inicialização normal do Flatpak/MangoHud antes de avisar uma única vez.
@@ -340,8 +351,10 @@ class LiveMonitor:
         if stats:
             self.reference_target = max(self.reference_target or 0, stats["target"])
             stats = dict(stats, target=self.reference_target)
-        # 25% lento é útil no resumo final; ao vivo só interrompemos o usuário por uma queda bem clara.
-        if not stats or stats["slow_share"] < 0.65 or stats["fps_avg"] >= 0.8 * stats["target"]:
+        # No relatório final 25% lento ainda é apenas um sinal. Ao vivo, porém, esperar chegar a
+        # 70–80% da velocidade era tarde demais: 35% de uma janela de 12 s abaixo de 90% da meta
+        # já é uma queda sustentada que merece soltar o limitador e elevar a energia AGORA.
+        if not stats or stats["slow_share"] < 0.35 or stats["fps_avg"] >= 0.90 * stats["target"]:
             return None
         self.alerted = True
         action = None
@@ -356,11 +369,13 @@ class LiveMonitor:
             import re
             m = re.search(r"fixado em (nativo|\d+x)", action)
             level = m.group(1) if m else None
-        msg = (f"⚠️ {self.title} está travando agora: {stats['fps_avg']:.0f} FPS "
+        msg = (f"⚠️ {self.title} caiu de desempenho: {stats['fps_avg']:.0f} FPS "
                f"(meta {stats['target']}, {stats['slow_share']:.0%} da última janela abaixo do ritmo).")
+        if action:
+            msg += f" Ação durante a partida: {action}."
         if level:
             msg += f" Próxima abertura preparada em {level}."
-        msg += " O jogo não foi fechado; no PCSX2 a resolução segura entra na próxima abertura."
+        msg += " O jogo continua aberto. A resolução do PCSX2 não é regravada no meio da luta, pois isso pode causar outra travada."
         data = {"game_id": self.game_id, "console": self.console, "title": self.title,
                 **{k: round(v, 3) if isinstance(v, float) else v for k, v in stats.items()},
                 "verdict": "travando", "action": action, "next_level": level,

@@ -41,12 +41,12 @@ def test_live_stats_requires_time_and_detects_sustained_slowdown(tmp_path):
     p = tmp_path / "growing.csv"
     p.write_text(_mango_many([60.0] * 20 + [36.0] * 80))
     s = perf.live_stats(p)
-    assert s["samples"] == 80 and s["target"] == 50
+    assert s["samples"] == 48 and s["target"] == 50
     assert s["fps_avg"] == 36.0 and s["slow_share"] == 1.0
     # Queda que ainda mantém meta de 60 é travamento, e não um jogo legítimo de 30 FPS.
     p.write_text(_mango_many([60.0] * 40 + [36.0] * 40))
     s = perf.live_stats(p)
-    assert s["target"] == 60.0 and s["slow_share"] == 0.5
+    assert s["target"] == 60.0 and s["slow_share"] == 40 / 48
 
 
 def test_live_stats_ignores_csv_created_before_its_header(tmp_path):
@@ -64,10 +64,11 @@ def test_live_monitor_alerts_once_and_exposes_one_notification(tmp_path):
     (logs / "game.csv").write_text(_mango_many([60.0] * 25 + [36.0] * 75))
     calls = []
     monitor = perf.LiveMonitor(paths, "ps2-dmc3", "ps2", "Devil May Cry 3", logs, 0,
-                               on_stutter=lambda stats: calls.append(stats) or "travou em 3x: fixado em 2x")
+                               on_stutter=lambda stats: calls.append(stats) or "TDP elevado agora para 15 W")
     data = monitor.check()
-    assert data["verdict"] == "travando" and data["next_level"] == "2x" and len(calls) == 1
+    assert data["verdict"] == "travando" and data["next_level"] is None and len(calls) == 1
     assert monitor.adjusted is True
+    assert "Ação durante a partida" in data["message"] and "TDP elevado" in data["message"]
     assert monitor.check() is None
     assert "Devil May Cry 3" in perf.live_message(paths)
     assert perf.live_message(paths) is None
@@ -86,6 +87,24 @@ def test_live_monitor_keeps_the_known_target_after_a_sustained_drop(tmp_path):
     csv.write_text(_mango_many([60.0] * 80 + [42.0] * 80))
     data = monitor.check()
     assert data["target"] == 60 and data["fps_avg"] == 42 and data["verdict"] == "travando"
+
+
+def test_live_monitor_reacts_before_the_game_reaches_70_percent(tmp_path):
+    """Uma queda sustentada para 83% de 60 já aciona a correção ao vivo; não espera 70%."""
+    from types import SimpleNamespace
+    paths = SimpleNamespace(data=tmp_path / "data")
+    paths.data.mkdir()
+    logs = tmp_path / "logs"; logs.mkdir()
+    csv = logs / "game.csv"
+    calls = []
+    monitor = perf.LiveMonitor(paths, "ps2-dmc3", "ps2", "Devil May Cry 3", logs, 0,
+                               on_stutter=lambda s: calls.append(s) or "TDP já estava no máximo")
+    csv.write_text(_mango_many([60.0] * 80))
+    assert monitor.check() is None
+    csv.write_text(_mango_many([60.0] * 80 + [50.0] * 48))
+    data = monitor.check()
+    assert data and data["target"] == 60 and data["fps_avg"] == 50
+    assert len(calls) == 1
 
 
 def test_live_monitor_reports_missing_mangohud_instead_of_staying_silent(tmp_path):
@@ -147,7 +166,7 @@ def test_wrap_command_flatpak_gets_mangohud_env(tmp_path):
     assert out[:2] == ["/usr/bin/flatpak", "run"]
     assert "--env=MANGOHUD=1" in out
     cfg = next(a for a in out if a.startswith("--env=MANGOHUD_CONFIG="))
-    assert "alpha=0.0" in cfg and "autostart_log" in cfg and f"output_folder={log_dir}" in cfg
+    assert "alpha=0.0" in cfg and "autostart_log" in cfg and "log_duration=14400" in cfg and f"output_folder={log_dir}" in cfg
     assert log_dir == tmp_path / ".var/app/net.pcsx2.PCSX2/dc-perf"
     assert out[-4:] == ["net.pcsx2.PCSX2", "-fullscreen", "--", "/r/jogo.iso"]
 

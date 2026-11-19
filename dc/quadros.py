@@ -41,6 +41,21 @@ def soltar(rodar=subprocess.run, dormir=time.sleep, esperas=ESPERAS) -> int:
     return ok
 
 
+def soltar_agora(rodar=subprocess.run) -> bool:
+    """Remove o limite do Gamescope nesta partida, sem esperar e sem fechar o emulador.
+
+    O Steam pode reaplicar um perfil de FPS depois do início; o vigia de desempenho usa esta ação
+    quando detecta queda sustentada. Em emuladores, limitar a tela abaixo do ritmo nativo produz
+    câmera lenta, portanto liberar o limite é a correção segura que pode valer imediatamente.
+    """
+    try:
+        r = rodar(["gamescopectl", "debug_set_fps_limit", "0"], capture_output=True,
+                  timeout=3, check=False)
+        return r.returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
 def em_segundo_plano(paths, console: str, abrir=subprocess.Popen, ambiente=None) -> bool:
     """Chamado pelo lançador antes de abrir o emulador (o processo segue sozinho depois do exec)."""
     if not deve_soltar(paths, console, ambiente):

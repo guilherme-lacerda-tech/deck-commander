@@ -249,14 +249,25 @@ def main(argv: list[str]) -> None:
     def _trava_ao_vivo(_stats):
         if na_dock:
             return None
-        from . import autotune, perfil
-        # Ajuste que realmente vale DURANTE a sessão: energia sobe imediatamente. Resolução de emulador não é
-        # regravada em jogo porque PCSX2/Dolphin podem ignorá-la ou gerar outra travada; ela fica para o próximo boot.
+        # Correções que valem DURANTE a sessão. Não se escreve a resolução do PCSX2/Dolphin com
+        # a ROM aberta: esses emuladores podem ignorar o INI ou introduzir uma segunda travada.
+        # Também não se reduz qualidade automaticamente por uma única luta; primeiro se tira todo
+        # limitador externo e se prioriza potência, mantendo a partida viva.
+        acoes = []
         agora = tdp_ctl.priorizar_desempenho() if tdp_ctl else None
-        if not perfil.aprende(paths):
-            return agora
-        proximo = autotune.record(paths, game_id, console, "travando")
-        return " · ".join(x for x in (agora, proximo) if x) or None
+        if agora:
+            acoes.append(agora)
+        elif tdp_ctl:
+            acoes.append("TDP já estava no máximo")
+        try:
+            from . import quadros
+            if quadros.deve_soltar(paths, console) and quadros.soltar_agora():
+                acoes.append("limite de FPS do SteamOS removido agora")
+        except Exception as e:  # noqa: BLE001 - ajuste ao vivo nunca pode interferir na partida
+            say(f"limite de FPS: não confirmei o desbloqueio ({e})")
+        # Uma ação (inclusive confirmar que já estava no máximo) impede que o encerramento converta
+        # uma queda isolada em uma redução automática de resolução para a próxima sessão.
+        return " · ".join(acoes) or "medição registrada; controles de desempenho já estavam liberados"
 
     live = (perf.LiveMonitor(paths, game_id, console, title, log_dir, t0,
                              on_stutter=_trava_ao_vivo).start() if measure else None)
