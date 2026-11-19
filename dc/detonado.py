@@ -277,9 +277,15 @@ def capitulo(paths, game_id: str, n: int, traduzir: bool = True, api=_api, tradu
         salvo = json.loads(f.read_text("utf-8"))
     except (OSError, ValueError):
         salvo = None
-    if salvo is None:
+    # Uma tentativa antiga podia deixar {original: [], pt: null} quando a wiki respondeu vazia;
+    # trate isso como tentativa incompleta, não como cache válido. Assim a fila consegue reparar
+    # o DMC3 e qualquer guia que tenha sido preparado sem conteúdo por uma queda de rede.
+    if salvo is None or not salvo.get("original"):
         txt = wikitext(cap["pagina"], api) or ""
-        salvo = {"original": limpar_wikitext(txt), "pt": None}
+        original = limpar_wikitext(txt)
+        if not original:
+            return {"erro": f"não consegui baixar a parte '{cap['titulo']}' agora"}
+        salvo = {"original": original, "pt": None}
         _gravar(f, salvo)
     if traduzir and salvo.get("pt") is None and salvo["original"]:
         pt = (tradutor or _traduzir)(paths, game_id, [cap["titulo"]] + salvo["original"])
@@ -335,7 +341,11 @@ def baixar_tudo(paths, game_id: str, titulo: str, api=_api, tradutor=None, log=p
     comeco = d.get("atual", 0)  # começa pela parte em que você está, depois as seguintes
     for k in range(n):
         i = (comeco + k) % n
-        capitulo(paths, game_id, i, api=api, tradutor=tradutor)
+        parte = capitulo(paths, game_id, i, api=api, tradutor=tradutor)
+        if parte.get("erro"):
+            return f"detonado não terminou: {parte['erro']}"
+        if not parte.get("traduzido"):
+            return f"detonado não terminou: a tradução de '{parte['titulo']}' não ficou pronta"
         log(f"detonado {game_id}: {k + 1}/{n}")
         time.sleep(0.5)  # gentil com a wiki
     return f"detonado de {d['jogo']}: {n} parte(s) prontas para ler sem internet"

@@ -78,6 +78,25 @@ def test_capitulo_traduz_uma_vez_e_lembra_onde_parou(tmp_path):
     assert D.info(paths, "gba-pokemon")["atual"] == 2  # buscar de novo não perde onde você estava
 
 
+def test_empty_old_cache_is_downloaded_again_instead_of_being_called_ready(tmp_path):
+    paths = get_paths(tmp_path).ensure()
+    D.preparar(paths, "gba-pokemon", "Pokemon FireRed", api=_api)
+    vazio = paths.data / "detonado/gba-pokemon/000.json"
+    vazio.parent.mkdir(parents=True, exist_ok=True)
+    vazio.write_text('{"original": [], "pt": null}')
+    c = D.capitulo(paths, "gba-pokemon", 0, api=_api,
+                    tradutor=lambda _p, _g, textos: ["PT: " + x for x in textos])
+    assert c["traduzido"] and c["paragrafos"] and D.pronto(paths, "gba-pokemon") is False
+
+
+def test_full_download_never_reports_success_with_missing_text(tmp_path):
+    paths = get_paths(tmp_path).ensure()
+    D.preparar(paths, "gba-pokemon", "Pokemon FireRed", api=_api)
+    out = D.baixar_tudo(paths, "gba-pokemon", "Pokemon FireRed",
+                         api=lambda _p: {"parse": {"wikitext": ""}}, tradutor=lambda *_a: None)
+    assert out.startswith("detonado não terminou:") and not D.pronto(paths, "gba-pokemon")
+
+
 def test_sem_ia_fica_o_original(tmp_path):
     paths = get_paths(tmp_path).ensure()
     D.preparar(paths, "gba-pokemon", "Pokemon FireRed", api=_api)
