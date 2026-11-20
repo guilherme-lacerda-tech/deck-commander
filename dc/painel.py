@@ -1038,6 +1038,59 @@ def voltar_tempo(p: Ponte, a: dict) -> dict:
     return {"texto": continuar.voltar_no_tempo(p.paths, int(a.get("segundos") or 5))}
 
 
+def saves_copias(p: Ponte, a: dict) -> dict:
+    """As cópias de segurança que podem ser escolhidas no próprio painel do Deck."""
+    from . import copia_saves as C
+    from . import continuar
+
+    mapa = p._map()
+    raiz = p.paths.backups / "saves"
+    ids = {d.name for d in raiz.iterdir() if d.is_dir()} if raiz.exists() else set()
+    ids.update(mapa)
+    jogos = [{"gid": gid, "titulo": mapa.get(gid, {}).get("title", gid)} for gid in sorted(ids)
+             if C.copias(p.paths, gid)]
+    aberto = continuar.jogo_aberto(p.paths) or {}
+    gid = a.get("gid") or aberto.get("game_id") or (jogos[0]["gid"] if jogos else None)
+    if gid not in {j["gid"] for j in jogos}:
+        gid = jogos[0]["gid"] if jogos else None
+    copias = []
+    if gid:
+        for n, pasta in enumerate(C.copias(p.paths, gid), 1):
+            try:
+                dados = json.loads((pasta / "copia.json").read_text("utf-8"))
+                arquivos = len(dados.get("arquivos", []))
+            except (OSError, ValueError):
+                arquivos = 0
+            try:
+                quando = datetime.strptime(pasta.name[:19], "%Y-%m-%d_%H-%M-%S").replace(tzinfo=timezone.utc)
+                horario = quando.astimezone().strftime("%d/%m/%Y às %H:%M")
+            except ValueError:
+                horario = pasta.name.replace("_", " ") + " UTC"
+            copias.append({"n": n, "quando": horario, "arquivos": arquivos})
+    return {"jogos": jogos, "gid": gid, "titulo": mapa.get(gid, {}).get("title", gid) if gid else "",
+            "copias": copias, "jogo_aberto": bool(ops.game_running())}
+
+
+def saves_voltar(p: Ponte, a: dict) -> dict:
+    """Restaura uma cópia apenas com o emulador fechado, preservando o save atual antes."""
+    from . import copia_saves as C
+
+    gid = a.get("gid")
+    try:
+        n = int(a.get("n"))
+    except (TypeError, ValueError):
+        raise Erro("Escolha uma cópia válida.")
+    if ops.game_running():
+        raise Erro("Feche o jogo antes de voltar um save: com o emulador aberto ele pode gravar por cima.")
+    if not gid or gid not in {p.name for p in (p.paths.backups / "saves").glob("*") if p.is_dir()}:
+        raise Erro("Não achei as cópias desse jogo.")
+    try:
+        texto = C.voltar(p.paths, gid, n)
+    except ValueError as e:
+        raise Erro(str(e))
+    return {"texto": "✅ " + texto + ". O save que estava ativo foi guardado antes da restauração."}
+
+
 def retro_jogos(p: Ponte, a: dict) -> dict:
     from . import retro as RT
     return RT.jogos_para_o_painel()
@@ -1101,7 +1154,7 @@ ACOES = {f.__name__: f for f in (
     transferir_enviar, trazer_preparar, trazer_enviar, qualidade, qualidade_definir, controle_definir,
     downloads_limpar, traducao_limpar, desinstalar_lista, devolver, removido_perguntado, musica, musica_volume,
     musica_midia, musica_playlist, musica_salvar, musica_conectar, pc_tv, espaco_sugestoes, familia, familia_salvar,
-    familia_atualizar, familia_puxar, melhorias, melhorias_definir, contexto, retro, retro_definir, retro_jogos, perfil_definir, continuar_definir, voltar_tempo, detonado, detonado_capitulo,
+    familia_atualizar, familia_puxar, melhorias, melhorias_definir, contexto, retro, retro_definir, retro_jogos, perfil_definir, continuar_definir, voltar_tempo, saves_copias, saves_voltar, detonado, detonado_capitulo,
     emulador_definir, biblioteca_importar, atualizar, ports, ports_definir, conquistas, conquistas_salvar,
     conquistas_sair)}
 ACOES["downloads_pausar"] = lambda p, a: _pausar(p, a, True)

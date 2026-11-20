@@ -274,6 +274,26 @@ def test_quality_list_and_set(P):
     assert run(P, "qualidade")["jogos"][0]["atual"] == "padrão"
 
 
+def test_panel_lists_and_restores_one_of_five_save_copies(P, tmp_path, monkeypatch):
+    from dc import copia_saves as C
+    card = tmp_path / "memcard.mcd"; card.write_bytes(b"bom")
+    _lm(P, {"ps2-jogo": {"title": "Jogo", "console": "ps2", "rom": "/x"}})
+    listar = lambda gid: [{"origem": str(card), "destino": "{EMU}/memcard.mcd"}]  # noqa: E731
+    monkeypatch.setattr(C, "_saves", listar)
+    monkeypatch.setattr(C.voltar, "__defaults__", (1, listar))
+    C.guardar(P, "ps2-jogo", listar=listar)
+    card.write_bytes(b"ruim")
+    monkeypatch.setattr("dc.ops.game_running", lambda: False)
+    r = run(P, "saves_copias")
+    assert r["ok"] and r["gid"] == "ps2-jogo" and r["copias"][0]["n"] == 1
+    restaurado = run(P, "saves_voltar", {"gid": "ps2-jogo", "n": 1})
+    assert restaurado["ok"], restaurado
+    assert "guardado antes" in restaurado["texto"]
+    assert card.read_bytes() == b"bom"
+    monkeypatch.setattr("dc.ops.game_running", lambda: True)
+    assert not run(P, "saves_voltar", {"gid": "ps2-jogo", "n": 1})["ok"]
+
+
 def test_detonado_prepara_antes_de_exibir_e_nunca_entrega_ingles(P, monkeypatch):
     _lm(P, {"ps2-jogo": {"title": "Jogo", "console": "ps2", "rom": "/x"}})
     calls = []

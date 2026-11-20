@@ -63,6 +63,13 @@ def guardar(paths: Paths, game_id: str, manter: int = MANTER, listar=_saves) -> 
             pass
     nome = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
     dest = _pasta(paths, game_id) / nome
+    # Um "voltar" pode guardar o estado atual no mesmo segundo em que a cópia anterior foi criada.
+    # Não sobrescreva aquela pasta: mantém o horário legível e acrescenta só um sufixo se necessário.
+    serie = 2
+    while dest.exists():
+        dest = _pasta(paths, game_id) / f"{nome}-{serie}"
+        serie += 1
+    nome = dest.name
     tmp = dest.with_name(nome + ".parcial")
     shutil.rmtree(tmp, ignore_errors=True)
     for a in arqs:
@@ -89,6 +96,14 @@ def voltar(paths: Paths, game_id: str, n: int = 1, listar=_saves) -> str:
     for a in info["arquivos"]:
         Path(a["origem"]).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(escolhida / a["copia"], a["origem"])
+    # `guardar(..., MANTER + 1)` acima abre uma vaga temporária para proteger o save que estava
+    # ativo. Voltar para a cópia mais antiga não pode fazê-la ser a sexta removida por engano;
+    # conservamos a escolhida e as cópias mais novas até completar o limite normal de cinco.
+    manter = {escolhida}
+    manter.update(p for p in copias(paths, game_id) if p != escolhida and len(manter) < MANTER)
+    for antiga in copias(paths, game_id):
+        if antiga not in manter:
+            shutil.rmtree(antiga, ignore_errors=True)
     return f"{len(info['arquivos'])} arquivo(s) de save voltaram para a cópia de {escolhida.name} (UTC)"
 
 

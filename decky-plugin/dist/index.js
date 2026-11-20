@@ -453,13 +453,14 @@ function TelaInicio({ ir }) {
     const [tudo, setTudo] = SP_REACT.useState(false);
     const modo = ctx && ctx.ok ? ctx.modo : "nenhum";
     const UTEIS = { switch: ["detonado", "traducao", "qualidade", "atalhos", "musica"], retro: ["retro", "detonado", "traducao", "qualidade", "musica"],
-        emulador: ["retro", "detonado", "traducao", "qualidade", "musica"], pc: ["pc", "qualidade", "musica"] };
+        emulador: ["retro", "saves", "detonado", "traducao", "qualidade", "musica"], pc: ["pc", "qualidade", "musica"] };
     const filtro = !tudo && UTEIS[modo];
     const itens = [
         ["telegram", "💬 Telegram"], ["downloads", "⬇️ Downloads"],
         ["traducao", "🈯 Tradução" + (d && d.perguntas ? " (" + d.perguntas + " pergunta" + (d.perguntas > 1 ? "s" : "") + ")" : "")],
         ["pc", "🖥️ PC (jogar os jogos do PC)"], ["transferir", "📦 Transferir jogos (Deck ⇄ PC)"],
         ["retro", "🕹️ Retrô: botões de trás, continuar, voltar no tempo e filtros"],
+        ["saves", "💾 Rever e restaurar cópias de save"],
         ["detonado", "📖 Detonado (passo a passo em português)"],
         ["qualidade", "🎚️ Qualidade e controles"], ["desinstalar", "🗑️ Desinstalar jogos"], ["musica", "🎵 Música"],
         ["conquistas", "🏆 Conquistas (RetroAchievements)"],
@@ -1019,6 +1020,33 @@ function TelaRetro() {
             Bt(d.filtros ? "Desligar filtros" : "Ligar filtros", () => fazer("retro_definir", { filtros: !d.filtros, agora: aberto }), { disabled: ocupado }, "flt")));
 }
 
+// As cópias são feitas antes de cada sessão. Restaurar sempre salva o estado atual primeiro e
+// exige o jogo fechado: assim um toque não troca arquivos enquanto o emulador ainda os mantém em memória.
+function TelaSaves() {
+    const [d, setD] = SP_REACT.useState(null);
+    const [msg, setMsg] = SP_REACT.useState(null);
+    const [ocupado, setOcupado] = SP_REACT.useState(false);
+    const carregar = async (args) => { const r = await painel("saves_copias", args || {}); setD(r); return r; };
+    SP_REACT.useEffect(() => { carregar({}); }, []);
+    const voltar = (c) => confirmar("Voltar para esta cópia?",
+        "O save ativo será guardado antes. Depois abra o jogo de novo para carregar a cópia escolhida.", "Restaurar", async () => {
+            setOcupado(true); setMsg({ texto: "restaurando…" });
+            const r = await painel("saves_voltar", { gid: d.gid, n: c.n });
+            setOcupado(false); setMsg(r.ok ? { texto: r.texto } : { erro: r.erro });
+            await carregar({ gid: d.gid });
+        });
+    if (!d || !d.ok) return Sec("Cópias de save", Carregando(d));
+    return h("div", null,
+        Sec("Cópias automáticas", Txt("O Deck Commander guarda até 5 cópias antes de cada sessão. Escolha uma para voltar; a cópia atual é guardada antes, então nada se perde."),
+            d.jogos.length ? Lista("Jogo", d.jogos.map((j) => ({ data: j.gid, label: j.titulo })), d.gid, (gid) => carregar({ gid })) : null,
+            !d.jogos.length ? Txt("Ainda não há cópias. A primeira é criada automaticamente antes de abrir um jogo.") : null),
+        d.copias.length ? Sec("Escolha um dos " + d.copias.length + " pontos de " + d.titulo,
+            d.copias.map((c) => Bt("↩ Copia " + c.n + " — " + c.quando + " (" + c.arquivos + " arquivo" + (c.arquivos === 1 ? "" : "s") + ")",
+                () => voltar(c), { disabled: ocupado || d.jogo_aberto }, "save" + c.n)),
+            d.jogo_aberto ? Txt("Feche o jogo para restaurar: isso impede que o emulador sobrescreva a cópia.", { color: "#ffcf70" }) : null,
+            Msg(msg)) : null);
+}
+
 // ---- Detonado por capítulo (StrategyWiki, traduzido) --------------------------------------------------------------
 function TelaDetonado() {
     const [d, setD] = SP_REACT.useState(null);
@@ -1058,7 +1086,7 @@ function TelaDetonado() {
 }
 
 const TELAS = { detonado: TelaDetonado, telegram: TelaTelegram, downloads: TelaDownloads, traducao: TelaTraducao, pc: TelaPC, musica: TelaMusica, familia: TelaFamilia,
-    transferir: TelaTransferir, qualidade: TelaQualidade, desinstalar: TelaDesinstalar, atalhos: AtalhosPanel, retro: TelaRetro,
+    transferir: TelaTransferir, qualidade: TelaQualidade, desinstalar: TelaDesinstalar, atalhos: AtalhosPanel, retro: TelaRetro, saves: TelaSaves,
     conquistas: TelaConquistas };
 
 function Panel() {

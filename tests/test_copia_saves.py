@@ -43,6 +43,20 @@ def test_voltar_devolve_e_guarda_o_atual_antes(tmp_path, monkeypatch):
     assert (C.copias(paths, "sotn")[0] / "emulador/memcards/Castlevania_1.mcd").read_bytes() == b"estragado"
 
 
+def test_voltar_para_a_mais_antiga_ainda_mantem_cinco_copias(tmp_path, monkeypatch):
+    paths, card, listar = _ambiente(tmp_path, monkeypatch)
+    for i in range(5):
+        monkeypatch.setattr(C, "datetime", _Relogio(i))
+        _mexe(card, f"save {i}".encode(), 1000 + i)
+        C.guardar(paths, "sotn", listar=listar)
+    escolhida = C.copias(paths, "sotn")[-1]
+    monkeypatch.setattr(C, "datetime", _Relogio(10)); _mexe(card, b"atual", 2000)
+    C.voltar(paths, "sotn", 5, listar=listar)
+    assert card.read_bytes() == b"save 0"
+    assert len(C.copias(paths, "sotn")) == 5
+    assert escolhida in C.copias(paths, "sotn")
+
+
 def test_retroarch_grava_o_save_do_jogo_sem_esperar_fechar():
     from dc import retro_hacks as R
     assert 'autosave_interval = "10"' in R.cfg_retroarch("")
