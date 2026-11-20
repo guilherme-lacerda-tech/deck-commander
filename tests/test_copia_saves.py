@@ -62,6 +62,19 @@ def test_retroarch_grava_o_save_do_jogo_sem_esperar_fechar():
     assert 'autosave_interval = "10"' in R.cfg_retroarch("")
 
 
+def test_pcsx2_ring_keeps_only_the_five_newest_states(tmp_path):
+    import time
+    names = [tmp_path / f"SLES-54186 (CRC).{n:02d}.p2s" for n in range(1, 8)]
+    for n, p in enumerate(names):
+        p.write_bytes(str(n).encode())
+        time.sleep(0.002)
+    ponto = tmp_path / "SLES-54186 (CRC).10.p2s"; ponto.write_bytes(b"continue")
+    removidos = C.manter_pcsx2(tmp_path)
+    assert {p.name for p in removidos} == {names[0].name, names[1].name}
+    assert [p.name for p in names[2:] if p.exists()] == [p.name for p in names[2:]]
+    assert ponto.exists()
+
+
 class _Relogio:
     def __init__(self, s):
         self.s = s

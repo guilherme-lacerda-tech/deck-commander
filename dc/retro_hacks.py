@@ -206,8 +206,11 @@ def ini_duckstation(texto: str, turbo: float = 2.0) -> str:
 def ini_pcsx2(texto: str, turbo: float = 2.0) -> str:
     """Configura PCSX2.ini com teclas de trás do Steam Deck."""
     hotkeys = {
-        "SaveStateToSlot": "Keyboard/F9",
+        # O PCSX2 troca para o próximo slot depois de gravar. `copia_saves.monitorar_pcsx2`
+        # conserva apenas os cinco mais recentes, em vez de o L4 sempre destruir o mesmo ponto.
+        "SaveStateAndSelectNextSlot": "Keyboard/F9",
         "LoadStateFromSlot": "Keyboard/F10",
+        "NextSaveStateSlot": "Keyboard/F11",
         "ToggleTurbo": "Keyboard/F12"  # liga/desliga com um toque
     }
     
@@ -218,6 +221,8 @@ def ini_pcsx2(texto: str, turbo: float = 2.0) -> str:
     texto = ini_definir(texto, "Hotkeys", hotkeys)
     texto = ini_definir(texto, "Framerate", framerate)
     texto = ini_definir(texto, "EmuCore/GS", {"OsdShowMessages": "true", "OsdShowIndicators": "true", "OsdShowSpeed": "true"})  # avisos na tela
+    # F11 abre o seletor nativo com miniaturas/data; F10 carrega a escolha. Não há menu paralelo do Commander.
+    texto = ini_definir(texto, "EmuCore", {"UseSavestateSelector": "true"})
 
     manter = set(hotkeys.keys())
     for f in ("F9", "F10", "F11", "F12"):  # F9 era "renderização por software" no PCSX2

@@ -245,6 +245,18 @@ def main(argv: list[str]) -> None:
         threading.Thread(target=_pontos, daemon=True).start()
     sampler = perf.Sampler().start() if measure else None
     diagnostico = perf.DiagnosticsSampler(paths, game_id, console, title, tdp_ctl=tdp_ctl).start() if measure else None
+    historico_l4 = None
+    if console == "ps2":
+        try:
+            import threading
+            from . import copia_saves
+            parar_historico_l4 = threading.Event()
+            historico_l4 = (parar_historico_l4,
+                            threading.Thread(target=copia_saves.monitorar_pcsx2, args=(parar_historico_l4,), daemon=True))
+            historico_l4[1].start()
+            say("save states: anel de 5 pontos L4 ligado")
+        except Exception as e:  # noqa: BLE001 — o save do emulador continua funcionando mesmo sem a poda
+            say(f"save states: anel não iniciou ({e})")
     # O resumo do MangoHud só existia quando o emulador fechava. Este vigia lê o CSV já crescente
     # durante a partida e prepara, com segurança, o próximo lançamento se a queda for sustentada.
     def _trava_ao_vivo(_stats):
@@ -321,6 +333,9 @@ def main(argv: list[str]) -> None:
             say(f"emulador caiu ao abrir: código {code}")
     finally:
         (paths.state / "jogo-aberto.json").unlink(missing_ok=True)
+        if historico_l4:
+            historico_l4[0].set()
+            historico_l4[1].join(timeout=3)
         if live:
             live.stop()
         if saves_auto:

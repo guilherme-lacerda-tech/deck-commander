@@ -12,6 +12,7 @@ L4 nunca levam o progresso anterior: ele está na cópia. Só copia quando algo 
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import sys
 from datetime import datetime, timezone
@@ -20,6 +21,7 @@ from pathlib import Path
 from .paths import Paths, get_paths
 
 MANTER = 5
+_PCSX2_SLOT = re.compile(r"^(?P<nome>.+)\.(?P<slot>0[1-9])\.p2s$")
 
 
 def _pasta(paths: Paths, game_id: str) -> Path:
@@ -46,6 +48,59 @@ def copias(paths: Paths, game_id: str) -> list[Path]:
     """Cópias guardadas, a mais nova primeiro."""
     d = _pasta(paths, game_id)
     return sorted((p for p in d.iterdir() if (p / "copia.json").exists()), reverse=True) if d.exists() else []
+
+
+def manter_pcsx2(state_dir: Path, manter: int = MANTER) -> list[Path]:
+    """Mantém os ``manter`` save-states mais novos de cada jogo do PCSX2.
+
+    O próprio PCSX2 escolhe slots 1–9 em rotação. Não tocamos no slot 10, reservado pelo
+    "continuar de onde parou", nem em arquivo que não seja um state numerado de jogo.
+    Devolve apenas os arquivos descartados, o que permite testar a regra sem emulador aberto.
+    """
+    grupos: dict[str, list[Path]] = {}
+    try:
+        candidatos = list(state_dir.glob("*.p2s"))
+    except OSError:
+        return []
+    for p in candidatos:
+        m = _PCSX2_SLOT.match(p.name)
+        if m:
+            grupos.setdefault(m.group("nome"), []).append(p)
+    removidos: list[Path] = []
+    for arquivos in grupos.values():
+        try:
+            ordem = sorted(arquivos, key=lambda p: p.stat().st_mtime_ns, reverse=True)
+        except OSError:
+            continue
+        for antigo in ordem[manter:]:
+            try:
+                antigo.unlink()
+                removidos.append(antigo)
+            except OSError:
+                pass
+    return removidos
+
+
+def monitorar_pcsx2(parar, state_dir: Path | None = None, every: float = 2.0) -> None:
+    """Enquanto o jogo PS2 está aberto, poda o anel depois de uma gravação já estabilizada.
+
+    O PCSX2 grava states compactados em etapas; exigir a mesma assinatura em duas leituras
+    evita podar enquanto a gravação do L4 ainda está acontecendo.
+    """
+    state_dir = state_dir or (Path.home() / ".var/app/net.pcsx2.PCSX2/config/PCSX2/sstates")
+    anterior: dict[Path, tuple[int, int]] = {}
+    while not parar.wait(every):
+        atual: dict[Path, tuple[int, int]] = {}
+        try:
+            for p in state_dir.glob("*.p2s"):
+                if _PCSX2_SLOT.match(p.name):
+                    st = p.stat()
+                    atual[p] = (st.st_size, st.st_mtime_ns)
+        except OSError:
+            continue
+        if atual and atual == anterior:
+            manter_pcsx2(state_dir)
+        anterior = atual
 
 
 def guardar(paths: Paths, game_id: str, manter: int = MANTER, listar=_saves) -> Path | None:
