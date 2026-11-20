@@ -57,7 +57,9 @@ EMUS = {
     "duckstation": Emu("DuckStation", [H / ".local/share/duckstation/savestates",
                                        H / ".var/app/org.duckstation.DuckStation/data/duckstation/savestates"],
                        "savestate_10.sav"),
-    "pcsx2": Emu("PCSX2", [H / ".var/app/net.pcsx2.PCSX2/config/PCSX2/sstates"], "*.10.p2s"),
+    # O slot 10 também participa do histórico L4. O ponto de continuar usa-o só por instantes,
+    # copia o resultado para dc-continuar e devolve o arquivo original antes de sair.
+    "pcsx2": Emu("PCSX2", [H / ".var/app/net.pcsx2.PCSX2/config/PCSX2/sstates"], "*.10.p2s", devolver_espaco=True),
     "ppsspp": Emu("PPSSPP", [H / ".var/app/org.ppsspp.PPSSPP/config/ppsspp/PSP/PPSSPP_STATE"], "*.ppst",
                   tecla="F9", devolver_espaco=True),
     "dolphin": Emu("Dolphin", [H / ".var/app/org.DolphinEmu.dolphin-emu/data/dolphin-emu/StateSaves"], "*.s10"),

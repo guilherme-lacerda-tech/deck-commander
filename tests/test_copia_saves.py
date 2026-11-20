@@ -62,17 +62,17 @@ def test_retroarch_grava_o_save_do_jogo_sem_esperar_fechar():
     assert 'autosave_interval = "10"' in R.cfg_retroarch("")
 
 
-def test_pcsx2_ring_keeps_only_the_five_newest_states(tmp_path):
-    import time
-    names = [tmp_path / f"SLES-54186 (CRC).{n:02d}.p2s" for n in range(1, 8)]
-    for n, p in enumerate(names):
-        p.write_bytes(str(n).encode())
-        time.sleep(0.002)
-    ponto = tmp_path / "SLES-54186 (CRC).10.p2s"; ponto.write_bytes(b"continue")
-    removidos = C.manter_pcsx2(tmp_path)
-    assert {p.name for p in removidos} == {names[0].name, names[1].name}
-    assert [p.name for p in names[2:] if p.exists()] == [p.name for p in names[2:]]
-    assert ponto.exists()
+def test_pcsx2_ring_pushes_previous_save_one_position_back(tmp_path):
+    base = "SLES-54186 (CRC)"
+    for n in range(1, 11):
+        (tmp_path / f"{base}.{n:02d}.p2s").write_bytes(f"save{n}".encode())
+    backup = tmp_path / f"{base}.01.p2s.backup"; backup.write_bytes(b"old-save1")
+    assert C.girar_historico_pcsx2(backup)
+    assert (tmp_path / f"{base}.01.p2s").read_bytes() == b"save1"  # L4 novo: intocado
+    assert (tmp_path / f"{base}.02.p2s").read_bytes() == b"old-save1"
+    assert (tmp_path / f"{base}.03.p2s").read_bytes() == b"save2"
+    assert (tmp_path / f"{base}.10.p2s").read_bytes() == b"save9"
+    assert not backup.exists()
 
 
 class _Relogio:

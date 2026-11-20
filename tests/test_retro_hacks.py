@@ -108,8 +108,8 @@ def test_duckstation_e_pcsx2():
     assert d.index("SaveSelectedSaveState") < d.index("[Main]")  # entrou na seção certa
     assert R.ini_duckstation(d) == d
     p = R.ini_pcsx2("[Hotkeys]\nToggleTurbo = Keyboard/Tab\nHoldTurbo = Keyboard/Period\n\n[Pad]\nA = 1\n")
-    assert "ToggleTurbo = Keyboard/F12" in p and "SaveStateAndSelectNextSlot = Keyboard/F9" in p and "[Framerate]" in p
-    assert "NextSaveStateSlot = Keyboard/F11" in p and "UseSavestateSelector = true" in p
+    assert "ToggleTurbo = Keyboard/F12" in p and "SaveStateToSlot1 = Keyboard/F9" in p and "[Framerate]" in p
+    assert "NextSaveStateSlot = Keyboard/F11" in p and "UseSavestateSelector = true" in p and "BackupSavestate = true" in p
     assert "TurboScalar = 2.000000" in p
 
 

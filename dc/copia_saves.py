@@ -21,7 +21,8 @@ from pathlib import Path
 from .paths import Paths, get_paths
 
 MANTER = 5
-_PCSX2_SLOT = re.compile(r"^(?P<nome>.+)\.(?P<slot>0[1-9])\.p2s$")
+HISTORICO_PCSX2 = 10
+_PCSX2_BACKUP = re.compile(r"^(?P<nome>.+)\.01\.p2s\.backup$")
 
 
 def _pasta(paths: Paths, game_id: str) -> Path:
@@ -50,56 +51,58 @@ def copias(paths: Paths, game_id: str) -> list[Path]:
     return sorted((p for p in d.iterdir() if (p / "copia.json").exists()), reverse=True) if d.exists() else []
 
 
-def manter_pcsx2(state_dir: Path, manter: int = MANTER) -> list[Path]:
-    """Mantém os ``manter`` save-states mais novos de cada jogo do PCSX2.
+def girar_historico_pcsx2(backup: Path, slots: int = HISTORICO_PCSX2) -> bool:
+    """Promove o ``.01.p2s.backup`` nativo para Save2 e desloca Save2…Save10.
 
-    O próprio PCSX2 escolhe slots 1–9 em rotação. Não tocamos no slot 10, reservado pelo
-    "continuar de onde parou", nem em arquivo que não seja um state numerado de jogo.
-    Devolve apenas os arquivos descartados, o que permite testar a regra sem emulador aberto.
+    Depois de cada L4, o PCSX2 renomeia o Save1 anterior para ``.backup`` antes de
+    gravar o novo Save1. Só então deslocamos os arquivos, de trás para frente: o Save10
+    mais antigo é substituído, os demais preservam a ordem cronológica e Save1 não é tocado.
     """
-    grupos: dict[str, list[Path]] = {}
+    m = _PCSX2_BACKUP.match(backup.name)
+    if not m or slots < 2 or not backup.exists():
+        return False
+    base = m.group("nome")
+    state_dir = backup.parent
     try:
-        candidatos = list(state_dir.glob("*.p2s"))
+        for n in range(slots, 2, -1):
+            anterior = state_dir / f"{base}.{n - 1:02d}.p2s"
+            destino = state_dir / f"{base}.{n:02d}.p2s"
+            if anterior.exists():
+                anterior.replace(destino)
+        backup.replace(state_dir / f"{base}.02.p2s")
+        return True
     except OSError:
-        return []
-    for p in candidatos:
-        m = _PCSX2_SLOT.match(p.name)
-        if m:
-            grupos.setdefault(m.group("nome"), []).append(p)
-    removidos: list[Path] = []
-    for arquivos in grupos.values():
-        try:
-            ordem = sorted(arquivos, key=lambda p: p.stat().st_mtime_ns, reverse=True)
-        except OSError:
-            continue
-        for antigo in ordem[manter:]:
-            try:
-                antigo.unlink()
-                removidos.append(antigo)
-            except OSError:
-                pass
-    return removidos
+        return False
 
 
-def monitorar_pcsx2(parar, state_dir: Path | None = None, every: float = 2.0) -> None:
-    """Enquanto o jogo PS2 está aberto, poda o anel depois de uma gravação já estabilizada.
+def monitorar_pcsx2(parar, state_dir: Path | None = None, every: float = 1.0) -> None:
+    """Enquanto o jogo PS2 está aberto, transforma cada backup nativo do L4 em histórico.
 
-    O PCSX2 grava states compactados em etapas; exigir a mesma assinatura em duas leituras
-    evita podar enquanto a gravação do L4 ainda está acontecendo.
+    Exige duas leituras idênticas do ``.backup``: o PCSX2 compacta estados em segundo plano e
+    um arquivo ainda crescendo jamais pode entrar no histórico.
     """
     state_dir = state_dir or (Path.home() / ".var/app/net.pcsx2.PCSX2/config/PCSX2/sstates")
     anterior: dict[Path, tuple[int, int]] = {}
+    ja_existiam: set[tuple[Path, tuple[int, int]]] = set()
+    try:
+        for p in state_dir.glob("*.01.p2s.backup"):
+            st = p.stat()
+            ja_existiam.add((p, (st.st_size, st.st_mtime_ns)))
+    except OSError:
+        pass
     while not parar.wait(every):
         atual: dict[Path, tuple[int, int]] = {}
         try:
-            for p in state_dir.glob("*.p2s"):
-                if _PCSX2_SLOT.match(p.name):
+            for p in state_dir.glob("*.01.p2s.backup"):
+                if _PCSX2_BACKUP.match(p.name):
                     st = p.stat()
                     atual[p] = (st.st_size, st.st_mtime_ns)
         except OSError:
             continue
-        if atual and atual == anterior:
-            manter_pcsx2(state_dir)
+        for p, assinatura in atual.items():
+            if anterior.get(p) == assinatura and (p, assinatura) not in ja_existiam:
+                if girar_historico_pcsx2(p):
+                    ja_existiam.add((p, assinatura))
         anterior = atual
 
 
