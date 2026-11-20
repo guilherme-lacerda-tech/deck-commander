@@ -220,7 +220,7 @@ def test_apu_watts(tmp_path):
 
 def test_audio_xruns_reads_counters_without_audio_capture():
     from types import SimpleNamespace
-    txt = "S ID QUANT RATE WAIT BUSY W/Q B/Q ERR FORMAT NAME\nR 80 256 48000 1us 1us 0 0 7 S16LE melonDS\n"
+    txt = "S ID QUANT RATE WAIT BUSY W/Q B/Q ERR FORMAT NAME\nR 80 256 48000 1us 1us 0 0 7 S16LE 2 48000 melonDS\n"
     got = perf.audio_xruns(lambda *a, **k: SimpleNamespace(returncode=0, stdout=txt))
     assert got == {"melonDS": 7}
 

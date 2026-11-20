@@ -237,7 +237,8 @@ def audio_xruns(run=subprocess.run) -> dict[str, int] | None:
         # S ID QUANT RATE WAIT BUSY W/Q B/Q ERR FORMAT NAME — ERR é a coluna 8.
         if len(cols) < 10 or cols[0] not in ("R", "I") or not cols[8].isdigit():
             continue
-        nome = " ".join(cols[10:]) or cols[9]
+        # FORMAT ocupa três campos (ex.: S16LE 2 48000); o nome começa depois deles.
+        nome = " ".join(cols[12:]) or cols[9]
         out[nome] = int(cols[8])
     return out
 
