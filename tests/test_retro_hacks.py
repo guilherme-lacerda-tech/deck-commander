@@ -109,6 +109,7 @@ def test_duckstation_e_pcsx2():
     assert R.ini_duckstation(d) == d
     p = R.ini_pcsx2("[Hotkeys]\nToggleTurbo = Keyboard/Tab\nHoldTurbo = Keyboard/Period\n\n[Pad]\nA = 1\n")
     assert "ToggleTurbo = Keyboard/F12" in p and "SaveStateToSlot1 = Keyboard/F9" in p and "[Framerate]" in p
+    assert "LoadStateFromSlot1 = Keyboard/F10" in p and "LoadStateFromSlot = Keyboard/G" in p
     assert "NextSaveStateSlot = Keyboard/F11" in p and "UseSavestateSelector = true" in p and "BackupSavestate = true" in p
     assert "TurboScalar = 2.000000" in p
 
@@ -123,7 +124,8 @@ def test_layout_steam():
     assert not R.tem_botoes_de_tras(LAYOUT)
     r = R.layout_com_botoes_de_tras(LAYOUT)
     assert R.tem_botoes_de_tras(r)
-    assert '"key_press F9, Salvar estado"' in r and '"key_press F10, Carregar estado"' in r
+    assert '"key_press F9, Salvar estado"' in r and '"key_press F10, Voltar ao Save1"' in r
+    assert '"mode_shift button_back_right_upper 8"' in r and '"key_press G, Carregar histórico"' in r
     assert '"key_press R, Reload"' not in r  # o R4 antigo foi trocado
     assert '"xinput_button shoulder_left"' in r  # o resto ficou
     assert r.count("{") == r.count("}")

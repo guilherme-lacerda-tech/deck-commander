@@ -1,3 +1,4 @@
+import re
 
 
 def definir(texto: str, valores: dict[str, str]) -> str:
@@ -209,7 +210,11 @@ def ini_pcsx2(texto: str, turbo: float = 2.0) -> str:
         # L4 grava sempre no slot 1. O Commander vê o .backup nativo que o PCSX2 cria
         # e desloca a versão anterior para os slots 2…10: Save1 é sempre o mais novo.
         "SaveStateToSlot1": "Keyboard/F9",
-        "LoadStateFromSlot": "Keyboard/F10",
+        # R4 sozinho volta sempre ao Save1. Com L5 segurado, o Steam Input manda G,
+        # que é o "carregar o item destacado" do seletor de histórico. Usar uma tecla
+        # própria evita depender de combinação de teclas no Steam Input.
+        "LoadStateFromSlot1": "Keyboard/F10",
+        "LoadStateFromSlot": "Keyboard/G",
         "NextSaveStateSlot": "Keyboard/F11",
         "ToggleTurbo": "Keyboard/F12"  # liga/desliga com um toque
     }
@@ -245,8 +250,8 @@ def hotkeys_dolphin(texto: str | None) -> str:
 
 BOTOES_DE_TRAS = {
     "button_back_left_upper": ["key_press F9, Salvar estado"],
-    "button_back_right_upper": ["key_press F10, Carregar estado"],
-    "button_back_left": ["key_press F11, Voltar no tempo"],
+    "button_back_right_upper": ["key_press F10, Voltar ao Save1"],
+    "button_back_left": ["key_press F11, Histórico de saves"],
     "button_back_right": ["key_press F12, Turbo liga-desliga"],
 }
 
@@ -279,6 +284,41 @@ def layout_com_botoes_de_tras(texto: str) -> str:
             continue
         abre, fecha, ind = pos
         linhas[abre + 1:fecha] = [ind + '\t"binding"\t\t"' + b + '"\n' for b in binds]
+    # L5 funciona como uma tecla de modo: enquanto está segurado, R4 deixa de carregar
+    # o Save1 e passa a confirmar o item que L5 destacou no seletor do PCSX2. A tecla G
+    # é reservada só para isso; combinação Ctrl+F10 não é uma operação atômica garantida
+    # pelo formato de bindings do Steam Input.
+    marcador = '"key_press G, Carregar histórico"'
+    atual = "".join(linhas)
+    if marcador in atual:
+        deslocamento = re.search(r'"mode_shift button_back_right_upper (\d+)"', atual)
+        if deslocamento:
+            grupo = int(deslocamento.group(1))
+        else:
+            antes = atual[:atual.index(marcador)]
+            grupo = int(re.findall(r'^\s*"id"\s+"(\d+)"', antes, re.M)[-1])
+    else:
+        ids = [int(x) for x in re.findall(r'^\s*"id"\s+"(\d+)"', atual, re.M)]
+        grupo = max(ids, default=0) + 1
+        fim = max(i for i, linha in enumerate(linhas) if linha.strip() == "}")
+        bloco = [
+            '\t"group"\n', '\t{\n', f'\t\t"id"\t\t"{grupo}"\n', '\t\t"mode"\t\t"switches"\n',
+            '\t\t"inputs"\n', '\t\t{\n', '\t\t\t"button_back_right_upper"\n', '\t\t\t{\n',
+            '\t\t\t\t"activators"\n', '\t\t\t\t{\n', '\t\t\t\t\t"Full_Press"\n', '\t\t\t\t\t{\n',
+            '\t\t\t\t\t\t"bindings"\n', '\t\t\t\t\t\t{\n',
+            '\t\t\t\t\t\t\t"binding"\t\t"key_press G, Carregar histórico"\n',
+            '\t\t\t\t\t\t}\n', '\t\t\t\t\t}\n', '\t\t\t\t}\n', '\t\t\t}\n', '\t\t}\n', '\t}\n',
+        ]
+        linhas[fim:fim] = bloco
+    # Reaplicar o layout deve preservar o mode shift; o loop acima reescreve o bloco de
+    # L5, por isso esta etapa é intencionalmente executada mesmo quando o grupo já existe.
+    pos = _bloco_bindings(linhas, "button_back_left")
+    if pos is not None:
+        abre, fecha, ind = pos
+        linhas[abre + 1:fecha] = [
+            ind + '\t"binding"\t\t"key_press F11, Histórico de saves"\n',
+            ind + f'\t"binding"\t\t"mode_shift button_back_right_upper {grupo}"\n',
+        ]
     return "".join(linhas)
 
 
