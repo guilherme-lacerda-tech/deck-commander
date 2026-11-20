@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import json
 import os
+import subprocess
 import tempfile
 import threading
 import time
@@ -215,6 +216,95 @@ def apu_watts(hwmon_root: Path=Path('/sys/class/hwmon')) -> float | None:
             if power_file.exists():
                 return float(power_file.read_text().strip()) / 1e6  # µW para W
     return None
+
+
+def audio_xruns(run=subprocess.run) -> dict[str, int] | None:
+    """Lê os contadores de erro do PipeWire, sem capturar/gravar qualquer áudio.
+
+    ``pw-top`` expõe o contador cumulativo ERR de cada nó de áudio. Só fazemos uma leitura curta
+    durante uma partida, suficiente para correlacionar estalos/sumidas de som com a telemetria de
+    vídeo; conteúdo de jogo, voz e microfone nunca entram no arquivo de diagnóstico.
+    """
+    try:
+        r = run(["pw-top", "-b", "-n", "2"], capture_output=True, text=True, timeout=4)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if r.returncode not in (0, 124):
+        return None
+    out: dict[str, int] = {}
+    for ln in r.stdout.splitlines():
+        cols = ln.split()
+        # S ID QUANT RATE WAIT BUSY W/Q B/Q ERR FORMAT NAME — ERR é a coluna 8.
+        if len(cols) < 10 or cols[0] not in ("R", "I") or not cols[8].isdigit():
+            continue
+        nome = " ".join(cols[10:]) or cols[9]
+        out[nome] = int(cols[8])
+    return out
+
+
+class DiagnosticsSampler:
+    """Diário leve da sessão: sensores, energia e saúde do áudio, sem conteúdo de áudio.
+
+    A cadência de dois segundos é deliberadamente baixa para não competir com o emulador. O CSV do
+    MangoHud continua guardando FPS/frametime a cada 250 ms; este JSONL guarda o contexto do Deck.
+    """
+    def __init__(self, paths, game_id: str, console: str, title: str, tdp_ctl=None, every: float = 2.0,
+                 audio_every: float = 15.0, clock=time.monotonic):
+        self.paths, self.game_id, self.console, self.title = paths, game_id, console, title
+        self.tdp_ctl, self.every, self.audio_every, self.clock = tdp_ctl, every, audio_every, clock
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        self.path = paths.logs / "diagnosticos" / f"{game_id}-{stamp}.jsonl"
+        self._stop = threading.Event()
+        self._t = threading.Thread(target=self._run, daemon=True)
+        self._started = self.clock()
+        self._last_audio = float("-inf")
+        self._last_xruns: dict[str, int] | None = None
+
+    def _write(self, data: dict) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(data, ensure_ascii=False, separators=(",", ":")) + "\n")
+
+    def start(self):
+        self._write({"event": "inicio", "at": datetime.now(timezone.utc).isoformat(), "game_id": self.game_id,
+                     "console": self.console, "title": self.title, "audio_content_recorded": False})
+        self._t.start()
+        return self
+
+    def sample(self) -> dict:
+        agora = self.clock()
+        data: dict = {"event": "amostra", "at": datetime.now(timezone.utc).isoformat(),
+                      "seconds": round(agora - self._started, 1), "apu_watts": apu_watts(), "battery": battery()}
+        if self.tdp_ctl:
+            data["tdp_watts"] = self.tdp_ctl.ler()
+        if agora - self._last_audio >= self.audio_every:
+            self._last_audio = agora
+            xruns = audio_xruns()
+            if xruns is not None:
+                data["pipewire_err"] = xruns
+                if self._last_xruns is not None:
+                    delta = {k: v - self._last_xruns.get(k, 0) for k, v in xruns.items()
+                             if v > self._last_xruns.get(k, 0)}
+                    if delta:
+                        data["pipewire_err_new"] = delta
+                self._last_xruns = xruns
+        self._write(data)
+        return data
+
+    def _run(self) -> None:
+        while not self._stop.wait(self.every):
+            try:
+                self.sample()
+            except Exception:  # noqa: BLE001 - diagnóstico nunca pode interferir no jogo
+                pass
+
+    def stop(self) -> Path:
+        self._stop.set()
+        if self._t.is_alive():
+            self._t.join(timeout=5)
+        self._write({"event": "fim", "at": datetime.now(timezone.utc).isoformat(),
+                     "seconds": round(self.clock() - self._started, 1)})
+        return self.path
 
 
 def record_session(state_dir: Path, game_id: str, data: dict) -> None:

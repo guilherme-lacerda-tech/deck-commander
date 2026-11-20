@@ -244,6 +244,7 @@ def main(argv: list[str]) -> None:
                         say(f"continuar: {e}")
         threading.Thread(target=_pontos, daemon=True).start()
     sampler = perf.Sampler().start() if measure else None
+    diagnostico = perf.DiagnosticsSampler(paths, game_id, console, title, tdp_ctl=tdp_ctl).start() if measure else None
     # O resumo do MangoHud só existia quando o emulador fechava. Este vigia lê o CSV já crescente
     # durante a partida e prepara, com segurança, o próximo lançamento se a queda for sustentada.
     def _trava_ao_vivo(_stats):
@@ -345,6 +346,11 @@ def main(argv: list[str]) -> None:
                     say(f"auto-ajuste: {change}")
             except Exception as e:  # noqa: BLE001
                 say(f"desempenho: não registrado ({e})")
+        if diagnostico:
+            try:
+                say(f"diagnóstico da sessão: {diagnostico.stop()}")
+            except Exception as e:  # noqa: BLE001
+                say(f"diagnóstico: não finalizei ({e})")
         if tdp_ctl:
             try:
                 say(f"energia: {tdp_ctl.restaurar()}")

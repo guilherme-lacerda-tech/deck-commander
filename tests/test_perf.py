@@ -1,4 +1,6 @@
 """Medição de desempenho e bateria por jogo (dc/perf.py)."""
+import json
+
 from pathlib import Path
 
 from dc import perf
@@ -214,6 +216,31 @@ def test_apu_watts(tmp_path):
     (h / "power1_average").write_text("9500000\n")
     assert perf.apu_watts(tmp_path) == 9.5
     assert perf.apu_watts(tmp_path / "nada") is None
+
+
+def test_audio_xruns_reads_counters_without_audio_capture():
+    from types import SimpleNamespace
+    txt = "S ID QUANT RATE WAIT BUSY W/Q B/Q ERR FORMAT NAME\nR 80 256 48000 1us 1us 0 0 7 S16LE melonDS\n"
+    got = perf.audio_xruns(lambda *a, **k: SimpleNamespace(returncode=0, stdout=txt))
+    assert got == {"melonDS": 7}
+
+
+def test_diagnostics_sampler_writes_sensor_and_audio_metadata(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    paths = SimpleNamespace(logs=tmp_path / "logs")
+    ticks = [0.0]
+    monkeypatch.setattr(perf, "apu_watts", lambda: 11.5)
+    monkeypatch.setattr(perf, "battery", lambda: {"watts": 14.0, "wh_left": 30.0, "discharging": True})
+    monkeypatch.setattr(perf, "audio_xruns", lambda: {"PCSX2": 3})
+    d = perf.DiagnosticsSampler(paths, "ps2-dmc3", "ps2", "DMC3", tdp_ctl=SimpleNamespace(ler=lambda: 13),
+                                audio_every=1, clock=lambda: ticks[0])
+    d.start()
+    ticks[0] = 2
+    sample = d.sample()
+    d.stop()
+    rows = [json.loads(x) for x in d.path.read_text("utf-8").splitlines()]
+    assert sample["tdp_watts"] == 13 and sample["pipewire_err"] == {"PCSX2": 3}
+    assert rows[0]["audio_content_recorded"] is False and rows[-1]["event"] == "fim"
 
 
 def test_record_session_keeps_history(tmp_path):
