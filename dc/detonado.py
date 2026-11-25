@@ -262,7 +262,11 @@ def agendar(paths, game_id: str, titulo: str, run=subprocess.run) -> bool:
     venv = Path.home() / ".local/share/deck-commander/venv/bin/python"
     python = str(venv) if venv.exists() else sys.executable
     try:
-        r = run(["systemd-run", "--user", "--collect", f"--unit={unidade}", f"--working-directory={repo}",
+        # Tradução offline é útil, mas nunca deve disputar CPU/I/O com uma
+        # partida.  O serviço continua até terminar quando o Deck está livre,
+        # porém cede recursos imediatamente ao Steam/emulador.
+        r = run(["systemd-run", "--user", "--collect", "--property=Nice=15",
+                 "--property=IOSchedulingClass=idle", f"--unit={unidade}", f"--working-directory={repo}",
                  python, "-m", "dc.detonado", "baixar", game_id],
                 capture_output=True, text=True, timeout=10)
         return getattr(r, "returncode", 0) == 0

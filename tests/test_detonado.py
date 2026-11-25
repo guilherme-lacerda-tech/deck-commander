@@ -155,6 +155,7 @@ def test_detonado_so_fica_pronto_quando_tudo_esta_em_portugues_e_pode_ser_agenda
     assert D.agendar(paths, "gba-pokemon", "Pokemon FireRed",
                      run=lambda cmd, **kw: calls.append(cmd) or SimpleNamespace(returncode=0))
     assert calls[0][-3:] == ["dc.detonado", "baixar", "gba-pokemon"]
+    assert "--property=Nice=15" in calls[0] and "--property=IOSchedulingClass=idle" in calls[0]
     D.baixar_tudo(paths, "gba-pokemon", "Pokemon FireRed", api=_api,
                    tradutor=lambda _p, _g, textos: ["PT: " + x for x in textos], log=lambda _m: None)
     assert D.pronto(paths, "gba-pokemon")
