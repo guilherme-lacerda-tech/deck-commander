@@ -215,6 +215,9 @@ def ini_pcsx2(texto: str, turbo: float = 2.0) -> str:
         # própria evita depender de combinação de teclas no Steam Input.
         "LoadStateFromSlot1": "Keyboard/F10",
         "LoadStateFromSlot": "Keyboard/G",
+        # No histórico: cima = state anterior, baixo = state seguinte. São teclas
+        # reservadas para a camada de L5 do Steam Input, não comandos do jogo.
+        "PreviousSaveStateSlot": "Keyboard/F8",
         "NextSaveStateSlot": "Keyboard/F11",
         "ToggleTurbo": "Keyboard/F12"  # liga/desliga com um toque
     }
@@ -230,7 +233,7 @@ def ini_pcsx2(texto: str, turbo: float = 2.0) -> str:
     texto = ini_definir(texto, "EmuCore", {"UseSavestateSelector": "true", "BackupSavestate": "true"})
 
     manter = set(hotkeys.keys())
-    for f in ("F9", "F10", "F11", "F12"):  # F9 era "renderização por software" no PCSX2
+    for f in ("F8", "F9", "F10", "F11", "F12"):  # F9 era "renderização por software" no PCSX2
         texto = ini_remover_tecla(texto, "Hotkeys", "Keyboard/" + f, manter)
     
     return texto
@@ -253,6 +256,15 @@ BOTOES_DE_TRAS = {
     "button_back_right_upper": ["key_press F10, Voltar ao Save1"],
     "button_back_left": ["key_press F11, Histórico de saves"],
     "button_back_right": ["key_press F12, Turbo liga-desliga"],
+}
+
+# Enquanto L5 está pressionado, estes controles deixam de ir para o jogo e passam a
+# controlar o seletor nativo do PCSX2: setas navegam e A carrega o state destacado.
+HISTORICO_L5 = {
+    "button_back_right_upper": "key_press G, Carregar histórico",
+    "dpad_north": "key_press F8, Histórico anterior",
+    "dpad_south": "key_press F11, Histórico próximo",
+    "button_a": "key_press G, Carregar histórico",
 }
 
 
@@ -284,11 +296,10 @@ def layout_com_botoes_de_tras(texto: str) -> str:
             continue
         abre, fecha, ind = pos
         linhas[abre + 1:fecha] = [ind + '\t"binding"\t\t"' + b + '"\n' for b in binds]
-    # L5 funciona como uma tecla de modo: enquanto está segurado, R4 deixa de carregar
-    # o Save1 e passa a confirmar o item que L5 destacou no seletor do PCSX2. A tecla G
-    # é reservada só para isso; combinação Ctrl+F10 não é uma operação atômica garantida
-    # pelo formato de bindings do Steam Input.
-    marcador = '"key_press G, Carregar histórico"'
+    # L5 funciona como uma tecla de modo: enquanto está segurado, seta para cima/baixo
+    # percorre os states e A confirma o destacado. A tecla G é reservada para confirmar;
+    # combinação Ctrl+F10 não é uma operação atômica garantida pelo Steam Input.
+    marcador = '"key_press F8, Histórico anterior"'
     atual = "".join(linhas)
     if marcador in atual:
         deslocamento = re.search(r'"mode_shift button_back_right_upper (\d+)"', atual)
@@ -303,12 +314,14 @@ def layout_com_botoes_de_tras(texto: str) -> str:
         fim = max(i for i, linha in enumerate(linhas) if linha.strip() == "}")
         bloco = [
             '\t"group"\n', '\t{\n', f'\t\t"id"\t\t"{grupo}"\n', '\t\t"mode"\t\t"switches"\n',
-            '\t\t"inputs"\n', '\t\t{\n', '\t\t\t"button_back_right_upper"\n', '\t\t\t{\n',
-            '\t\t\t\t"activators"\n', '\t\t\t\t{\n', '\t\t\t\t\t"Full_Press"\n', '\t\t\t\t\t{\n',
-            '\t\t\t\t\t\t"bindings"\n', '\t\t\t\t\t\t{\n',
-            '\t\t\t\t\t\t\t"binding"\t\t"key_press G, Carregar histórico"\n',
-            '\t\t\t\t\t\t}\n', '\t\t\t\t\t}\n', '\t\t\t\t}\n', '\t\t\t}\n', '\t\t}\n', '\t}\n',
+            '\t\t"inputs"\n', '\t\t{\n',
         ]
+        for botao, bind in HISTORICO_L5.items():
+            bloco += [f'\t\t\t"{botao}"\n', '\t\t\t{\n', '\t\t\t\t"activators"\n', '\t\t\t\t{\n',
+                      '\t\t\t\t\t"Full_Press"\n', '\t\t\t\t\t{\n', '\t\t\t\t\t\t"bindings"\n',
+                      '\t\t\t\t\t\t{\n', f'\t\t\t\t\t\t\t"binding"\t\t"{bind}"\n',
+                      '\t\t\t\t\t\t}\n', '\t\t\t\t\t}\n', '\t\t\t\t}\n', '\t\t\t}\n']
+        bloco += ['\t\t}\n', '\t}\n']
         linhas[fim:fim] = bloco
     # Reaplicar o layout deve preservar o mode shift; o loop acima reescreve o bloco de
     # L5, por isso esta etapa é intencionalmente executada mesmo quando o grupo já existe.
@@ -332,4 +345,7 @@ def tem_botoes_de_tras(texto: str) -> bool:
         dentro = "".join(linhas[pos[0] + 1:pos[1]])
         if any(f'"{b}"' not in dentro for b in binds):
             return False
-    return True
+    # Versões anteriores tinham só R4 para confirmar o histórico. Exigir esta camada
+    # faz o atualizador corrigir perfis já gravados, sem alterar states.
+    return ("mode_shift button_back_right_upper" in texto
+            and all(f'"{bind}"' in texto for bind in HISTORICO_L5.values()))
