@@ -1,46 +1,34 @@
-# Estado do projeto (v0.9.0)
+# Estado verificável do projeto
 
-Validado num Steam Deck LCD (SteamOS 3.9.5). 875 testes automatizados (CI no GitHub + timer semanal no Deck) e teste de ponta a ponta no próprio aparelho (`tools/e2e_local.py`: download → biblioteca ao vivo → duplicata → remoção).
+Atualizado em 25/11/2026. Este documento separa o que foi testado em código, o que foi instalado no Deck e o que ainda precisa de uma partida real. Não use a palavra “profissional” como sinônimo de “sem pendências”: a validação em hardware continua obrigatória para recursos que dependem do Steam Input e de emuladores reais.
 
-| Módulo (spec v5.1) | Estado | Observação |
+## Funcionalidades entregues e cobertas por teste automatizado
+
+| Área | Estado | Garantia atual |
 |---|---|---|
-| M-1 Inventário | ✅ | procedência `unknown` sem chute; inclui cartão SD; BIOS detectadas por tamanho |
-| M0 Segurança | ✅ | backup verificado com fallback, quarentena, restore que fecha/reabre o Steam, safe-mode ≠ uninstall |
-| M18+M19 Operation Store | ✅ | lock com reentrância segura (validado com reboot real), aprovação 1 h, `db verify` |
-| M27 Contratos | ✅ | 21 contratos, validação no CI |
-| M1 Plugins | ✅ parcial | dono por função documentado, `plugins.lock`; instalar plugins do Decky é manual (não há CLI oficial) |
-| M2 Biblioteca | ✅ | lançador fixo + mapa, plugin ao vivo, autocorreção que respeita remoção, coleções/abas por console e por loja, capas, duplicatas (antes de baixar, no /sync e /duplicados + /remover) |
-| M3 Qualidade | ✅ parcial | 10 consoles; perfis com read-back; respeita ajuste manual; **resolução por jogo** (/qualidade); verificação de controles. Shader/aspect ratio por emulador e mapeamento automático do Dolphin ainda não |
-| M4 Telegram/torrent | ✅ | console por texto, .torrent/magnet, /sync automático com nova tentativa, .zip/.7z/.rar seguros, multidisco, energia com histerese |
-| M5 Traduções | ✅ parcial | IPS/BPS/UPS/XDelta nativos (XDelta em pedaços, soma por pedaço); disco de outra versão com receita (God of War PSP); instaladores .exe recusados |
-| M6 Saves | ✅ | 4 tipos, backup diário, import que nunca sobrescreve em conflito |
-| M7 Disco | ✅ | top 10 + sugestões (nunca apaga) |
-| M20/M21 | ✅ | sensores com estado próprio; diagnóstico auto/ask/alert com limite de 3 tentativas |
-| M10 Status/testes | ✅ parcial | /status, painel local, testes semanais + relatório HTML. E2E no aparelho (`tools/e2e_local.py`). Benchmark (exige MangoHud e cenário fixo): pendente |
-| M11/M12/M15/M16/M17 | ✅ | versão, updates (só avisa), instalador por módulo, uninstall com confirmação, recuperação, export sem segredos |
-| A2 Tradução Switch (IA) | ✅ | mod LayeredFS + extração automática (NSP/NCA/esparso/BKTR em Python puro) + PT-BR oficial por jogo; validado nos 9 jogos de teste; nenhum dos 9 tinha MSBT traduzível (3 têm PT-BR oficial, 2 formato fechado, 4 são GBA) |
-| A1 Tradução retrô (IA) | ✅ | RomTranslate Studio (PS1/PS2/PSP/GBA/SNES/NES/N64/GC/DS) + Meowth (Pokémon GBA); FireRed traduzido de ponta a ponta; filtro rígido de frase (testado com lixo real do Hercules); automático ao baixar |
-| A3 Conversão Switch | ✅ parcial | diagnóstico/organizar validados na biblioteca real; descompactar depende do nsz |
-| M8 Proton Pulse | ⛔ | plugin opcional não instalado no Deck de teste |
-| M9 Fork do Panel | ⛔ | depende do repositório oficial do Panel de Control |
+| Biblioteca e atalhos | Coberta | O índice reconcilia metadados sem tocar ROMs, saves ou atalhos que não pertencem ao Deck Commander. Impede importação em massa do EmuDeck/RetroDECK, incluindo Wii. |
+| Atualizações | Coberta | Consulta GitHub e tem fallback por `git ls-remote`; portanto encontra nova versão fora da mesma rede Wi-Fi. Instalação mantém backup, testes e rollback; não atualiza silenciosamente no meio de uma partida. |
+| Save states PCSX2 | Coberta estruturalmente | L4 mantém uma janela rotativa de dez estados anteriores; R4 carrega Save1; L5 abre seleção com D-pad e A. A rotação espera o arquivo terminar de ser escrito para reduzir disputa de I/O. Nunca altera saves normais/ROMs. |
+| Desempenho | Coberta em lógica | MangoHud detecta lentidão sustentada e aumenta TDP/solta o limite de FPS durante o jogo; perfis preservam resolução por jogo e aprendem piso de TDP estável. A política é imagem primeiro, fluidez em seguida e bateria apenas para não desperdiçar. |
+| Detonados | Coberta | Baixa previamente, traduz com a IA local configurada e só mostra conteúdo PT-BR offline. DMC3 usa Devil May Cry Wiki (CC BY-SA), pois o índice da StrategyWiki listava páginas não publicadas; as 20 missões foram verificadas na fonte. |
+| RetroArch cheats | Base corrigida | O caminho agora aponta para o banco oficial de 28 mil cheats dentro do Flatpak. A ativação de cheats pelo painel ainda não existe. |
+| RetroAchievements | Integração pronta, sem conta | O painel detecta a integração, mas depende de usuário e API key do dono; credenciais não são inventadas nem gravadas fora do cofre local. |
 
-## Limitações conhecidas
-- **Primeira instalação** do plugin e do TabMaster exige um reinício (o Decky só carrega plugins ao ligar).
-  Depois disso, jogos novos aparecem sem reiniciar.
-- **Switch 2** é experimental (Lichii, dumps extraídos `base/exefs/main`); o download automático de Switch 2 não é organizado sozinho.
-- **Unifideck** grava `shortcuts.vdf` diretamente; se ele regravar o arquivo enquanto o Steam tiver
-  atalhos ainda não salvos, a autocorreção do plugin recria os do Deck Commander.
-- Testado só no modelo LCD. O OLED usa a mesma lógica de energia (por tipo, não por nome), mas não foi validado em hardware.
-- **Deck dormindo não faz nada**: com a tela apagada (suspenso) não baixa nem responde ao bot. O Telegram guarda as
-  mensagens por até 24 h e o bot responde quando o Deck acorda.
-- **Dolphin (GameCube/Wii)**: o mapeamento automático usa nomes de botão conferidos no binário do Dolphin 2609 e o
-  nome do controle visto no Deck ("Steam Virtual Gamepad"), mas ainda não foi jogado. O original fica em `*.dc-orig`.
-- **Sem o Decky** (ex.: removido por um update do SteamOS) os jogos novos entram pelo caminho antigo
-  (`shortcuts.vdf` + `/reiniciar`), que não foi revalidado na v0.4.
-- As coleções guardam referências a atalhos já removidos (o Steam as ignora; não aparecem nas abas).
+## Auditoria de instalação atual
 
-## Próximos passos sugeridos
-1. Benchmark reproduzível com MangoHud (M10.2) e E2E com jogos homebrew (M10.4).
-2. Deck OLED (tela de 90 Hz): ajuste para jogos de 60 quadros — precisa de um OLED para testar.
-3. Trapaças (`dc/cheats.py`): começado, ainda não ligado no painel.
-4. Aplicar patch XDelta (hoje IPS/BPS/UPS; as traduções do Deck Commander já saem em BPS).
+- Serviços `deck-commander-bot` e `deck-commander-power`: ativos na última verificação.
+- Banco de biblioteca: reconciliado com segurança; a auditoria ficou em **9/10**. O ponto restante é a confirmação uma vez nos próprios emuladores Azahar (3DS), Cemu (Wii U) e RPCS3 (PS3). Não é seguro criar configurações desses emuladores por chute, pois isso pode fazê-los abrir como primeira execução.
+- Estados do PCSX2: hash conferido antes/depois das implantações; nenhuma state foi apagada, renomeada ou restaurada durante a auditoria.
+- Código: suíte completa de testes deve ser executada antes de cada implantação. O linter possui apontamentos históricos e ainda não é um selo de limpeza total.
+
+## Limitações honestas que ainda faltam validar
+
+1. Uma partida real do DMC3, incluindo save state sob carga, para medir FPS, TDP, temperatura e travadas. Testes de lógica não substituem isso.
+2. Steam Input físico para confirmar L4/R4/L5 no perfil atualmente carregado.
+3. Primeira instalação completa dentro de uma VM com SteamOS/Game Mode. O host Windows não dispõe de Hyper-V habilitado/elevado nem de uma imagem SteamOS; WSL não testa Game Mode.
+4. Ativação de cheats RetroArch pela interface e vinculação do RetroAchievements após as credenciais do proprietário serem cadastradas.
+5. Teste de uma biblioteca Wii real, com EmuDeck já configurado, para comprovar visualmente que não há poluição por centenas de ROMs.
+
+## Critério de aceite recomendado
+
+Considere o conjunto pronto para uso cotidiano quando os itens 1, 2 e 5 acima forem aprovados no Deck real. Considere-o pronto para distribuição a terceiros somente depois de também concluir o item 3 e validar os emuladores que a instalação deles utiliza.

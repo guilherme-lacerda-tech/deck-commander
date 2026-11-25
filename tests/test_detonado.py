@@ -114,6 +114,21 @@ def test_pagina_ausente_na_fonte_nao_inutiliza_as_outras_partes(tmp_path):
     assert D.titulos(paths, "gba-pokemon")[1] == "Indisponível na fonte"
 
 
+def test_dmc3_troca_o_indice_quebrado_por_fonte_com_as_20_missoes(tmp_path):
+    """A StrategyWiki listava M01..M20 sem publicar as páginas; não reutilize esse cache."""
+    paths = get_paths(tmp_path).ensure()
+    pasta = paths.data / "detonado/ps2-dmc3"
+    pasta.mkdir(parents=True)
+    (pasta / "indice.json").write_text('{"jogo":"DMC3 antigo","capitulos":[{}]}', "utf-8")
+    (pasta / "000.json").write_text('{"original":["texto velho"],"pt":["velho"]}', "utf-8")
+    d = D.preparar(paths, "ps2-dmc3", "Devil May Cry 3 (PS2)")
+    assert d["fonte_nome"] == "Devil May Cry Wiki"
+    assert d["licenca"] == "CC BY-SA" and d["api"] == D.FANDOM_API
+    assert len(d["capitulos"]) == 20 and d["capitulos"][6]["pagina"].endswith("/M07")
+    assert not (pasta / "000.json").exists()  # não mistura capítulos de fontes diferentes
+    assert not D.precisa_migrar(d, "Devil May Cry 3")
+
+
 def test_sem_ia_fica_o_original(tmp_path):
     paths = get_paths(tmp_path).ensure()
     D.preparar(paths, "gba-pokemon", "Pokemon FireRed", api=_api)

@@ -27,13 +27,58 @@ API = "https://strategywiki.org/w/api.php"
 SITE = "https://strategywiki.org/wiki/"
 UA = "DeckCommander/0.9 (detonado offline; https://github.com/guilherme-lacerda-tech/deck-commander)"
 
+# A StrategyWiki tem uma tabela de conteúdo do DMC3, mas praticamente todas as
+# subpáginas daquela tabela foram apagadas.  O Devil May Cry Wiki mantém as 20
+# missões, também sob CC BY-SA.  Isto é uma troca de fonte explícita e
+# atribuída, não uma tentativa de adivinhar/inventar instruções ausentes.
+FANDOM_API = "https://devilmaycry.fandom.com/api.php"
+FANDOM_SITE = "https://devilmaycry.fandom.com/wiki/"
+DMC3_WIKI = "Devil May Cry 3: Dante's Awakening walkthrough"
+
 
 # ------------------------------------------------------------------------------------------------ wiki
 def _api(params: dict, timeout: float = 20) -> dict:
-    url = API + "?" + urllib.parse.urlencode(params | {"format": "json", "formatversion": "2"})
+    return _api_url(API, params, timeout)
+
+
+def _api_url(base: str, params: dict, timeout: float = 20) -> dict:
+    url = base + "?" + urllib.parse.urlencode(params | {"format": "json", "formatversion": "2"})
     req = urllib.request.Request(url, headers={"User-Agent": UA})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         return json.load(r)
+
+
+def _api_da_fonte(dados: dict):
+    """Cliente da fonte guardada no índice (o cache continua legível offline)."""
+    base = dados.get("api")
+    if not base:
+        return _api
+    return lambda params: _api_url(base, params)
+
+
+def fonte_especial(titulo: str) -> dict | None:
+    """Fonte alternativa só quando há cobertura comprovadamente melhor para o jogo."""
+    nome = _sem_marcas(titulo).casefold()
+    if "devil may cry 3" not in nome:
+        return None
+    return {
+        "jogo": DMC3_WIKI,
+        "fonte": FANDOM_SITE + urllib.parse.quote(DMC3_WIKI.replace(" ", "_")),
+        "fonte_nome": "Devil May Cry Wiki",
+        "licenca": "CC BY-SA",
+        "api": FANDOM_API,
+        "site": FANDOM_SITE,
+        "capitulos": [
+            {"grupo": "Missões", "titulo": f"Missão {i:02d}",
+             "pagina": f"{DMC3_WIKI}/M{i:02d}"} for i in range(1, 21)
+        ],
+    }
+
+
+def precisa_migrar(dados: dict, titulo: str) -> bool:
+    """Evita manter o índice quebrado quando uma fonte alternativa conhecida existe."""
+    especial = fonte_especial(titulo)
+    return bool(especial and dados and dados.get("api") != especial["api"])
 
 
 def wikitext(pagina: str, api=_api) -> str | None:
@@ -274,13 +319,28 @@ def _gravar(f: Path, dados) -> None:
 
 def preparar(paths, game_id: str, titulo: str, jogo: str | None = None, api=_api) -> dict:
     """Acha o jogo na wiki e guarda o índice. `jogo` = nome exato na StrategyWiki (quando a busca não acha)."""
+    especial = fonte_especial(titulo)
+    if especial:
+        anterior = info(paths, game_id)
+        # Só arquivos de cache do próprio detonado são removidos; ROMs, saves e
+        # configurações do emulador não ficam sequer sob esta pasta. Sem isso,
+        # uma tradução velha de uma página StrategyWiki poderia ser mostrada
+        # como se viesse da nova fonte.
+        if anterior and anterior.get("api") != especial["api"]:
+            for antigo in _pasta(paths, game_id).glob("[0-9][0-9][0-9].json"):
+                antigo.unlink(missing_ok=True)
+        dados = especial | {"atual": anterior.get("atual", 0)}
+        _gravar(_pasta(paths, game_id) / "indice.json", dados)
+        return dados
     jogo = jogo or achar_jogo(titulo, api)
     if not jogo:
         return {"erro": f"Não achei o detonado de \"{_sem_marcas(titulo)}\" na StrategyWiki."}
     caps = indice(jogo, api)
     if not caps:
         return {"erro": f"A StrategyWiki tem \"{jogo}\", mas sem detonado por partes."}
-    dados = {"jogo": jogo, "fonte": SITE + urllib.parse.quote(jogo.replace(" ", "_")), "capitulos": caps,
+    dados = {"jogo": jogo, "fonte": SITE + urllib.parse.quote(jogo.replace(" ", "_")),
+             "fonte_nome": "StrategyWiki", "licenca": "CC BY-SA", "site": SITE,
+             "capitulos": caps,
              "atual": info(paths, game_id).get("atual", 0)}
     _gravar(_pasta(paths, game_id) / "indice.json", dados)
     return dados
@@ -298,6 +358,8 @@ def capitulo(paths, game_id: str, n: int, traduzir: bool = True, api=_api, tradu
     d = info(paths, game_id)
     if not d or not 0 <= n < len(d["capitulos"]):
         return {"erro": "capítulo não existe"}
+    if api is _api:
+        api = _api_da_fonte(d)
     cap = d["capitulos"][n]
     f = _pasta(paths, game_id) / f"{n:03d}.json"
     try:
@@ -329,7 +391,7 @@ def capitulo(paths, game_id: str, n: int, traduzir: bool = True, api=_api, tradu
             _gravar(f, salvo)
     return {"titulo": salvo.get("titulo_pt") or cap["titulo"], "grupo": cap["grupo"],
             "paragrafos": salvo.get("pt") or salvo["original"], "traduzido": salvo.get("pt") is not None,
-            "fonte": SITE + urllib.parse.quote(cap["pagina"].replace(" ", "_"))}
+            "fonte": d.get("site", SITE) + urllib.parse.quote(cap["pagina"].replace(" ", "_"))}
 
 
 def titulos(paths, game_id: str) -> list[str]:
@@ -374,6 +436,8 @@ def herdar(paths, de: str, para: str) -> bool:
 
 def baixar_tudo(paths, game_id: str, titulo: str, api=_api, tradutor=None, log=print) -> str:
     d = info(paths, game_id) or preparar(paths, game_id, titulo, api=api)
+    if precisa_migrar(d, titulo):
+        d = preparar(paths, game_id, titulo, api=api)
     if d.get("erro"):
         _status(paths, game_id, d["erro"])
         return d["erro"]

@@ -975,6 +975,10 @@ def detonado(p: Ponte, a: dict) -> dict:
     if not gid:
         return {"jogos": jogos, "gid": None}
     d = D.info(p.paths, gid)
+    # Corrige no primeiro acesso os caches DMC3 criados antes da fonte
+    # alternativa; a migração só toca o cache do detonado.
+    if d and D.precisa_migrar(d, mapa.get(gid, {}).get("title", gid)):
+        d = D.preparar(p.paths, gid, mapa.get(gid, {}).get("title", gid))
     falha = D.erro(p.paths, gid)
     if falha and not a.get("nome"):
         return {"jogos": jogos, "gid": gid, "erro": falha + " Você pode informar o nome exato do jogo na StrategyWiki para tentar outra fonte."}
@@ -995,7 +999,9 @@ def detonado(p: Ponte, a: dict) -> dict:
     nomes = D.titulos(p.paths, gid)
     indisponiveis = sum(1 for i in range(len(d["capitulos"]))
                          if D.capitulo(p.paths, gid, i, traduzir=False).get("indisponivel")) if not preparando else 0
-    return {"jogos": jogos, "gid": gid, "jogo": d["jogo"], "fonte": d["fonte"], "atual": d.get("atual", 0),
+    return {"jogos": jogos, "gid": gid, "jogo": d["jogo"], "fonte": d["fonte"],
+            "fonte_nome": d.get("fonte_nome", "StrategyWiki"), "licenca": d.get("licenca", "CC BY-SA"),
+            "atual": d.get("atual", 0),
             "preparando": preparando, "indisponiveis": indisponiveis,
             "capitulos": [{"n": i, "label": (c["grupo"] + " · " if c["grupo"] != "Detonado" else "") + nomes[i]}
                           for i, c in enumerate(d["capitulos"])]}

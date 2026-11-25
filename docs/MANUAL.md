@@ -193,10 +193,12 @@ total) e quais você já **masterizou** (todas as conquistas no hardcore — o "
   Configurações → Conquistas; DuckStation, PCSX2, PPSSPP e Dolphin → Configurações → Conquistas (Achievements).
 
 ### Detonado (passo a passo em português)
-Painel → **Detonado**. Com um jogo aberto, ele já vem escolhido. O detonado vem da StrategyWiki, separado em partes
+Painel → **Detonado**. Com um jogo aberto, ele já vem escolhido. O detonado vem de uma wiki licenciada, separado em partes
 na ordem do jogo — no Pokémon por insígnia (ginásio), no God of War por capítulo, no Shadow of the Colossus por
-colosso. Escolha a parte em que você está; o painel lembra. A primeira vez mostra o texto original e traduz em segundo
-plano; depois fica em português e funciona sem internet. Se o jogo não for achado, digite o nome dele na StrategyWiki.
+colosso. Escolha a parte em que você está; o painel lembra. Na primeira vez ele prepara e traduz tudo em segundo
+plano; só libera a leitura depois de ficar em português e funcionar sem internet. O painel informa a fonte e a
+licença. Para DMC3 a fonte é Devil May Cry Wiki (CC BY-SA), pois a StrategyWiki listava missões sem páginas publicadas.
+Se o jogo não for achado, informe o nome exato que aparece na fonte indicada pelo painel.
 
 ## 8. Qualidade e controles
 - Jogo pesado ou com gráfico estranho: `/qualidade <jogo> nativo|2x|3x|padrão` muda só ele. As exceções aparecem em

@@ -1047,7 +1047,7 @@ function TelaSaves() {
             Msg(msg)) : null);
 }
 
-// ---- Detonado por capítulo (StrategyWiki, traduzido) --------------------------------------------------------------
+// ---- Detonado por capítulo (fonte licenciada, traduzido) ----------------------------------------------------------
 function TelaDetonado() {
     const [d, setD] = SP_REACT.useState(null);
     const [cap, setCap] = SP_REACT.useState(null);
@@ -1073,7 +1073,7 @@ function TelaDetonado() {
             d.preparando ? Txt("⏳ Preparando o detonado completo em português para funcionar sem internet. A tela atualiza sozinha.") : null,
             d.indisponiveis ? Txt("⚠️ " + d.indisponiveis + " parte(s) não foram publicadas pela fonte; as demais estão prontas offline em português.") : null,
             d.erro ? Txt("⚠️ " + d.erro) : null,
-            d.erro ? Campo("Nome do jogo na StrategyWiki", nome, setNome) : null,
+            d.erro ? Campo("Nome exato do jogo na fonte", nome, setNome) : null,
             d.erro ? Bt("Procurar com esse nome", () => carregar({ gid: d.gid, nome }), { disabled: !nome }, "nm") : null),
         total ? Sec("Onde você está", Lista("Parte", d.capitulos.map((c) => ({ data: c.n, label: (c.n + 1) + ". " + c.label })),
             cap ? cap.n : d.atual, (n) => abrir(d.gid, n))) : null,
@@ -1083,7 +1083,7 @@ function TelaDetonado() {
             (cap.paragrafos || []).map((t, i) => Txt(t, null, "p" + i)),
             Bt("◀ Parte anterior", () => abrir(d.gid, Math.max(0, cap.n - 1)), { disabled: cap.n === 0 }, "ant"),
             Bt("Próxima parte ▶", () => abrir(d.gid, Math.min(total - 1, cap.n + 1)), { disabled: cap.n >= total - 1 }, "prox"),
-            Txt("Fonte: StrategyWiki (" + d.jogo + "), licença CC BY-SA — traduzido pela IA do Deck Commander.", { opacity: 0.6 }, "fonte")) : null);
+            Txt("Fonte: " + (d.fonte_nome || "StrategyWiki") + " (" + d.jogo + "), licença " + (d.licenca || "CC BY-SA") + " — traduzido pela IA do Deck Commander.", { opacity: 0.6 }, "fonte")) : null);
 }
 
 const TELAS = { detonado: TelaDetonado, telegram: TelaTelegram, downloads: TelaDownloads, traducao: TelaTraducao, pc: TelaPC, musica: TelaMusica, familia: TelaFamilia,
