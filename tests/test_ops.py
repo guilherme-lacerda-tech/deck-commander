@@ -134,3 +134,22 @@ def test_index_and_verify(env, tmp_path):
                         [{"appid": 222, "AppName": "Novo", "exe": '"/x/dc-launch"'}])
     assert rep["missing"] == [str(b)] and rep["modified"] == [str(a)] and rep["untracked"] == [str(c)]
     assert rep["shortcut_untracked"] == ["Novo"] and rep["shortcut_missing"] == ["111"]
+
+
+def test_reconcile_db_corrige_so_o_indice(env, tmp_path):
+    """Reparo da auditoria não pode apagar/mover arquivo nem tocar atalho do Steam."""
+    paths, *_ = env
+    s = Store(paths.db)
+    a = tmp_path / "a.iso"; a.write_bytes(b"a")
+    b = tmp_path / "b.iso"; b.write_bytes(b"b")
+    games = [Game("ps2-a", "A", "ps2", str(a)), Game("ps2-b", "B", "ps2", str(b))]
+    ops.index_files(s, games)
+    b.unlink(); a.write_bytes(b"alterado")
+    c = tmp_path / "c.iso"; c.write_bytes(b"c")
+    with s.tx() as cx:
+        cx.execute("INSERT INTO provenance VALUES('111','dc','x','op')")
+    shortcuts = [{"appid": 222, "AppName": "Novo", "exe": '"/x/dc-launch"'}]
+    feito = ops.reconcile_db(s, [Game("ps2-a", "A", "ps2", str(a)), Game("ps2-c", "C", "ps2", str(c))], shortcuts)
+    assert feito == {"missing": 1, "modified": 1, "indexed": 1, "provenance_added": 1, "provenance_removed": 1}
+    assert a.read_bytes() == b"alterado" and c.read_bytes() == b"c"  # dados ficam intocados
+    assert all(not v for v in ops.db_verify(s, [Game("ps2-a", "A", "ps2", str(a)), Game("ps2-c", "C", "ps2", str(c))], shortcuts).values())

@@ -304,7 +304,8 @@ def diagnose(paths: Paths, store: Store, repair: bool = False) -> list[Finding]:
         shortcuts = []
     rep = ops.db_verify(store, games, shortcuts)
     div = {k: len(v) for k, v in rep.items() if v}
-    f.append(Finding("db", "ask", not div, json.dumps(div) if div else "ok", "python3 -m dc x db index (usuário decide)" if div else ""))
+    f.append(Finding("db", "ask", not div, json.dumps(div) if div else "ok",
+                     "python3 -m dc x db repair (só reconstrói o índice; não altera jogos)" if div else ""))
     f.append(Finding("steam-sem-db", "ask", not rep["shortcut_untracked"],
                      f"{rep['shortcut_untracked'][:5]}" if rep["shortcut_untracked"] else "ok"))
     # 11 controles sem mapeamento / 12 jogos duplicados

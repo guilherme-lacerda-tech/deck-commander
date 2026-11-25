@@ -30,7 +30,7 @@ def test_missing_rom_still_flagged(tmp_path, monkeypatch):
 
 def test_db_hint_is_a_real_command():
     src = open(health.__file__, encoding="utf-8").read()
-    assert "python3 -m dc x db index" in src and '"dc db index' not in src
+    assert "python3 -m dc x db repair" in src and '"dc db repair' not in src
 
 
 def test_diagnose_without_steam_login_does_not_crash(tmp_path, monkeypatch):

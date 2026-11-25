@@ -182,6 +182,45 @@ def db_verify(store: Store, games, shortcuts: list[dict]) -> dict:
     return rep
 
 
+def reconcile_db(store: Store, games, shortcuts: list[dict]) -> dict[str, int]:
+    """Reconstrói apenas metadados derivados do índice; nunca altera ROM, save ou atalho.
+
+    ``files`` é uma fotografia do disco. Arquivos que sumiram deixam somente uma linha obsoleta no
+    SQLite, e arquivos modificados precisam ter tamanho/data atualizados. A proveniência de atalhos
+    do próprio Deck Commander também pode ser reconstituída do ``shortcuts.vdf``; registros manuais
+    ou de outros importadores são preservados.
+    """
+    rep = db_verify(store, games, shortcuts)
+    dc_shortcuts = {str((s.get("appid") or 0) & 0xFFFFFFFF)
+                    for s in shortcuts if "dc-launch" in (s.get("exe") or "")}
+    changed = {"missing": 0, "modified": 0, "indexed": 0, "provenance_added": 0, "provenance_removed": 0}
+    with store.tx() as c:
+        for path in rep["missing"]:
+            changed["missing"] += c.execute("DELETE FROM files WHERE path=?", (path,)).rowcount
+        for path in rep["modified"]:
+            st = os.stat(path)
+            changed["modified"] += c.execute("UPDATE files SET size=?, mtime=? WHERE path=?",
+                                              (st.st_size, st.st_mtime, path)).rowcount
+        for game in games:
+            c.execute("INSERT OR IGNORE INTO games(id,title,console,created_at) VALUES(?,?,?,?)",
+                      (game.game_id, game.title, game.console, _now()))
+            st = os.stat(game.path)
+            cur = c.execute("INSERT OR IGNORE INTO files(game_id,path,size,mtime,origin,origin_note)"
+                            " VALUES(?,?,?,?,?,?)",
+                            (game.game_id, game.path, st.st_size, st.st_mtime, "unknown",
+                             "já existia antes do Deck Commander"))
+            changed["indexed"] += cur.rowcount
+        known_dc = {r[0] for r in c.execute("SELECT appid FROM provenance WHERE source='dc'")}
+        for appid in dc_shortcuts - known_dc:
+            changed["provenance_added"] += c.execute(
+                "INSERT OR IGNORE INTO provenance(appid,source,created_at,operation_id) VALUES(?,?,?,?)",
+                (appid, "dc", _now(), "audit-repair")).rowcount
+        for appid in known_dc - dc_shortcuts:
+            changed["provenance_removed"] += c.execute(
+                "DELETE FROM provenance WHERE appid=? AND source='dc'", (appid,)).rowcount
+    return changed
+
+
 # ---------------------------------------------------------------- M15 uninstall
 def uninstall(paths: Paths, code_dir: Path, purge: bool, purge_backups: bool, confirm: str = "",
               home: Path | None = None, esperar_plugin: float = 40, steam=None) -> list[str]:

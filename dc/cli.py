@@ -110,6 +110,9 @@ def _extra(paths, args) -> int:
         s = _store(paths); games, _ = library.scan(syncer.rom_roots())
         if r and r[0] == "index":
             print("registrados:", ops.index_files(s, games))
+        elif r and r[0] == "repair":
+            print(json.dumps(ops.reconcile_db(s, games, vdf.read_shortcuts(syncer.shortcuts_path())),
+                             ensure_ascii=False, sort_keys=True))
         else:
             print(json.dumps(ops.db_verify(s, games, vdf.read_shortcuts(syncer.shortcuts_path())), indent=1, ensure_ascii=False))
     elif c == "saves":
