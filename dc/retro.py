@@ -18,6 +18,12 @@ from . import retro_hacks as R
 from . import vdf
 
 RA = ".var/app/org.libretro.RetroArch/config/retroarch"
+# O RetroArch instalado pelo Flathub já traz a base oficial libretro de cheats dentro
+# do sandbox.  Usar este caminho interno é importante: apontar para uma pasta vazia
+# no $HOME fazia o menu de cheats parecer instalado, mas sem nenhum código disponível.
+# Não copiamos a base para fora do Flatpak: ela continua atualizada junto do app e
+# funciona sem internet.
+RA_CHEATS_OFICIAIS = "/app/share/libretro/database/cht"
 ARQUIVOS = {
     "RetroArch": RA + "/retroarch.cfg",
     "DuckStation": ".local/share/duckstation/settings.ini",
@@ -51,9 +57,7 @@ def emuladores(home: Path, turbo: float = 2.0, filtros: bool = True) -> list[str
     ra = home / ARQUIVOS["RetroArch"]
     if ra.exists():
         txt = R.cfg_retroarch(ra.read_text("utf-8", "replace"), turbo)
-        cheats = home / RA / "cheats"
-        cheats.mkdir(parents=True, exist_ok=True)
-        txt = R.definir(txt, {"cheat_database_path": str(cheats), "video_shader_enable": "true" if filtros else "false",
+        txt = R.definir(txt, {"cheat_database_path": RA_CHEATS_OFICIAIS, "video_shader_enable": "true" if filtros else "false",
                               "auto_shaders_enable": "true"})
         if _gravar(ra, txt):
             feitos.append("RetroArch")

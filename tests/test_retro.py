@@ -37,6 +37,7 @@ def test_aplicar_e_desfazer(tmp_path):
     assert "em 1 jogo" in msg and "RetroArch" in msg and "DuckStation" in msg and "Dolphin" in msg
     ra = (h / retro.ARQUIVOS["RetroArch"]).read_text()
     assert 'input_save_state = "f9"' in ra and 'video_shader_enable = "true"' in ra
+    assert f'cheat_database_path = "{retro.RA_CHEATS_OFICIAIS}"' in ra
     assert (h / retro.RA / "config/Snes9x/Snes9x.slangp").exists()
     assert 'run_ahead_enabled = "false"' in (h / retro.RA / "config/Mupen64Plus-Next/Mupen64Plus-Next.cfg").read_text()
     lay = (base / "castlevania sotn/controller_neptune.vdf").read_text()
