@@ -284,6 +284,19 @@ def test_finish_session_records_and_flags_for_bot(tmp_path):
     assert "não registrada" in perf.finish_session(paths, "g", "ps2", "t", logs, time.time() - 5, s2)
 
 
+def test_finish_session_descarta_tempo_parado_do_lancador(tmp_path):
+    """Suspensão/Steam preso não pode transformar uma partida de minutos em dias de telemetria."""
+    import time
+    from types import SimpleNamespace
+    paths = SimpleNamespace(state=tmp_path / "state", data=tmp_path / "data", config=tmp_path / "cfg")
+    paths.data.mkdir(); logs = tmp_path / "logs"; logs.mkdir()
+    (logs / "jogo.csv").write_text(_mango_many([60.0] * 480))  # dois minutos reais no MangoHud
+    s = perf.Sampler(hwmon_root=tmp_path / "x", sysfs_root=tmp_path / "y"); s.apu = [8.0]
+    perf.finish_session(paths, "ps2-dmc3", "ps2", "DMC3", logs, time.time() - 4 * 86400, s)
+    h = perf.history(paths.state, "ps2-dmc3")[-1]
+    assert h["minutos"] == 2.0 and h["duracao_origem"] == "MangoHud"
+
+
 def test_enabled_default_and_off(tmp_path):
     from types import SimpleNamespace
     p = SimpleNamespace(config=tmp_path)

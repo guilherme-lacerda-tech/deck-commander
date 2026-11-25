@@ -76,6 +76,20 @@ def parse_mangohud(path: Path) -> dict | None:
     return _stats(rest if len(rest) >= 20 else samples)
 
 
+def duracao_mangohud(path: Path) -> float | None:
+    """Duração efetivamente medida pelo MangoHud, em segundos.
+
+    O relógio de parede do lançador pode atravessar uma suspensão do Deck ou um
+    processo de Steam que ficou preso. Para uma sessão longa o relógio do
+    MangoHud é a fonte mais fiel do tempo que o jogo realmente renderizou.
+    """
+    samples = _mangohud_samples(path)
+    if len(samples) < 20:
+        return None
+    segundos = samples[-1][0] - samples[0][0]
+    return segundos if segundos >= 60 else None
+
+
 def live_stats(path: Path, window: int = 48, target: float | None = None) -> dict | None:
     """Mede a janela mais recente de uma partida que ainda está rodando.
 
@@ -390,8 +404,8 @@ class LiveMonitor:
     """Observa o CSV do MangoHud enquanto o jogo está aberto.
 
     Não fecha o emulador e não grava no INI em uso. Quando a queda é sustentada, chama a função
-    opcional para deixar a qualidade menor preparada para a próxima abertura e publica um aviso
-    atômico que o painel e o Telegram podem mostrar.
+    opcional para elevar potência e remover limitadores externos durante a própria partida, e
+    publica um aviso atômico que o painel e o Telegram podem mostrar.
     """
 
     def __init__(self, paths, game_id: str, console: str, title: str, log_dir: Path | None,
@@ -559,13 +573,21 @@ def finish_session(paths, game_id: str, console: str, title: str, log_dir, t0: f
     if dur < 20:
         return "partida curta demais (<20 s), não registrada"
     log = newest_log(log_dir, t0) if log_dir else None
+    hud_secs = duracao_mangohud(log) if log else None
+    # Suspender o Deck ou uma janela do Steam que não encerrou o lançador já produziu uma sessão
+    # de vários dias no histórico do DMC3. Só substituímos quando há uma medição longa e a
+    # discrepância é inequívoca; partidas normais continuam usando o relógio de parede.
+    duracao_origem = "relógio"
+    if hud_secs and dur > max(hud_secs * 3, hud_secs + 15 * 60):
+        dur = hud_secs
+        duracao_origem = "MangoHud"
     stats = parse_mangohud(log) if log else None
     stats = stats or {}
     fps_avg = stats.get("fps_avg")
     target = stats.get("target") or (60 if (fps_avg or 0) > 35 else 30)
     # consumo: bateria quando está descarregando (o Deck inteiro); na tomada, só o chip
     watts = sampler.bat or sampler.apu
-    data = {"title": title, "console": console, "minutos": round(dur / 60, 1),
+    data = {"title": title, "console": console, "minutos": round(dur / 60, 1), "duracao_origem": duracao_origem,
             "fonte_watts": "bateria" if sampler.bat else "chip", "res": (rec or {}).get("new")}
     if watts:
         data.update(summary(stats or {"fps_avg": None}, watts, sampler.wh_left or 0, target)
