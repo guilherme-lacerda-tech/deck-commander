@@ -42,7 +42,17 @@ def test_verificar_ve_versao_nova_e_igual(P, tmp_path):
 def test_sem_internet_nao_quebra(P, tmp_path):
     def falha(url):
         raise OSError("sem rede")
-    assert A.verificar(P, falha, tmp_path) is None and A.estado(P)["erro"] == "OSError"
+    assert A.verificar(P, falha, tmp_path, git_sha=lambda: None) is None and A.estado(P)["erro"] == "OSError"
+
+
+def test_fallback_git_quando_api_esta_limitada(P, tmp_path):
+    _instalado(tmp_path, "1630b3f")
+    def falha(_url):
+        raise OSError("API bloqueada")
+    nova = A.verificar(P, falha, tmp_path, git_sha=lambda: SHA)
+    assert nova and nova["sha"] == SHA and "consulta Git" in A.estado(P)["erro"]
+    (tmp_path / "deck-commander/VERSAO.txt").write_text(SHA[:7])
+    assert A.verificar(P, falha, tmp_path, git_sha=lambda: SHA) is None
 
 
 def test_aviso_uma_vez_por_dia_e_por_versao(P, tmp_path):

@@ -36,6 +36,17 @@ def _get_json(url: str) -> dict:
         return json.load(r)
 
 
+def _sha_git() -> str | None:
+    """Consulta o commit público sem depender do limite da API HTTP do GitHub."""
+    try:
+        r = subprocess.run(["git", "ls-remote", f"https://github.com/{REPO}.git", "refs/heads/main"],
+                           capture_output=True, text=True, timeout=30, check=False)
+        sha = r.stdout.split(maxsplit=1)[0] if r.returncode == 0 and r.stdout.split() else ""
+        return sha if len(sha) >= 7 else None
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
 def pasta_programa(home: Path | None = None) -> Path:
     return (home or Path.home()) / "deck-commander"
 
@@ -64,7 +75,7 @@ def estado(paths) -> dict:
         return {}
 
 
-def verificar(paths, get_json=_get_json, home: Path | None = None, agora: float | None = None) -> dict | None:
+def verificar(paths, get_json=_get_json, home: Path | None = None, agora: float | None = None, git_sha=None) -> dict | None:
     """Há versão nova? Devolve {"sha", "data", "resumo"} ou None. Guarda o resultado (o painel mostra)."""
     agora = agora or time.time()
     try:
@@ -73,6 +84,17 @@ def verificar(paths, get_json=_get_json, home: Path | None = None, agora: float 
         data = c["commit"]["committer"]["date"][:10]
         resumo = c["commit"]["message"].splitlines()[0][:160]
     except Exception as e:  # noqa: BLE001 — sem internet: tenta amanhã
+        # Alguns provedores/rate limits bloqueiam api.github.com, mas ainda liberam o protocolo Git.
+        # Sem essa alternativa o Deck pareceria não procurar atualização mesmo estando on-line.
+        sha = (git_sha or _sha_git)()
+        if sha:
+            local = versao_local(home)
+            nova = None if sha.startswith(local) or local.startswith(sha[:7]) else {
+                "sha": sha, "data": "data não informada", "resumo": "Atualização disponível (consulta Git)"}
+            st = estado(paths)
+            st.update(conferido=agora, erro=f"API {type(e).__name__}; consulta Git usada", local=local, nova=nova)
+            _cache(paths).write_text(json.dumps(st, ensure_ascii=False), "utf-8")
+            return nova
         st = estado(paths)
         st.update(conferido=agora, erro=f"{type(e).__name__}")
         _cache(paths).write_text(json.dumps(st, ensure_ascii=False), "utf-8")
