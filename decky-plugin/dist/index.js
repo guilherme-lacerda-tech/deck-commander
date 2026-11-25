@@ -1071,6 +1071,7 @@ function TelaDetonado() {
         Sec("Jogo", Lista("Jogo", d.jogos.map((j) => ({ data: j.gid, label: j.titulo })), d.gid, (g) => carregar({ gid: g })),
             !d.gid ? Txt("Escolha o jogo (com um jogo aberto, ele já vem escolhido).") : null,
             d.preparando ? Txt("⏳ Preparando o detonado completo em português para funcionar sem internet. A tela atualiza sozinha.") : null,
+            d.indisponiveis ? Txt("⚠️ " + d.indisponiveis + " parte(s) não foram publicadas pela fonte; as demais estão prontas offline em português.") : null,
             d.erro ? Txt("⚠️ " + d.erro) : null,
             d.erro ? Campo("Nome do jogo na StrategyWiki", nome, setNome) : null,
             d.erro ? Bt("Procurar com esse nome", () => carregar({ gid: d.gid, nome }), { disabled: !nome }, "nm") : null),

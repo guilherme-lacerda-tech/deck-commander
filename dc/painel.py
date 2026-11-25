@@ -993,8 +993,10 @@ def detonado(p: Ponte, a: dict) -> dict:
     if preparando:
         D.agendar(p.paths, gid, mapa.get(gid, {}).get("title", gid))
     nomes = D.titulos(p.paths, gid)
+    indisponiveis = sum(1 for i in range(len(d["capitulos"]))
+                         if D.capitulo(p.paths, gid, i, traduzir=False).get("indisponivel")) if not preparando else 0
     return {"jogos": jogos, "gid": gid, "jogo": d["jogo"], "fonte": d["fonte"], "atual": d.get("atual", 0),
-            "preparando": preparando,
+            "preparando": preparando, "indisponiveis": indisponiveis,
             "capitulos": [{"n": i, "label": (c["grupo"] + " · " if c["grupo"] != "Detonado" else "") + nomes[i]}
                           for i, c in enumerate(d["capitulos"])]}
 

@@ -98,6 +98,22 @@ def test_full_download_never_reports_success_with_missing_text(tmp_path):
     assert D.erro(paths, "gba-pokemon") == out
 
 
+def test_pagina_ausente_na_fonte_nao_inutiliza_as_outras_partes(tmp_path):
+    paths = get_paths(tmp_path).ensure()
+    D.preparar(paths, "gba-pokemon", "Pokemon FireRed", api=_api)
+
+    def api(params):
+        if params.get("page", "").endswith("Route 1"):
+            return {"error": {"code": "missingtitle"}}
+        return _api(params)
+
+    out = D.baixar_tudo(paths, "gba-pokemon", "Pokemon FireRed", api=api,
+                         tradutor=lambda _p, _g, textos: ["PT: " + x for x in textos], log=lambda _m: None)
+    assert out.startswith("detonado parcial") and D.pronto(paths, "gba-pokemon")
+    assert D.capitulo(paths, "gba-pokemon", 1, traduzir=False)["indisponivel"]
+    assert D.titulos(paths, "gba-pokemon")[1] == "Indisponível na fonte"
+
+
 def test_sem_ia_fica_o_original(tmp_path):
     paths = get_paths(tmp_path).ensure()
     D.preparar(paths, "gba-pokemon", "Pokemon FireRed", api=_api)

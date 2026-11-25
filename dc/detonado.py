@@ -41,6 +41,12 @@ def wikitext(pagina: str, api=_api) -> str | None:
     return (d.get("parse") or {}).get("wikitext")
 
 
+def pagina_ausente(pagina: str, api=_api) -> bool:
+    """Diz se a própria StrategyWiki não publicou a subpágina (não confunde com queda de rede)."""
+    d = api({"action": "parse", "page": pagina, "prop": "wikitext", "redirects": "1"})
+    return (d.get("error") or {}).get("code") in {"missingtitle", "invalidtitle"}
+
+
 def _sem_marcas(titulo: str) -> str:
     """Nome do jogo sem o que o arquivo tem a mais: (BR), [ISO], (DUB IA), versão, nome de tradutor…"""
     t = re.sub(r"[\(\[][^\)\]]*[\)\]]", " ", titulo)
@@ -161,7 +167,7 @@ def info(paths, game_id: str) -> dict:
 
 
 def pronto(paths, game_id: str) -> bool:
-    """O guia só é offline/português quando todas as partes já estão traduzidas no disco."""
+    """O guia fica offline quando cada parte é PT-BR ou foi confirmada ausente na fonte."""
     d = info(paths, game_id)
     caps = d.get("capitulos") or []
     if not caps:
@@ -171,6 +177,8 @@ def pronto(paths, game_id: str) -> bool:
             parte = json.loads((_pasta(paths, game_id) / f"{i:03d}.json").read_text("utf-8"))
         except (OSError, ValueError):
             return False
+        if parte.get("indisponivel"):
+            continue
         if not parte.get("pt") or not parte.get("titulo_pt"):
             return False
     return True
@@ -296,6 +304,8 @@ def capitulo(paths, game_id: str, n: int, traduzir: bool = True, api=_api, tradu
         salvo = json.loads(f.read_text("utf-8"))
     except (OSError, ValueError):
         salvo = None
+    if salvo and salvo.get("indisponivel"):
+        return {"erro": salvo["indisponivel"], "indisponivel": True}
     # Uma tentativa antiga podia deixar {original: [], pt: null} quando a wiki respondeu vazia;
     # trate isso como tentativa incompleta, não como cache válido. Assim a fila consegue reparar
     # o DMC3 e qualquer guia que tenha sido preparado sem conteúdo por uma queda de rede.
@@ -303,6 +313,12 @@ def capitulo(paths, game_id: str, n: int, traduzir: bool = True, api=_api, tradu
         txt = wikitext(cap["pagina"], api) or ""
         original = limpar_wikitext(txt)
         if not original:
+            # Alguns índices da StrategyWiki ainda listam páginas que foram apagadas. Isso não é
+            # falha da conexão nem autorização para despejar uma página em inglês: o worker marca
+            # explicitamente a lacuna e deixa todas as outras partes úteis offline.
+            if pagina_ausente(cap["pagina"], api):
+                return {"erro": f"A StrategyWiki não publicou a parte '{cap['titulo']}'.",
+                        "indisponivel": True}
             return {"erro": f"não consegui baixar a parte '{cap['titulo']}' agora"}
         salvo = {"original": original, "pt": None}
         _gravar(f, salvo)
@@ -323,7 +339,11 @@ def titulos(paths, game_id: str) -> list[str]:
     out = []
     for i, cap in enumerate(d.get("capitulos", [])):
         try:
-            pt = json.loads((_pasta(paths, game_id) / f"{i:03d}.json").read_text("utf-8")).get("titulo_pt")
+            salvo = json.loads((_pasta(paths, game_id) / f"{i:03d}.json").read_text("utf-8"))
+            if salvo.get("indisponivel"):
+                out.append("Indisponível na fonte")
+                continue
+            pt = salvo.get("titulo_pt")
         except (OSError, ValueError):
             pt = None
         out.append(pt or cap["titulo"])
@@ -359,9 +379,15 @@ def baixar_tudo(paths, game_id: str, titulo: str, api=_api, tradutor=None, log=p
         return d["erro"]
     n = len(d["capitulos"])
     comeco = d.get("atual", 0)  # começa pela parte em que você está, depois as seguintes
+    indisponiveis = []
     for k in range(n):
         i = (comeco + k) % n
         parte = capitulo(paths, game_id, i, api=api, tradutor=tradutor)
+        if parte.get("indisponivel"):
+            _gravar(_pasta(paths, game_id) / f"{i:03d}.json", {"indisponivel": parte["erro"]})
+            indisponiveis.append(d["capitulos"][i]["titulo"])
+            log(f"detonado {game_id}: parte ausente na fonte: {d['capitulos'][i]['titulo']}")
+            continue
         if parte.get("erro"):
             msg = f"detonado não terminou: {parte['erro']}"
             _status(paths, game_id, msg)
@@ -373,6 +399,9 @@ def baixar_tudo(paths, game_id: str, titulo: str, api=_api, tradutor=None, log=p
         log(f"detonado {game_id}: {k + 1}/{n}")
         time.sleep(0.5)  # gentil com a wiki
     _status(paths, game_id)
+    if indisponiveis:
+        return (f"detonado parcial de {d['jogo']}: {n - len(indisponiveis)}/{n} parte(s) em português offline; "
+                f"{len(indisponiveis)} não publicada(s) pela fonte")
     return f"detonado de {d['jogo']}: {n} parte(s) prontas para ler sem internet"
 
 
