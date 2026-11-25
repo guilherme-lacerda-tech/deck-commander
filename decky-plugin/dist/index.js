@@ -459,7 +459,7 @@ function TelaInicio({ ir }) {
         ["telegram", "💬 Telegram"], ["downloads", "⬇️ Downloads"],
         ["traducao", "🈯 Tradução" + (d && d.perguntas ? " (" + d.perguntas + " pergunta" + (d.perguntas > 1 ? "s" : "") + ")" : "")],
         ["pc", "🖥️ PC (jogar os jogos do PC)"], ["transferir", "📦 Transferir jogos (Deck ⇄ PC)"],
-        ["retro", "🕹️ Retrô: botões de trás, continuar, voltar no tempo e filtros"],
+        ["retro", "🕹️ Retrô: botões de trás, histórico/voltar no tempo e filtros"],
         ["saves", "💾 Rever e restaurar cópias de save"],
         ["detonado", "📖 Detonado (passo a passo em português)"],
         ["qualidade", "🎚️ Qualidade e controles"], ["desinstalar", "🗑️ Desinstalar jogos"], ["musica", "🎵 Música"],
@@ -999,8 +999,8 @@ function TelaRetro() {
     return h("div", null,
         Sec("Botões de trás",
             Txt(d.aplicado
-                ? "✅ Ligados: L4 salva o estado · R4 carrega · L5 (segurar) volta no tempo · R5 liga/desliga o turbo (um toque) " + (d.turbo || 2) + "x."
-                : "Desligados. Ligue para usar os botões de trás do Deck como no R4/Retroid: salvar e carregar estado, voltar no tempo e acelerar."),
+                ? "✅ Ligados: L4 salva · R4 carrega o Save1 · L5 abre o histórico no PS2 (↑/↓ e A) ou volta no tempo nos compatíveis · R5 liga/desliga o turbo (um toque) " + (d.turbo || 2) + "x."
+                : "Desligados. Ligue para usar os botões de trás do Deck: salvar/carregar estado, histórico ou voltar no tempo e turbo."),
             Txt("Vale para: " + (d.emuladores.join(", ") || "nenhum emulador encontrado") + ". Jogo aberto: feche e abra de novo para valer.", { opacity: 0.8 }),
             Bt(d.aplicado ? "🔄 Aplicar de novo (jogos novos)" : "🕹️ Ligar botões de trás", () => fazer("retro_definir", { turbo: d.turbo || 2 }), { disabled: ocupado }, "on"),
             [2, 3, 4].map((x) => Bt("⏩ Turbo " + x + "x" + (d.turbo === x ? " ✓" : ""), () => fazer("retro_definir", { turbo: x }), { disabled: ocupado }, "t" + x)),

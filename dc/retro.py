@@ -3,7 +3,8 @@
 - emuladores: RetroArch (teclas, rewind, turbo, comandos pela rede local, cheats, exceções por núcleo + filtros),
   DuckStation, PCSX2 e Dolphin com as mesmas teclas reservadas (F9–F12);
 - Steam Input: em cada atalho de jogo desses emuladores, os botões de trás viram essas teclas
-  (L4 salvar, R4 carregar, L5 voltar no tempo, R5 turbo). O resto do layout do jogo não muda.
+  (L4 salvar, R4 carregar, L5 abre histórico no PS2/volta no tempo onde há rewind, R5 turbo).
+  O resto do layout do jogo não muda.
 Antes da 1ª mudança de cada arquivo fica uma cópia "<arquivo>.antes-dc" (desfazer = /retro desfazer).
 """
 from __future__ import annotations
@@ -181,7 +182,7 @@ def gravar_modelo(home: Path) -> str:
     """Modelo de layout "Deck Commander Retrô" na pasta de modelos do Steam (ele enxerga na hora, sem reiniciar).
     Devolve o endereço que o Steam usa para escolher o modelo num jogo."""
     texto = R.layout_com_botoes_de_tras(_modelo(home)).replace(
-        "Gamepad with Mouse Trackpad", "Deck Commander Retro (L4 salva, R4 carrega, L5 volta, R5 turbo)", 1)
+        "Gamepad with Mouse Trackpad", "Deck Commander Retro (L4 salva, R4 carrega, L5 histórico/volta, R5 turbo)", 1)
     _gravar(home / ".local/share/Steam/controller_base/templates" / MODELO, texto)
     return "template://" + MODELO
 
@@ -213,7 +214,7 @@ def preparar(home: Path | None = None, mapa: dict | None = None, turbo: float = 
     modelo = gravar_modelo(home) if (home / ".local/share/Steam/controller_base/templates").exists() else None
     texto = (f"🕹️ Botões de trás em {len(jogos)} jogo(s)"
              + (f"; emuladores ajustados: {', '.join(emus)}" if emus else "; emuladores já estavam prontos")
-             + ". L4 salva · R4 carrega · L5 (segurar) volta no tempo · R5 liga/desliga o turbo.")
+             + ". L4 salva · R4 carrega · L5: histórico no PS2 (↑/↓ e A) ou volta no tempo nos compatíveis · R5 turbo.")
     return {"texto": texto, "appids": [a for _, a in jogos if a], "modelo": modelo}
 
 

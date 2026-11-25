@@ -150,7 +150,7 @@ Ligue uma vez no painel: **Deck Commander → Retrô → Ligar**.
 |---|---|
 | **L4** | salva o estado (save rápido); ficam os 10 últimos |
 | **R4** | carrega o save rápido mais novo |
-| **L5** (segurando) | volta no tempo (RetroArch, DuckStation e PSP) |
+| **L5** (segurando) | no **PS2**, abre o histórico de states; no RetroArch, DuckStation e PSP, volta no tempo |
 | **R5** | liga/desliga o turbo (2x, 3x ou 4x, escolhido no painel) |
 
 - **Save rápido x save do jogo:**
@@ -164,11 +164,16 @@ Ligue uma vez no painel: **Deck Commander → Retrô → Ligar**.
 - **Seu layout:** se você trocar o layout de controle de um jogo no Steam, o Deck Commander não mexe mais nele.
 - **Conquistas:** crie uma conta em retroachievements.org e entre nela dentro de cada emulador.
 
+### Histórico de states no PS2
+No PCSX2, segure **L5** para abrir a lista dos últimos states do L4. Ainda segurando L5, use **↑/↓** para
+destacar o ponto desejado e **A** para carregar. **R4**, sem L5, sempre carrega o Save1 mais recente.
+
 ### Continuar de onde parou
 - **Descanso (todos os jogos, inclusive Switch e PC):** aperte o botão de ligar. O Deck congela o jogo e, ao apertar
   de novo, você está no mesmo quadro.
 - **Seguro extra (PS1, PS2, PSP, GameCube/Wii e RetroArch):** o Deck Commander guarda um "ponto de continuar" do jogo
-  quando você aperta o botão Steam ou o "…", quando o Deck vai dormir e a cada 10 minutos. Ao abrir o jogo de novo,
+  quando você aperta o botão Steam ou o "…" e quando o Deck vai dormir. Ele não grava state no meio da jogatina,
+  para não causar uma travada. Ao abrir o jogo de novo,
   ele já começa no ponto — mesmo que a bateria tenha acabado ou que você tenha saído do jogo.
   - O ponto fica num espaço só dele: os seus saves do L4 nunca são trocados.
   - Se o emulador mudou de versão desde o ponto, o jogo abre normal (ponto de outra versão pode travar).

@@ -116,7 +116,7 @@ Aviso aqui quando o download terminar.
 /traduzir biblioteca — traduz todos os jogos que ainda não estão em português (pergunta antes)
 /converter <jogo> [organizar|descompactar] — Switch: update/DLC e NSZ
 /status · /queue · /disk · /diagnostico
-/retro [2x|3x|4x] — botões de trás: L4 salva, R4 carrega, L5 volta no tempo, R5 turbo · /retro desfazer
+/retro [2x|3x|4x] — botões de trás: L4 salva, R4 carrega, L5 abre histórico no PS2/volta no tempo nos compatíveis, R5 turbo · /retro desfazer
 /nuvem [agora] — saves no Google Drive (ligar pelo PC: tools/pc/nuvem-google.ps1)
 /texturas <jogo> <link> — texturas HD (PS2, GameCube, Wii)
 /netplay <jogo> — jogar em rede com o Deck do par (RetroArch) · /netplay aceitar

@@ -3,7 +3,7 @@ trás do Steam Deck. Nada de ler/gravar disco nestas funções (outra parte do p
 biblioteca padrão, type hints, docstrings curtas em português.
 
 Teclas reservadas (os botões de trás do Deck viram estas teclas pelo Steam Input):
-  L4 = F9 (salvar estado), R4 = F10 (carregar estado), L5 = F11 (voltar no tempo, segurar),
+  L4 = F9 (salvar estado), R4 = F10 (carregar o Save1), L5 = F11 (histórico no PCSX2; voltar no tempo nos compatíveis),
   R5 = F12 e também KEYPAD_PLUS (turbo, segurar).
 
 Constante:
