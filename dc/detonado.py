@@ -252,7 +252,10 @@ def agendar(paths, game_id: str, titulo: str, run=subprocess.run) -> bool:
     A unidade user do systemd impede que a tradução morra quando o painel fecha. Um nome de unidade estável faz
     chamadas repetidas (sync, abrir jogo e painel) reaproveitarem a mesma preparação.
     """
-    if not game_id or pronto(paths, game_id):
+    # Um cache DMC3 antigo podia estar "pronto" apenas porque as páginas
+    # ausentes foram marcadas uma a uma. Ainda assim ele precisa rodar uma vez
+    # para migrar à fonte completa.
+    if not game_id or (pronto(paths, game_id) and not precisa_migrar(info(paths, game_id), titulo)):
         return False
     unidade = "dc-detonado-" + "".join(ch for ch in game_id if ch.isalnum())[:40]
     repo = Path(__file__).resolve().parents[1]

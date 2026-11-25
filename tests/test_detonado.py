@@ -129,6 +129,17 @@ def test_dmc3_troca_o_indice_quebrado_por_fonte_com_as_20_missoes(tmp_path):
     assert not D.precisa_migrar(d, "Devil May Cry 3")
 
 
+def test_cache_dmc3_antigo_pronto_ainda_e_agendado_para_migracao(tmp_path):
+    paths = get_paths(tmp_path).ensure()
+    pasta = paths.data / "detonado/ps2-dmc3"; pasta.mkdir(parents=True)
+    (pasta / "indice.json").write_text('{"jogo":"antigo","capitulos":[{}]}', "utf-8")
+    (pasta / "000.json").write_text('{"indisponivel":"página ausente"}', "utf-8")
+    calls = []
+    assert D.agendar(paths, "ps2-dmc3", "Devil May Cry 3",
+                     run=lambda cmd, **kw: calls.append(cmd) or SimpleNamespace(returncode=0))
+    assert calls[0][-3:] == ["dc.detonado", "baixar", "ps2-dmc3"]
+
+
 def test_sem_ia_fica_o_original(tmp_path):
     paths = get_paths(tmp_path).ensure()
     D.preparar(paths, "gba-pokemon", "Pokemon FireRed", api=_api)
