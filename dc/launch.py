@@ -196,7 +196,9 @@ def main(argv: list[str]) -> None:
         from . import tdp
         tdp_ctl = tdp.Tdp(paths.state / "tdp-anterior.json")
         if not (paths.config / "tdp-desligado").exists():
-            say(f"energia: {tdp_ctl.aplicar_console(console, na_dock)}")
+            from . import tdp_perfil
+            minimo = tdp_perfil.recomendado(paths, game_id, console)
+            say(f"energia: {tdp_ctl.aplicar_console(console, na_dock, minimo)}")
         else:
             tdp_ctl = None
     except Exception as e:  # noqa: BLE001 — energia nunca impede o jogo de abrir
@@ -300,6 +302,13 @@ def main(argv: list[str]) -> None:
             if na_dock:
                 return None
         tdp_ctl.usar_piso_portatil(console)
+        # Só depois de cinco minutos lisos o watt extra deixa de ser hipótese e passa a ser
+        # perfil do jogo. Na abertura seguinte ele evita a mesma queda, sem elevar os demais.
+        try:
+            from . import tdp_perfil
+            tdp_perfil.confirmar(paths, game_id, console, tdp_ctl.ler())
+        except Exception:  # noqa: BLE001 — persistir o aprendizado nunca quebra a partida
+            pass
         return tdp_ctl.reduzir_passo()
 
     live = (perf.LiveMonitor(paths, game_id, console, title, log_dir, t0,

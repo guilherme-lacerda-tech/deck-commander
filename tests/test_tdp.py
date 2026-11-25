@@ -45,6 +45,13 @@ def test_manual_higher_tdp_is_respected_and_never_reduced(tmp_path):
     assert t.reduzir_passo() is None and f.atual == 15
 
 
+def test_learned_minimum_starts_the_same_game_above_console_floor(tmp_path):
+    f = Fake(atual=12, maximo=15)
+    t = tdp.Tdp(tmp_path / "st.json", run=f)
+    assert "14 W" in t.aplicar_console("ps2", minimo=14)
+    assert f.atual == 14 and t.piso == 14
+
+
 def test_dock(tmp_path):
     for nome, st in (("card0-eDP-1", "connected"), ("card0-DP-1", "disconnected")):
         (tmp_path / nome).mkdir(); (tmp_path / nome / "status").write_text(st + "\n")

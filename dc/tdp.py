@@ -70,7 +70,7 @@ class Tdp:
         except Exception:
             return False
 
-    def aplicar_console(self, console: str, em_dock: bool = False) -> str:
+    def aplicar_console(self, console: str, em_dock: bool = False, minimo: int | None = None) -> str:
         if console not in TDP_POR_CONSOLE:
             return f"Console {console} não reconhecido."
 
@@ -80,6 +80,10 @@ class Tdp:
             if maximo is None:
                 maximo = 15
             tdp = maximo
+        elif minimo is not None:
+            # Perfil aprendido: qualidade alta não começa numa potência que já se provou insuficiente.
+            # O limite máximo e qualquer valor manual maior continuam respeitados abaixo.
+            tdp = max(tdp, minimo)
         self.piso = tdp
 
         if not self.estado.exists():  # jogo aberto em cima de outro não perde o valor original
