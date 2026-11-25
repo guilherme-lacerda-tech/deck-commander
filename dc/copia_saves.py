@@ -75,14 +75,17 @@ def girar_historico_pcsx2(backup: Path, slots: int = HISTORICO_PCSX2) -> bool:
         return False
 
 
-def monitorar_pcsx2(parar, state_dir: Path | None = None, every: float = 1.0) -> None:
+def monitorar_pcsx2(parar, state_dir: Path | None = None, every: float = 1.0, confirmacoes: int = 3) -> None:
     """Enquanto o jogo PS2 está aberto, transforma cada backup nativo do L4 em histórico.
 
-    Exige duas leituras idênticas do ``.backup``: o PCSX2 compacta estados em segundo plano e
-    um arquivo ainda crescendo jamais pode entrar no histórico.
+    Exige três leituras idênticas do ``.backup`` (por padrão, dois segundos de silêncio): o PCSX2
+    compacta estados em segundo plano e um arquivo ainda crescendo jamais pode entrar no histórico.
+    Isso também deixa o emulador terminar o Save1 antes das renomeações leves do histórico, em vez
+    de disputar I/O no instante do L4.
     """
     state_dir = state_dir or (Path.home() / ".var/app/net.pcsx2.PCSX2/config/PCSX2/sstates")
     anterior: dict[Path, tuple[int, int]] = {}
+    estaveis: dict[tuple[Path, tuple[int, int]], int] = {}
     ja_existiam: set[tuple[Path, tuple[int, int]]] = set()
     try:
         for p in state_dir.glob("*.01.p2s.backup"):
@@ -100,9 +103,12 @@ def monitorar_pcsx2(parar, state_dir: Path | None = None, every: float = 1.0) ->
         except OSError:
             continue
         for p, assinatura in atual.items():
-            if anterior.get(p) == assinatura and (p, assinatura) not in ja_existiam:
+            chave = (p, assinatura)
+            estaveis[chave] = estaveis.get(chave, 0) + 1 if anterior.get(p) == assinatura else 1
+            if estaveis[chave] >= max(3, confirmacoes) and chave not in ja_existiam:
                 if girar_historico_pcsx2(p):
-                    ja_existiam.add((p, assinatura))
+                    ja_existiam.add(chave)
+        estaveis = {chave: n for chave, n in estaveis.items() if chave[0] in atual and chave[0] in anterior}
         anterior = atual
 
 

@@ -75,6 +75,37 @@ def test_pcsx2_ring_pushes_previous_save_one_position_back(tmp_path):
     assert not backup.exists()
 
 
+def test_monitor_pcsx2_espera_quietude_antes_de_girar(tmp_path):
+    """O histórico não disputa o diretório de estados no instante em que L4 ainda está gravando."""
+    base = "SLES-54186 (CRC)"
+    (tmp_path / f"{base}.01.p2s").write_bytes(b"novo")
+    backup = tmp_path / f"{base}.01.p2s.backup"
+
+    class Parar:
+        n = 0
+        def wait(self, _every):
+            self.n += 1
+            if self.n == 1:
+                backup.write_bytes(b"anterior")
+            return self.n >= 3  # duas leituras: ainda não pode renomear
+
+    C.monitorar_pcsx2(Parar(), tmp_path)
+    assert backup.exists() and not (tmp_path / f"{base}.02.p2s").exists()
+
+    backup.unlink()
+
+    class PararCompleto:
+        n = 0
+        def wait(self, _every):
+            self.n += 1
+            if self.n == 1:
+                backup.write_bytes(b"anterior")
+            return self.n >= 6  # leituras extras evitam granularidade de timestamp do Windows no teste
+
+    C.monitorar_pcsx2(PararCompleto(), tmp_path)
+    assert not backup.exists() and (tmp_path / f"{base}.02.p2s").read_bytes() == b"anterior"
+
+
 class _Relogio:
     def __init__(self, s):
         self.s = s
