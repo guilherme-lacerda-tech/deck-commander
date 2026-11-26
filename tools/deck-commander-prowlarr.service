@@ -1,0 +1,13 @@
+[Unit]
+Description=Deck Commander Prowlarr
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=%h/.local/share/deck-commander/prowlarr/Prowlarr -nobrowser -data=%h/.local/share/deck-commander/prowlarr-data
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target
