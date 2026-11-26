@@ -621,7 +621,10 @@ class Bot:
                     + self._power_note()
             return (f"⬇️ Baixando {name[:-8]}. Não sei o console: responda só o nome dele (ex.: PS1)."
                     + self._power_note())
-        c = escolhido
+        # Fora de links e arquivos, só uma mensagem que seja inteiramente o
+        # nome do console é seleção de console. "Mario Kart Wii", por exemplo,
+        # é um título, não uma resposta "Wii".
+        c = escolha_exata if escolha_exata != "pc" else None
         # Não trate nomes inequívocos de plataformas ainda não suportadas como
         # título de jogo: a resposta precisa continuar clara (PS5 não vira
         # uma busca por um suposto jogo chamado "PlayStation 5").

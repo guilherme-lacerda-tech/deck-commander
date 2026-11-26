@@ -99,6 +99,12 @@ def test_nome_de_jogo_pede_plataforma_sem_iniciar_download(x):
     assert x.cfg["catalogo"]["1"]["titulo"] == "Devil May Cry 3"
 
 
+def test_titulo_com_nome_de_console_nao_vira_escolha_de_console(x):
+    assert "qual plataforma" in msg(x, "Mario Kart Wii")
+    assert x.cfg["catalogo"]["1"]["titulo"] == "Mario Kart Wii"
+    assert x.qbt.added == []
+
+
 def test_plataforma_depois_do_nome_mostra_fontes_legais(x):
     msg(x, "Hades")
     r = msg(x, "PC")
