@@ -145,9 +145,16 @@ def main():
     done = json.loads(plugin_bridge.done_path(paths).read_text())
     done.pop(gid, None)
     plugin_bridge.done_path(paths).write_text(json.dumps(done, indent=1, ensure_ascii=False))
+    # O /sync agenda capa e detonado no mesmo instante em que cria o atalho.
+    # Mesmo após remover o jogo, esses caches próprios do Commander não têm
+    # valor para um ROM artificial; retire-os para o E2E ser realmente limpo.
+    shutil.rmtree(paths.data / "art" / gid, ignore_errors=True)
+    shutil.rmtree(paths.data / "detonado" / gid, ignore_errors=True)
     shutil.rmtree(ROOT, ignore_errors=True)
     lm = json.loads((paths.data / "launch-map.json").read_text())
-    check(not any("E2E" in e["title"] for e in lm.values()) and not q.torrents(), "limpeza completa")
+    check(not any("E2E" in e["title"] for e in lm.values()) and not q.torrents()
+          and not (paths.data / "art" / gid).exists() and not (paths.data / "detonado" / gid).exists(),
+          "limpeza completa")
     print("RESULTADO:", "FALHOU" if check.failed else "TUDO OK")
     sys.exit(1 if check.failed else 0)
 
