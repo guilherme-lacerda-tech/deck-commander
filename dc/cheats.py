@@ -1,6 +1,8 @@
 import re
 import unicodedata
 
+MAX_CHEATS = 10000  # limita memória diante de arquivos .cht danificados ou não confiáveis
+
 # TRADUCOES: dicionário de termos em inglês para português
 TRADUCOES = {
     "Infinite Lives": "Vidas infinitas",
@@ -38,6 +40,8 @@ def ler_cht(texto: str) -> list[dict]:
     for linha in linhas:
         if linha.startswith("cheats = "):
             n_cheats = int(linha.split("= ")[1])
+            if not 0 <= n_cheats <= MAX_CHEATS:
+                raise ValueError("quantidade de cheats inválida")
             break
 
     cheats = {}
@@ -49,6 +53,8 @@ def ler_cht(texto: str) -> list[dict]:
                 continue
             i, chave, valor = match.groups()
             i = int(i)
+            if i >= MAX_CHEATS:
+                raise ValueError("índice de cheat inválido")
             cheat_atual = cheats.setdefault(i, {"i": i, "desc": "", "code": "", "enable": False, "extra": {}})
             bruto = valor.strip()
             valor = bruto.strip('"')

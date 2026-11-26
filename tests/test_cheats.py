@@ -1,4 +1,6 @@
 """Cheats do RetroArch por jogo — docs/specs/cheats.md."""
+import pytest
+
 from dc import cheats as C
 
 T = ('cheats = 2\n\ncheat0_desc = "Infinite Lives"\ncheat0_code = "7E0DBE:09"\ncheat0_enable = false\n'
@@ -36,3 +38,9 @@ def test_campos_intercalados_e_extras_com_aspas_sao_preservados():
 
 def test_nao_confunde_sequencia_com_jogo_original():
     assert C.achar_cht(["Super Mario World 2 (USA).cht"], "Super Mario World.sfc") is None
+
+
+@pytest.mark.parametrize("texto", ["cheats = 999999999", "cheats = -1", "cheat10000_desc = x"])
+def test_recusa_quantidades_e_indices_excessivos(texto):
+    with pytest.raises(ValueError):
+        C.ler_cht(texto)
