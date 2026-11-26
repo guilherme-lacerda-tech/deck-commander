@@ -9,6 +9,7 @@
 | IA local | túnel SSH reverso do PC para o Deck; Ollama `qwen2.5:7b` respondeu pelo endereço local do Deck e carregou na GPU do PC | ativo, privado e persistente ao login do Windows |
 | Atualizações fora da mesma rede | consulta GitHub com fallback por `git ls-remote`; cache do Deck conferido | versão instalada é a atual e não há atualização pendente |
 | Biblioteca | diagnóstico DB × disco × Steam | nenhum arquivo ou atalho ausente/modificado sem procedência do Deck Commander |
+| Instalação ponta a ponta no Deck | torrent local → `.zip` → `/sync` → atalho Steam ao vivo → duplicata → remoção | passou duas vezes; a segunda confirmou limpeza de atalho, torrent, quarentena de teste, arte e detonado temporários |
 | Serviços | `deck-commander-bot` e `deck-commander-power` | ativos |
 | Controle de DMC3 | VDF do Steam Input no próprio Deck | R4 = Save1; L5 = histórico com setas e A |
 | States PCSX2 | hash antes/depois das implantações | inalterado; 20 arquivos presentes |
@@ -21,6 +22,7 @@
 3. O painel não aceita um detonado parcialmente traduzido: se faltar qualquer bloco em português, continua em preparação e não mistura inglês no texto.
 4. Trabalhadores de guia são executados com prioridade baixa no Deck. A tradução usa primeiro a IA local do PC/GPU e só usa o modelo do Deck como reserva.
 5. O cálculo de duração usa MangoHud quando a suspensão do Deck torna o relógio de parede inválido. A telemetria antiga afetada foi reparada a partir do CSV original.
+6. O E2E apagava o jogo de teste mas deixava caches de capa/detonado. A limpeza agora remove esses dois caches do `game_id` de teste e a execução real confirmou que não sobrou resíduo.
 
 ## Pendências que ainda exigem prova externa
 
