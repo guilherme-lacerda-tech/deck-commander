@@ -27,7 +27,6 @@ PENDING_TTL = 600  # "Switch 1" vale para o próximo arquivo nos próximos 10 mi
 
 # Texto livre -> console. "switch 2" é reconhecido para responder que não é suportado.
 ALIASES = [
-    (r"pc|computador|windows", "pc"),
     (r"3ds|n3ds|nintendo\s*3ds|new\s*3ds", "n3ds"),
     (r"wii\s*u|wiiu", "wiiu"),
     (r"ps\s*3|playstation\s*3|play\s*3", "ps3"),
@@ -545,13 +544,16 @@ class Bot:
         # console/torrent. Assim "DMC3" -> "PS2" não troca a categoria de um
         # download anterior por engano.
         escolhido = parse_console(text)
-        if pedido and time.time() - pedido.get("at", 0) < PENDING_TTL and escolhido:
+        escolha_exata = next((c for rx, c in ALIASES if re.fullmatch(rf"\s*(?:{rx})\s*", text, re.I)), None)
+        if re.fullmatch(r"\s*(?:pc|computador|windows)\s*", text, re.I):
+            escolha_exata = "pc"
+        if pedido and not doc and time.time() - pedido.get("at", 0) < PENDING_TTL and escolha_exata:
             self.cfg["catalogo"].pop(str(uid), None)
             self.save_cfg()
-            if escolhido == "switch2":
+            if escolha_exata == "switch2":
                 return "Switch 2 ainda é experimental no Deck; escolha outra plataforma ou use PC/Switch."
             from . import catalogo_legal
-            return catalogo_legal.pesquisar(pedido.get("titulo", ""), escolhido, rotulo(escolhido))
+            return catalogo_legal.pesquisar(pedido.get("titulo", ""), escolha_exata, rotulo(escolha_exata))
         if pedido and time.time() - pedido.get("at", 0) >= PENDING_TTL:
             self.cfg["catalogo"].pop(str(uid), None)
             self.save_cfg()

@@ -114,6 +114,17 @@ def test_plataforma_retro_nao_procura_rom_automaticamente(x):
     assert x.qbt.added == []
 
 
+def test_magnet_com_console_nao_e_engolido_pelo_catalogo(x):
+    msg(x, "Hades")
+    r = msg(x, f"Switch {MAG}")
+    assert r.startswith("Adicionado (switch)")
+    assert x.qbt.added == [(MAG, "switch")]
+
+
+def test_pc_nao_e_categoria_de_torrent():
+    assert bot.parse_console("PC") is None
+
+
 def test_file_that_is_not_a_torrent(x, monkeypatch):
     assert "só sei usar arquivos .torrent" in msg(x, document={"file_name": "jogo.iso", "file_id": "1"})
 
