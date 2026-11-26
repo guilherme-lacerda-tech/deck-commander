@@ -137,6 +137,27 @@ def test_escolha_experimental_preserva_titulo_para_nova_plataforma(x):
     assert "Hades" in msg(x, "PC")
 
 
+def test_pedido_por_nome_inicia_jogo_do_catalogo_compartilhado(x, monkeypatch):
+    from dc import familia_servico as fs
+    item = {"titulo": "Jogo Teste", "console": "ps2", "gid": "ps2-teste", "magnet": MAG}
+    monkeypatch.setattr(fs, "catalogo_guardado", lambda p: {"jogos": [item]})
+    chamadas = []
+    monkeypatch.setattr(fs, "puxar", lambda p, q, gid: chamadas.append(gid) or "download na fila")
+    monkeypatch.setattr(x, "_already", lambda *a: None)
+    msg(x, "Jogo Teste")
+    assert "download na fila" in msg(x, "PS2")
+    assert chamadas == ["ps2-teste"]
+
+
+def test_pedido_nao_baixa_versao_ambigua(x, monkeypatch):
+    from dc import familia_servico as fs
+    item = {"titulo": "Jogo Teste", "console": "ps2", "gid": "um", "magnet": MAG}
+    monkeypatch.setattr(fs, "catalogo_guardado", lambda p: {"jogos": [item, {**item, "gid": "dois"}]})
+    msg(x, "Jogo Teste")
+    assert "mais de uma versão" in msg(x, "PS2")
+    assert x.qbt.added == []
+
+
 def test_file_that_is_not_a_torrent(x, monkeypatch):
     assert "só sei usar arquivos .torrent" in msg(x, document={"file_name": "jogo.iso", "file_id": "1"})
 

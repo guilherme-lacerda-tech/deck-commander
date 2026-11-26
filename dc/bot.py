@@ -550,6 +550,26 @@ class Bot:
         if pedido and not doc and time.time() - pedido.get("at", 0) < PENDING_TTL and escolha_exata:
             if escolha_exata == "switch2":
                 return "Switch 2 ainda é experimental no Deck; escolha outra plataforma ou use PC/Switch."
+            from . import familia_servico
+            candidatos = [j for j in familia_servico.catalogo_guardado(self.paths).get("jogos", [])
+                          if j.get("titulo", "").casefold() == pedido.get("titulo", "").casefold()
+                          and j.get("console") == escolha_exata and valid_magnet(j.get("magnet", ""))]
+            if len(candidatos) == 1:
+                if ops.in_safe_mode(self.paths):
+                    return "Safe-mode ativo; nenhum download foi iniciado."
+                j = candidatos[0]
+                if self._already(j["titulo"], escolha_exata):
+                    return "Esse jogo já parece estar na biblioteca ou na fila; não baixei outra cópia."
+                try:
+                    resultado = familia_servico.puxar(self.paths, self.qbt, j["gid"])
+                except Exception as e:  # noqa: BLE001 — par fora da rede, falha de transferência ou do qBittorrent
+                    self.log(f"falha ao puxar catálogo compartilhado: {type(e).__name__}")
+                    return "Não consegui iniciar pelo catálogo compartilhado; confira a conexão com o outro Deck."
+                self.cfg["catalogo"].pop(str(uid), None)
+                self.save_cfg()
+                return resultado
+            if len(candidatos) > 1:
+                return "Há mais de uma versão nesse console. Use /familia jogos para escolher a versão exata."
             self.cfg["catalogo"].pop(str(uid), None)
             self.save_cfg()
             from . import catalogo_legal

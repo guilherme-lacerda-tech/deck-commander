@@ -207,6 +207,7 @@ def aplicar_prontos(paths: Paths) -> list[str]:
             continue  # ainda baixando
         pac = _dir(paths) / "pacotes" / pd["gid"]
         feitos = []
+        falhou_patch = False
         if pac.exists():
             gl = pac / ".config/deck-commander/glossary.json"
             if gl.exists():  # glossário: junta (não troca o seu)
@@ -223,7 +224,16 @@ def aplicar_prontos(paths: Paths) -> list[str]:
                         feitos.append(str(patches.apply_file(rom, bps)))
                     except Exception as e:  # noqa: BLE001  patch ruim não pode travar os outros pedidos
                         avisos.append(f"⚠️ patch {bps.name} não aplicou em {pd['titulo']}: {e}")
-                bps.unlink()
+                        falhou_patch = True
+                    else:
+                        bps.unlink()
+                else:
+                    falhou_patch = True
+        if falhou_patch:
+            familia.marcar(est, pd["gid"], "erro_traducao", "patch preservado; aplicação falhou ou ROM não localizada")
+            avisos.append(f"⚠️ Tradução de {pd['titulo']} pendente; patch preservado para revisão.")
+            continue
+        if pac.exists():
             feitos += familia.aplicar_pacote(pac, Path.home())
         familia.marcar(est, pd["gid"], "pronto", f"{len(feitos)} arquivo(s) de tradução aplicados")
         avisos.append(f"👪 {pd['titulo']} (de {pd.get('de', 'par')}) chegou" +

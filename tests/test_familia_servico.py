@@ -92,4 +92,5 @@ def test_nome_com_espaco_e_patch_ruim(tmp_path, monkeypatch):
     monkeypatch.setattr(patches, "apply_file", lambda r, b: (_ for _ in ()).throw(ValueError("checksum")))
     av = fs.aplicar_prontos(paths)
     assert any("não aplicou" in a for a in av)
+    assert (paths.data / "familia/pacotes/gba-x/Patches PT/jogo x.bps").read_bytes() == b"BPS1ruim"
     assert fs.aplicar_prontos(paths) == []  # pedido marcado: não repete o erro a cada volta
