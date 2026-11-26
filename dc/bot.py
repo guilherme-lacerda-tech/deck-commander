@@ -642,6 +642,8 @@ class Bot:
     def _iniciar_catalogo(self, uid: int, titulo: str) -> str:
         """Guarda um único pedido curto e pede a plataforma, sem iniciar download."""
         titulo = " ".join((titulo or "").split())[:120]
+        titulo = re.sub(r"^(?:baixa|baixar|download|instala|instalar|quero jogar)\s+", "", titulo, flags=re.I)
+        titulo = re.sub(r"\s+(?:pra|para) mim$", "", titulo, flags=re.I).strip()
         if not titulo:
             return "Diga o nome do jogo primeiro."
         self.cfg.setdefault("catalogo", {})[str(uid)] = {"titulo": titulo, "at": time.time()}
