@@ -158,6 +158,25 @@ def test_pedido_nao_baixa_versao_ambigua(x, monkeypatch):
     assert x.qbt.added == []
 
 
+def test_busca_prowlarr_escolhe_console_e_adiciona_download(x, monkeypatch):
+    from dc import prowlarr
+    monkeypatch.setattr(prowlarr, "pesquisar", lambda p, titulo: [
+        {"titulo": "Jogo Teste PS2", "magnet": MAG, "seeders": 1},
+        {"titulo": "Jogo Teste Wii", "magnet": MAG, "seeders": 1}])
+    msg(x, "Jogo Teste")
+    resposta = msg(x, "PS2")
+    assert "Jogo Teste PS2" in resposta and "Jogo Teste Wii" not in resposta
+    assert x.qbt.added == []
+    assert msg(x, "/resultado 1").startswith("Adicionado (ps2)")
+    assert x.qbt.added == [(MAG, "ps2")]
+
+
+def test_resultado_busca_expirado_nao_baixa(x):
+    x.cfg["resultados_busca"] = {"1": {"console": "ps2", "itens": [{"magnet": MAG}], "at": 0}}
+    assert "vencido" in msg(x, "/resultado 1")
+    assert x.qbt.added == []
+
+
 def test_file_that_is_not_a_torrent(x, monkeypatch):
     assert "só sei usar arquivos .torrent" in msg(x, document={"file_name": "jogo.iso", "file_id": "1"})
 

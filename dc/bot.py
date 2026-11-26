@@ -264,6 +264,21 @@ class Bot:
         if cmd == "/procurar":
             titulo = " ".join(args).strip()
             return self._iniciar_catalogo(uid, titulo) if titulo else "Uso: /procurar <nome do jogo>"
+        if cmd == "/resultado":
+            pedido = self.cfg.get("resultados_busca", {}).get(str(uid)) or {}
+            try:
+                n = int(args[0]) - 1
+                itens = pedido["itens"]
+                if time.time() - pedido["at"] >= PENDING_TTL or n < 0 or n >= len(itens):
+                    raise ValueError()
+                item = itens[n]
+            except (IndexError, KeyError, TypeError, ValueError):
+                return "Resultado inválido ou vencido. Procure o jogo novamente."
+            resposta = self.handle(uid, chat, f"/add {pedido['console']} {item['magnet']}")
+            if resposta.startswith("Adicionado"):
+                self.cfg["resultados_busca"].pop(str(uid), None)
+                self.save_cfg()
+            return resposta
         if cmd == "/add":
             if not args:
                 return "Uso: /add [console] <magnet>"
@@ -570,6 +585,25 @@ class Bot:
                 return resultado
             if len(candidatos) > 1:
                 return "Há mais de uma versão nesse console. Use /familia jogos para escolher a versão exata."
+            from . import prowlarr
+            try:
+                resultados = prowlarr.pesquisar(self.paths, pedido.get("titulo", ""))
+            except prowlarr.BuscaErro as e:
+                return f"Não consegui pesquisar agora: {e}. Tente novamente."
+            if resultados is not None:
+                # Só oferece resultados que indicam claramente o console solicitado.
+                resultados = [j for j in resultados if parse_console(j["titulo"]) == escolha_exata
+                              and valid_magnet(j["magnet"])][:8]
+                if not resultados:
+                    return "Não achei um download identificado com essa plataforma. Tente outro nome ou console."
+                self.cfg.setdefault("resultados_busca", {})[str(uid)] = {
+                    "console": escolha_exata, "itens": resultados, "at": time.time()}
+                self.cfg["catalogo"].pop(str(uid), None)
+                self.save_cfg()
+                self.next_buttons = [(f"{i+1}. {j['titulo'][:45]}", f"/resultado {i+1}")
+                                     for i, j in enumerate(resultados)]
+                return "Escolha a versão para iniciar o download:\n" + "\n".join(
+                    f"{i+1}. {j['titulo']} — /resultado {i+1}" for i, j in enumerate(resultados))
             self.cfg["catalogo"].pop(str(uid), None)
             self.save_cfg()
             from . import catalogo_legal

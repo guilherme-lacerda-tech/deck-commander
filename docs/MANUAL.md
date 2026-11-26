@@ -45,6 +45,16 @@ O caminho de um jogo que você possui ou pode obter legalmente:
   Se algo falhar, o Deck continua na versão anterior. Para desfazer uma atualização: `/voltar`.
 
 ## 3. Baixar um jogo
+O bot também pode consultar um Prowlarr configurado pelo proprietário: ele procura o nome, filtra resultados que
+identificam a plataforma e oferece uma lista para escolher. Após a escolha, envia o magnet ao qBittorrent; a
+sincronização e a fila de tradução existentes cuidam do conteúdo concluído. Esse caminho requer um servidor
+Prowlarr com indexadores configurados e resultados que ofereçam magnet. Ele não garante encontrar todo jogo nem
+instalar automaticamente traduções que não sejam compatíveis. O Deck não inclui esse servidor por padrão.
+
+Configuração local (não enviar a chave ao chat nem colocá-la no Git): crie
+`~/.config/deck-commander/prowlarr.json` com as propriedades `url` e `api_key` do seu servidor e restrinja o
+arquivo ao usuário (`chmod 600`). A configuração é lida a cada pesquisa.
+
 Você pode mandar apenas o nome para escolher uma plataforma e consultar fontes legais: `Hades` → `PC`.
 O Commander não procura nem baixa ROMs comerciais de fontes não autorizadas; para emulação, importe dump próprio,
 homebrew ou um arquivo/link que você tem autorização para usar.
