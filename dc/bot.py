@@ -27,6 +27,7 @@ PENDING_TTL = 600  # "Switch 1" vale para o próximo arquivo nos próximos 10 mi
 
 # Texto livre -> console. "switch 2" é reconhecido para responder que não é suportado.
 ALIASES = [
+    (r"pc|computador|windows", "pc"),
     (r"3ds|n3ds|nintendo\s*3ds|new\s*3ds", "n3ds"),
     (r"wii\s*u|wiiu", "wiiu"),
     (r"ps\s*3|playstation\s*3|play\s*3", "ps3"),
@@ -92,10 +93,12 @@ COMMAND_IN_TEXT = re.compile(
     r"(/(?:traduzir|converter|sync|devolver|remover|qualidade|controles|status|disk|calibrar)"
     r"(?: (?!<)[A-Za-z0-9_\-]+)*?)(?=[ 	]*(?:$|[—(.,:;→]| - ))", re.MULTILINE)
 HELP = """Deck Commander — comandos
-Mais fácil: mande o nome do console (ex.: Switch 1, PS2) e depois encaminhe o .torrent ou cole o magnet.
+Mande só o nome de um jogo: eu pergunto a plataforma e mostro fontes legais. Para importar um jogo que você possui,
+encaminhe o .torrent ou cole o magnet.
 Aviso aqui quando o download terminar.
 
 /add [console] <magnet> — baixa (console: ps2 psx gc wii snes n64 gba psp nds switch)
+/procurar <jogo> — procura fontes legais e pergunta a plataforma
 /sync — leva downloads concluídos para a biblioteca  (/sync tudo confirma pacotes grandes)
 /console <id ou nome> <console> — diz ou corrige o console de um download (também baixando)
 /reiniciar — reinicia o Steam para mostrar jogos novos
@@ -259,6 +262,9 @@ class Bot:
         P, S = self.paths, self.store
         if cmd in ("/help", "/start"):
             return HELP
+        if cmd == "/procurar":
+            titulo = " ".join(args).strip()
+            return self._iniciar_catalogo(uid, titulo) if titulo else "Uso: /procurar <nome do jogo>"
         if cmd == "/add":
             if not args:
                 return "Uso: /add [console] <magnet>"
@@ -529,11 +535,26 @@ class Bot:
                 return self.handle(uid, chat, q["sim"] if yes_no in ("sim", "s") else q["nao"])
             return "Não tem nenhuma pergunta aberta agora. Se for de uma mensagem antiga, mande o comando de novo (/help)."
         pend = self.cfg.setdefault("pending_console", {})
+        pedido = self.cfg.setdefault("catalogo", {}).get(str(uid))
         doc = m.get("document")
         caption = m.get("caption") or ""
         foto = (m.get("photo") or [None])[-1] or (doc if doc and str(doc.get("mime_type", "")).startswith("image/") else None)
         if foto and caption.strip().lower().startswith("/corrigir"):
             return self._corrigir_foto(foto, caption)
+        # A plataforma responde ao pedido por nome antes do fluxo antigo de
+        # console/torrent. Assim "DMC3" -> "PS2" não troca a categoria de um
+        # download anterior por engano.
+        escolhido = parse_console(text)
+        if pedido and time.time() - pedido.get("at", 0) < PENDING_TTL and escolhido:
+            self.cfg["catalogo"].pop(str(uid), None)
+            self.save_cfg()
+            if escolhido == "switch2":
+                return "Switch 2 ainda é experimental no Deck; escolha outra plataforma ou use PC/Switch."
+            from . import catalogo_legal
+            return catalogo_legal.pesquisar(pedido.get("titulo", ""), escolhido, rotulo(escolhido))
+        if pedido and time.time() - pedido.get("at", 0) >= PENDING_TTL:
+            self.cfg["catalogo"].pop(str(uid), None)
+            self.save_cfg()
         sp = re.search(r"https?://open\.spotify\.com/(?:intl-[a-z]+/)?(playlist|album|artist|track)/[A-Za-z0-9]+\S*", text)
         if sp:  # link do Spotify colado: vira playlist rápida (nome = o resto da mensagem)
             return self._guardar_playlist(text[:sp.start()] + " " + text[sp.end():], sp.group(0))
@@ -598,7 +619,12 @@ class Bot:
                     + self._power_note()
             return (f"⬇️ Baixando {name[:-8]}. Não sei o console: responda só o nome dele (ex.: PS1)."
                     + self._power_note())
-        c = parse_console(text)
+        c = escolhido
+        # Não trate nomes inequívocos de plataformas ainda não suportadas como
+        # título de jogo: a resposta precisa continuar clara (PS5 não vira
+        # uma busca por um suposto jogo chamado "PlayStation 5").
+        if re.fullmatch(r"\s*(?:swich|(?:ps|playstation)\s*[4-9]|xbox\s*(?:one|series\s*[xs]?))\s*", text, re.I):
+            return f"Não conheço o console \"{text.strip()}\".\n{UNKNOWN_CONSOLE}"
         if c == "switch2":
             return "Switch 2 ainda não é suportado no Deck (o Lichii é experimental)."
         if c:
@@ -608,15 +634,22 @@ class Bot:
             pend[str(uid)] = {"console": c, "at": time.time()}; self.save_cfg()
             return f"Ok, próximo .torrent ou magnet = {c}. Pode encaminhar."
         import re as _re
-        if _re.search(r"(?i)\b(baix[ae]r?|download|instalar?|quero (o|a|jogar))\b", text) and not doc:
-            return ("Eu não procuro jogos sozinho 🙂 Mande o link magnet (magnet:?xt=…) ou encaminhe o arquivo "
-                    ".torrent — se quiser, mande antes o nome do console (ex.: PS2).")
-        if _re.search(r"\w", text) and _re.fullmatch(r"\s*[\w .+-]{1,24}\s*", text) and len(text.split()) <= 3 and not _re.search(
+        if _re.search(r"\w", text) and _re.fullmatch(r"\s*[\w .:'-]{2,80}\s*", text) and len(text.split()) <= 8 and not _re.search(
                 r"(?i)\b(ok|oi|ol[aá]|valeu|obrigad[oa]|blz|beleza|sim|n[aã]o|bom dia|boa (tarde|noite)|kk+|haha)\b", text):
-            return (f"Não conheço o console \"{text.strip()}\". Uso: Switch, 3DS, DS, Wii U, Wii, GameCube, N64, SNES, "
-                    "NES, GBA, Game Boy, PS1, PS2, PS3, PSP, Xbox, Dreamcast, Saturn, Mega Drive, Master System, "
-                    "Game Gear, Sega CD, PC Engine, Arcade — mande o nome e depois o .torrent ou magnet.")
+            return self._iniciar_catalogo(uid, text)
         return None  # conversa comum: ignora
+
+    def _iniciar_catalogo(self, uid: int, titulo: str) -> str:
+        """Guarda um único pedido curto e pede a plataforma, sem iniciar download."""
+        titulo = " ".join((titulo or "").split())[:120]
+        if not titulo:
+            return "Diga o nome do jogo primeiro."
+        self.cfg.setdefault("catalogo", {})[str(uid)] = {"titulo": titulo, "at": time.time()}
+        self.save_cfg()
+        return (f"«{titulo}»: em qual plataforma você quer jogar?\n"
+                "Responda, por exemplo: PC, Switch, PS2, Wii, GameCube, PS1, PSP ou Xbox.\n\n"
+                "Eu mostro fontes legais para a plataforma escolhida; para ROMs, só aceito "
+                "homebrew, dumps próprios ou arquivos/links que você tenha autorização para usar.")
 
     def _downloading(self, magnet: str) -> str | None:
         """Nome do torrent se esse magnet já estiver no qBittorrent (mesmo código btih)."""

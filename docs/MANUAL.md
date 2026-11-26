@@ -7,8 +7,9 @@ Testes que só dão para fazer com o Deck na mão, em 6 sessões curtas: [TESTES
 ---
 
 ## 1. O que é, em uma frase
-Você manda um link de jogo pelo Telegram (ou toca num botão no Deck). O Deck baixa, coloca o jogo na biblioteca do
-Steam com capa, ajusta a qualidade e traduz para português, tudo sozinho.
+Você manda o nome de um jogo pelo Telegram (ou toca num botão no Deck), escolhe a plataforma e recebe fontes
+legais. Quando fornece um arquivo ou link que pode usar, o Deck o coloca na biblioteca do Steam com capa, ajusta a
+qualidade e traduz para português, tudo sozinho.
 
 ## 2. Como funciona por dentro (o que contar para quem vai usar)
 Pense em cinco peças:
@@ -21,15 +22,17 @@ Pense em cinco peças:
 | **Plugin do Decky** | dentro do Steam | faz o atalho aparecer na hora (sem reiniciar o Steam), põe capa e a aba do console; é também o **painel** |
 | **Tradutor** | no Deck (e no PC, se ligado) | tira os textos do jogo, traduz com IA e instala como mod ou cópia "(PT-BR)" |
 
-O caminho de um jogo:
+O caminho de um jogo que você possui ou pode obter legalmente:
 
-1. Você manda `Switch` e depois o `.torrent` ou o magnet.
-2. O bot confere se é um link válido e se o jogo já existe. Se já existir, ele avisa antes de baixar.
-3. O qBittorrent baixa o jogo. Na bateria ele espera a tomada; com menos de 30% de bateria ele sempre pausa.
-4. Quando o download termina, o organizador descompacta e reconhece o console.
-5. O plugin cria o atalho, com capa, na aba do console.
-6. Se o jogo não está em português, ele entra sozinho na fila de tradução. O bot avisa a cada 20% e quando acaba.
-7. Ao abrir o jogo, o atalho chama o `dc-launch`. Ele:
+1. Você pode mandar só `Hades`, por exemplo. O bot pergunta a plataforma e mostra fontes oficiais para PC/console
+   atual. Para um console retrô, ele explica como importar homebrew, dump próprio ou material autorizado.
+2. Para importar, você manda `Switch` e depois o `.torrent` ou o magnet de uma fonte que pode usar.
+3. O bot confere se é um link válido e se o jogo já existe. Se já existir, ele avisa antes de baixar.
+4. O qBittorrent baixa o jogo. Na bateria ele espera a tomada; com menos de 30% de bateria ele sempre pausa.
+5. Quando o download termina, o organizador descompacta e reconhece o console.
+6. O plugin cria o atalho, com capa, na aba do console.
+7. Se o jogo não está em português, ele entra sozinho na fila de tradução. O bot avisa a cada 20% e quando acaba.
+8. Ao abrir o jogo, o atalho chama o `dc-launch`. Ele:
    - escolhe o emulador;
    - ajusta a resolução e a energia (e o modo dock, se houver monitor);
    - guarda uma cópia dos saves;
@@ -42,6 +45,10 @@ O caminho de um jogo:
   Se algo falhar, o Deck continua na versão anterior. Para desfazer uma atualização: `/voltar`.
 
 ## 3. Baixar um jogo
+Você pode mandar apenas o nome para escolher uma plataforma e consultar fontes legais: `Hades` → `PC`.
+O Commander não procura nem baixa ROMs comerciais de fontes não autorizadas; para emulação, importe dump próprio,
+homebrew ou um arquivo/link que você tem autorização para usar.
+
 1. Mande o nome do console: `Switch`, `PS2`, `PS1`, `GBA`, `SNES`, `Wii`…
 2. Encaminhe o arquivo `.torrent` ou cole o link `magnet:`. Também vale tudo numa mensagem só: `PS2 magnet:?xt=…`.
 3. Pronto. O bot avisa quando terminar, e o jogo aparece na aba do console, com capa.

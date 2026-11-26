@@ -92,6 +92,28 @@ def test_unknown_console_answers_clearly(x):
     assert "Não conheço o console" in msg(x, "Swich")
 
 
+def test_nome_de_jogo_pede_plataforma_sem_iniciar_download(x):
+    r = msg(x, "Devil May Cry 3")
+    assert "qual plataforma" in r.lower()
+    assert x.qbt.added == []
+    assert x.cfg["catalogo"]["1"]["titulo"] == "Devil May Cry 3"
+
+
+def test_plataforma_depois_do_nome_mostra_fontes_legais(x):
+    msg(x, "Hades")
+    r = msg(x, "PC")
+    assert "store.steampowered.com" in r
+    assert "Hades" in r
+    assert x.qbt.added == []
+
+
+def test_plataforma_retro_nao_procura_rom_automaticamente(x):
+    msg(x, "Devil May Cry 3")
+    r = msg(x, "PS2")
+    assert "não há uma loja oficial de roms" in r.lower()
+    assert x.qbt.added == []
+
+
 def test_file_that_is_not_a_torrent(x, monkeypatch):
     assert "só sei usar arquivos .torrent" in msg(x, document={"file_name": "jogo.iso", "file_id": "1"})
 
