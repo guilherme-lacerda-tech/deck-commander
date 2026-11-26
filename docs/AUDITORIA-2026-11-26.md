@@ -8,7 +8,7 @@
 | Detonados DMC3 | 20 arquivos de missão, todos com `pt`; auditoria de frases não achou texto longo original em inglês | 20/20 disponíveis offline em português |
 | IA local | túnel SSH reverso do PC para o Deck; Ollama `qwen2.5:7b` respondeu pelo endereço local do Deck e carregou na GPU do PC | ativo, privado e persistente ao login do Windows |
 | Atualizações fora da mesma rede | consulta GitHub com fallback por `git ls-remote`; cache do Deck conferido | versão instalada é a atual e não há atualização pendente |
-| Biblioteca | diagnóstico DB × disco × Steam | nenhum arquivo ou atalho ausente/modificado sem procedência do Deck Commander |
+| Biblioteca | diagnóstico DB × disco × Steam após o E2E | nenhum arquivo ou atalho ausente/modificado sem procedência do Deck Commander; um registro órfão de integração Spotify foi reconciliado sem tocar a biblioteca |
 | Instalação ponta a ponta no Deck | torrent local → `.zip` → `/sync` → atalho Steam ao vivo → duplicata → remoção | passou duas vezes; a segunda confirmou limpeza de atalho, torrent, quarentena de teste, arte e detonado temporários |
 | Serviços | `deck-commander-bot` e `deck-commander-power` | ativos |
 | Controle de DMC3 | VDF do Steam Input no próprio Deck | R4 = Save1; L5 = histórico com setas e A |
