@@ -137,6 +137,23 @@ def test_aplicar_sem_versao_nova(P, tmp_path):
     assert "mais nova" in A.aplicar(P, None, tmp_path, get_json=_commit())
 
 
+def test_falha_de_consulta_nao_e_versao_atual(P, tmp_path, monkeypatch):
+    _instalado(tmp_path)
+    monkeypatch.setattr(A, "_sha_git", lambda: None)
+    def falha(_url):
+        raise OSError("sem rede")
+    assert "Não consegui consultar" in A.aplicar(P, None, tmp_path, get_json=falha)
+    assert A.estado(P)["consulta_ok"] is False
+
+
+def test_falha_ao_agendar_nao_promete_atualizacao(P, tmp_path, monkeypatch):
+    _instalado(tmp_path)
+    monkeypatch.setattr(A, "testar", lambda pasta, rodar: (True, "ok"))
+    res = A.aplicar(P, SHA, tmp_path, _baixar(_tar(BOM)), lambda *a, **k: _R(rc=1))
+    assert "Não consegui iniciar" in res
+    assert (tmp_path / "deck-commander/VERSAO.txt").read_text().startswith("1630b3f")
+
+
 def test_painel_mostra_atualizacao(P, tmp_path, monkeypatch):
     from dc import painel
     (P.state / "atualizacao.json").write_text(json.dumps({"nova": {"sha": SHA, "data": "2026-11-16", "resumo": "x"}}))

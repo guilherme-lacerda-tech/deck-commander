@@ -92,17 +92,17 @@ def verificar(paths, get_json=_get_json, home: Path | None = None, agora: float 
             nova = None if sha.startswith(local) or local.startswith(sha[:7]) else {
                 "sha": sha, "data": "data não informada", "resumo": "Atualização disponível (consulta Git)"}
             st = estado(paths)
-            st.update(conferido=agora, erro=f"API {type(e).__name__}; consulta Git usada", local=local, nova=nova)
+            st.update(conferido=agora, erro=f"API {type(e).__name__}; consulta Git usada", consulta_ok=True, local=local, nova=nova)
             _cache(paths).write_text(json.dumps(st, ensure_ascii=False), "utf-8")
             return nova
         st = estado(paths)
-        st.update(conferido=agora, erro=f"{type(e).__name__}")
+        st.update(conferido=agora, erro=f"{type(e).__name__}", consulta_ok=False)
         _cache(paths).write_text(json.dumps(st, ensure_ascii=False), "utf-8")
         return None
     local = versao_local(home)
     nova = None if not _a_frente(local, sha, get_json) else {"sha": sha, "data": data, "resumo": resumo}
     st = estado(paths)
-    st.update(conferido=agora, erro=None, local=local, nova=nova)
+    st.update(conferido=agora, erro=None, consulta_ok=True, local=local, nova=nova)
     _cache(paths).write_text(json.dumps(st, ensure_ascii=False), "utf-8")
     return nova
 
@@ -179,6 +179,8 @@ def aplicar(paths, sha: str | None = None, home: Path | None = None, baixar=_bai
     if sha is None:
         nova = verificar(paths, get_json, home)
         if not nova:
+            if estado(paths).get("consulta_ok") is False:
+                return "⚠️ Não consegui consultar atualizações agora. Confira a conexão e tente novamente."
             return "O Deck Commander já está na versão mais nova."
         sha = nova["sha"]
     atual = pasta_programa(home)
@@ -200,8 +202,10 @@ def aplicar(paths, sha: str | None = None, home: Path | None = None, baixar=_bai
                   f"mv {q(str(staging))} {q(str(atual))}; cd {q(str(atual))}; chmod +x ./*.sh; "
                   f"python3 -m dc.atualizar depois >> {q(str(paths.logs / 'atualizacao.log'))} 2>&1; "
                   "systemctl --user restart deck-commander-bot deck-commander-power")
-        rodar(["systemd-run", "--user", "--collect", "--unit", f"dc-atualizar-{int(time.time())}", "bash", "-c", script],
-              capture_output=True, text=True, check=False)
+        agendado = rodar(["systemd-run", "--user", "--collect", "--unit", f"dc-atualizar-{int(time.time())}", "bash", "-c", script],
+                         capture_output=True, text=True, check=False)
+        if agendado.returncode != 0:
+            return "❌ Não consegui iniciar a atualização. A versão instalada não foi trocada."
         st = estado(paths)
         st.update(nova=None, local=sha[:7], atualizado=time.time())
         _cache(paths).write_text(json.dumps(st, ensure_ascii=False), "utf-8")
@@ -242,7 +246,9 @@ def main(argv: list[str]) -> int:
         depois()
     elif not argv:
         nova = verificar(paths)
-        print(f"Versão nova ({nova['data']}): {nova['resumo']}" if nova else "Já está na versão mais nova.")
+        print(f"Versão nova ({nova['data']}): {nova['resumo']}" if nova else
+              "Não consegui consultar atualizações agora." if estado(paths).get("consulta_ok") is False else
+              "Já está na versão mais nova.")
     else:
         print(__doc__)
         return 2

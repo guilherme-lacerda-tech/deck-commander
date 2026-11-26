@@ -370,6 +370,8 @@ class Bot:
             if args[:1] != ["sim"]:
                 nova = atualizar.verificar(P)
                 if not nova:
+                    if atualizar.estado(P).get("consulta_ok") is False:
+                        return "⚠️ Não consegui consultar atualizações agora. Confira a conexão e tente novamente."
                     return "✅ O Deck Commander já está na versão mais nova."
                 self.next_buttons = [("Atualizar agora", "/atualizar sim")]
                 return (f"🆕 Versão de {nova['data']}: {nova['resumo']}\nAtualizo agora? Jogos, saves e configurações "
