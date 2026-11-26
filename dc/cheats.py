@@ -78,12 +78,12 @@ def escrever_cht(cheats: list[dict]) -> str:
         return ""
     n = len(cheats)
     saida = [f"cheats = {n}\n"]
-    for c in cheats:
-        saida.append(f"cheat{c['i']}_desc = \"{c['desc']}\"\n")
-        saida.append(f"cheat{c['i']}_code = \"{c['code']}\"\n")
-        saida.append(f"cheat{c['i']}_enable = {str(c['enable']).lower()}\n")
+    for i, c in enumerate(cheats):
+        saida.append(f"cheat{i}_desc = \"{c['desc']}\"\n")
+        saida.append(f"cheat{i}_code = \"{c['code']}\"\n")
+        saida.append(f"cheat{i}_enable = {str(c['enable']).lower()}\n")
         for k, v in c["extra"].items():
-            saida.append(f"cheat{c['i']}_{k} = {v}\n")
+            saida.append(f"cheat{i}_{k} = {v}\n")
         saida.append("\n")
     return "".join(saida).rstrip("\n") + "\n"
 

@@ -44,3 +44,10 @@ def test_nao_confunde_sequencia_com_jogo_original():
 def test_recusa_quantidades_e_indices_excessivos(texto):
     with pytest.raises(ValueError):
         C.ler_cht(texto)
+
+
+def test_gravacao_reindexa_lista_esparsa():
+    lista = C.ler_cht('cheat4_desc = "Vida"\ncheat4_code = "ABCD"\n')
+    resultado = C.ler_cht(C.escrever_cht(lista))
+    assert len(resultado) == 1
+    assert resultado[0]["i"] == 0 and resultado[0]["code"] == "ABCD"
