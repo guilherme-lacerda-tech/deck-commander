@@ -32,3 +32,7 @@ def test_campos_intercalados_e_extras_com_aspas_sao_preservados():
     assert len(lista) == 2 and lista[0]["code"] == "ABCD"
     assert lista[0]["extra"]["memory_search_size"] == '"8 bit"'
     assert C.ler_cht(C.escrever_cht(lista)) == lista
+
+
+def test_nao_confunde_sequencia_com_jogo_original():
+    assert C.achar_cht(["Super Mario World 2 (USA).cht"], "Super Mario World.sfc") is None

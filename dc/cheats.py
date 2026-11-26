@@ -97,7 +97,9 @@ def achar_cht(arquivos: list[str], jogo: str) -> str | None:
     if not norm_jogo:
         return None
     exatos = [f for f in arquivos if normalizar(f) == norm_jogo]
-    candidatos = exatos or [f for f in arquivos if normalizar(f).startswith(norm_jogo)]  # igual vence "começa com"
+    # Nomes parecidos podem ser jogos distintos (ex.: Mario World e Mario World 2).
+    # Códigos do jogo errado podem corromper o progresso; não adivinhe por prefixo.
+    candidatos = exatos
     if not candidatos:
         return None
     regiao = lambda f: 0 if "(USA)" in f else 1 if "(Europe)" in f else 2  # noqa: E731
