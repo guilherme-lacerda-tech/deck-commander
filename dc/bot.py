@@ -548,10 +548,10 @@ class Bot:
         if re.fullmatch(r"\s*(?:pc|computador|windows)\s*", text, re.I):
             escolha_exata = "pc"
         if pedido and not doc and time.time() - pedido.get("at", 0) < PENDING_TTL and escolha_exata:
-            self.cfg["catalogo"].pop(str(uid), None)
-            self.save_cfg()
             if escolha_exata == "switch2":
                 return "Switch 2 ainda é experimental no Deck; escolha outra plataforma ou use PC/Switch."
+            self.cfg["catalogo"].pop(str(uid), None)
+            self.save_cfg()
             from . import catalogo_legal
             return catalogo_legal.pesquisar(pedido.get("titulo", ""), escolha_exata, rotulo(escolha_exata))
         if pedido and time.time() - pedido.get("at", 0) >= PENDING_TTL:

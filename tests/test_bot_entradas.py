@@ -125,6 +125,12 @@ def test_pc_nao_e_categoria_de_torrent():
     assert bot.parse_console("PC") is None
 
 
+def test_escolha_experimental_preserva_titulo_para_nova_plataforma(x):
+    msg(x, "Hades")
+    assert "escolha outra plataforma" in msg(x, "Switch 2")
+    assert "Hades" in msg(x, "PC")
+
+
 def test_file_that_is_not_a_torrent(x, monkeypatch):
     assert "só sei usar arquivos .torrent" in msg(x, document={"file_name": "jogo.iso", "file_id": "1"})
 
