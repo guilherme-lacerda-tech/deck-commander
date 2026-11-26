@@ -147,6 +147,14 @@ def test_sem_ia_fica_o_original(tmp_path):
     assert not c["traduzido"] and c["paragrafos"][0] == "Pallet Town"
 
 
+def test_guia_nao_aceita_traducao_incompleta(tmp_path, monkeypatch):
+    from dc.traducao import ia
+    paths = get_paths(tmp_path).ensure()
+    monkeypatch.setattr(ia, "translate", lambda *a, **k: SimpleNamespace(
+        translated={str(i): "PT" for i in range(9)}))
+    assert D._traduzir(paths, "jogo", ["texto"] * 10) is None
+
+
 def test_detonado_so_fica_pronto_quando_tudo_esta_em_portugues_e_pode_ser_agendado(tmp_path):
     paths = get_paths(tmp_path).ensure()
     D.preparar(paths, "gba-pokemon", "Pokemon FireRed", api=_api)

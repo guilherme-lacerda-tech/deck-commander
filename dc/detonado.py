@@ -425,9 +425,11 @@ def _traduzir(paths, game_id: str, textos: list[str]) -> list[str] | None:
     cfg = ia.load_cfg(paths)
     itens = [ia.Item(id=str(i), text=t) for i, t in enumerate(textos)]
     res = ia.translate(paths, cfg, itens, job=f"detonado-{game_id}")
-    if len(res.translated) < len(textos) * 0.8:  # tradução pela metade: melhor o original inteiro
+    # Não complete lacunas com o original: o painel promete conteúdo em
+    # português e até uma única frase ausente deixaria inglês escondido no guia.
+    if any(str(i) not in res.translated for i in range(len(textos))):
         return None
-    return [res.translated.get(str(i), t) for i, t in enumerate(textos)]
+    return [res.translated[str(i)] for i in range(len(textos))]
 
 
 def herdar(paths, de: str, para: str) -> bool:
