@@ -1,5 +1,13 @@
 # Deck Commander
 
+### Integração em desenvolvimento
+
+O teste `python -m pytest tests/test_e2e_mock.py -q` simula a busca, a entrega de um `.torrent` e o download do
+qBittorrent, e executa a importação local em diretórios temporários. Ele **não** executa RomM, rede real, Steam
+nem emulador; não comprova o fluxo de produção. A pasta `homelab/` contém uma base Ansible/Compose em desenvolvimento:
+exige imagem ROMarr, segredos e integração entre serviços e ainda não foi validada em Debian. Não use a stack com
+biblioteca ou saves reais antes de validar backup e restauração.
+
 Centro de comando para o **Steam Deck**: seus jogos de emulador organizados na biblioteca do Steam, com
 capa e aba por console, baixados e instalados por **mensagem no Telegram** — tudo no Gaming Mode, sem
 abrir o modo Desktop no dia a dia.

@@ -177,6 +177,18 @@ def test_resultado_busca_expirado_nao_baixa(x):
     assert x.qbt.added == []
 
 
+def test_resultado_torrent_e_enviado_ao_qbittorrent(x, monkeypatch):
+    from dc import prowlarr
+    monkeypatch.setattr(prowlarr, "pesquisar", lambda p, titulo: [
+        {"titulo": "Jogo PS2", "magnet": "", "download_url": "http://localhost:9696/download"}])
+    monkeypatch.setattr(prowlarr, "baixar_torrent", lambda p, url: TORRENT)
+    monkeypatch.setattr(x, "_already", lambda *a: None)
+    msg(x, "Jogo")
+    assert "Jogo PS2" in msg(x, "PS2")
+    assert msg(x, "/resultado 1").startswith("Adicionado (ps2)")
+    assert x.qbt.added == [("resultado.torrent", "ps2")]
+
+
 def test_file_that_is_not_a_torrent(x, monkeypatch):
     assert "só sei usar arquivos .torrent" in msg(x, document={"file_name": "jogo.iso", "file_id": "1"})
 

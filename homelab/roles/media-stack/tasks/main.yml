@@ -1,0 +1,26 @@
+---
+- name: Conferir parâmetros obrigatórios
+  ansible.builtin.assert:
+    that:
+      - romarr_image is defined
+      - romm_db_pass is defined
+      - romm_auth_secret is defined
+      - media_root is defined
+    quiet: true
+  no_log: true
+- name: Criar pasta da stack
+  ansible.builtin.file:
+    path: /opt/deck-commander
+    state: directory
+    mode: '0700'
+- name: Renderizar Compose
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: /opt/deck-commander/compose.yml
+    mode: '0600'
+  no_log: true
+- name: Aplicar Compose
+  community.docker.docker_compose_v2:
+    project_src: /opt/deck-commander
+    state: present
+  when: not ansible_check_mode

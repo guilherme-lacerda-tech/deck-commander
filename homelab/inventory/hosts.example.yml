@@ -1,0 +1,6 @@
+all:
+  children:
+    homelab:
+      hosts:
+        debian:
+          ansible_host: CHANGE_ME

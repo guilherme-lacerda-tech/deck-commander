@@ -274,7 +274,24 @@ class Bot:
                 item = itens[n]
             except (IndexError, KeyError, TypeError, ValueError):
                 return "Resultado inválido ou vencido. Procure o jogo novamente."
-            resposta = self.handle(uid, chat, f"/add {pedido['console']} {item['magnet']}")
+            if item.get("magnet"):
+                resposta = self.handle(uid, chat, f"/add {pedido['console']} {item['magnet']}")
+            else:
+                if ops.in_safe_mode(P):
+                    return "Safe-mode ativo; nenhum download foi iniciado."
+                from . import dedup, prowlarr
+                try:
+                    dados = prowlarr.baixar_torrent(P, item.get("download_url", ""))
+                    if not looks_like_torrent(dados):
+                        return "O arquivo recebido não é um torrent válido."
+                    nome = dedup.torrent_name(dados) or item["titulo"]
+                    if self._already(nome, pedido["console"]):
+                        return "Esse jogo já parece estar na biblioteca ou na fila; não baixei outra cópia."
+                    self.qbt.add_file(dados, "resultado.torrent", pedido["console"],
+                                      str(Path(syncer._cfg(P)["downloads_root"]) / pedido["console"]))
+                except (prowlarr.BuscaErro, QbtError):
+                    return "Não consegui adicionar o torrent. Verifique a fonte e o qBittorrent."
+                resposta = "Adicionado (" + pedido["console"] + "). Aviso quando terminar." + self._power_note()
             if resposta.startswith("Adicionado"):
                 self.cfg["resultados_busca"].pop(str(uid), None)
                 self.save_cfg()
@@ -593,7 +610,7 @@ class Bot:
             if resultados is not None:
                 # Só oferece resultados que indicam claramente o console solicitado.
                 resultados = [j for j in resultados if parse_console(j["titulo"]) == escolha_exata
-                              and valid_magnet(j["magnet"])][:8]
+                              and (valid_magnet(j.get("magnet", "")) or j.get("download_url"))][:8]
                 if not resultados:
                     return "Não achei um download identificado com essa plataforma. Tente outro nome ou console."
                 self.cfg.setdefault("resultados_busca", {})[str(uid)] = {

@@ -1,0 +1,7 @@
+---
+- name: Provisionar Deck Commander HomeLab
+  hosts: homelab
+  become: true
+  roles:
+    - docker
+    - media-stack
