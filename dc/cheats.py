@@ -40,9 +40,7 @@ def ler_cht(texto: str) -> list[dict]:
             n_cheats = int(linha.split("= ")[1])
             break
 
-    cheats = []
-    cheat_atual = {}
-    idx = -1
+    cheats = {}
 
     for linha in linhas:
         if linha.startswith("cheat") and "=" in linha:
@@ -51,12 +49,9 @@ def ler_cht(texto: str) -> list[dict]:
                 continue
             i, chave, valor = match.groups()
             i = int(i)
-            if i != idx:
-                if idx >= 0 and cheat_atual:
-                    cheats.append(cheat_atual)
-                cheat_atual = {"i": i, "desc": "", "code": "", "enable": False, "extra": {}}
-                idx = i
-            valor = valor.strip().strip('"')
+            cheat_atual = cheats.setdefault(i, {"i": i, "desc": "", "code": "", "enable": False, "extra": {}})
+            bruto = valor.strip()
+            valor = bruto.strip('"')
             if chave == "desc":
                 cheat_atual["desc"] = valor
             elif chave == "code":
@@ -64,19 +59,12 @@ def ler_cht(texto: str) -> list[dict]:
             elif chave == "enable":
                 cheat_atual["enable"] = valor.lower() == "true"
             else:
-                cheat_atual["extra"][chave] = valor
+                cheat_atual["extra"][chave] = bruto
         elif linha.startswith("cheats = "):
             continue
-    if idx >= 0 and cheat_atual:
-        cheats.append(cheat_atual)
-
-    if not n_cheats:
-        n_cheats = len(cheats)
-    if len(cheats) < n_cheats:
-        for i in range(len(cheats), n_cheats):
-            cheats.append({"i": i, "desc": "", "code": "", "enable": False, "extra": {}})
-
-    return sorted(cheats, key=lambda x: x["i"])
+    for i in range(n_cheats):
+        cheats.setdefault(i, {"i": i, "desc": "", "code": "", "enable": False, "extra": {}})
+    return [cheats[i] for i in sorted(cheats)]
 
 def escrever_cht(cheats: list[dict]) -> str:
     """Gera texto no formato .cht a partir de lista de cheats."""

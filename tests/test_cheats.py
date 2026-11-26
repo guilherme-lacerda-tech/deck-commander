@@ -23,3 +23,12 @@ def test_achar_e_traduzir():
     assert C.normalizar("Pokémon Fire Red & Blue") == "pokemon fire red and blue"
     assert C.traduzir_desc("Infinite Lives P1") == "Vidas infinitas P1"
     assert C.traduzir_desc("infinite ammo") == "Munição infinita"
+
+
+def test_campos_intercalados_e_extras_com_aspas_sao_preservados():
+    texto = ('cheats = 2\ncheat0_desc = "Vida"\ncheat1_desc = "Tempo"\n'
+             'cheat0_code = "ABCD"\ncheat0_memory_search_size = "8 bit"\n')
+    lista = C.ler_cht(texto)
+    assert len(lista) == 2 and lista[0]["code"] == "ABCD"
+    assert lista[0]["extra"]["memory_search_size"] == '"8 bit"'
+    assert C.ler_cht(C.escrever_cht(lista)) == lista
