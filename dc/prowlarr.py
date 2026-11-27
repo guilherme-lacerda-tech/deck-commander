@@ -4,11 +4,15 @@ from __future__ import annotations
 import json
 import urllib.parse
 import urllib.request
-from pathlib import Path
 
 
 class BuscaErro(RuntimeError):
     pass
+
+
+class SemRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
 
 
 def configuracao(paths):
@@ -19,10 +23,13 @@ def configuracao(paths):
         return None
     except (OSError, ValueError) as exc:
         raise BuscaErro("configuração do Prowlarr ilegível") from exc
-    endereco = str(cfg.get("url", "")).rstrip("/")
-    chave = str(cfg.get("api_key", ""))
+    if not isinstance(cfg, dict):
+        raise BuscaErro("configuração do Prowlarr inválida")
+    endereco = str(cfg.get("url") or "").rstrip("/")
+    chave = cfg.get("api_key")
     u = urllib.parse.urlsplit(endereco)
-    if u.scheme not in ("http", "https") or not u.hostname or u.username or u.password or not chave:
+    if (u.scheme not in ("http", "https") or not u.hostname or u.username or u.password or u.query or u.fragment
+            or not isinstance(chave, str) or not chave.strip() or any(c in chave for c in "\r\n")):
         raise BuscaErro("configuração do Prowlarr incompleta")
     return endereco, chave
 
@@ -43,6 +50,7 @@ def pesquisar(paths, titulo: str, abrir=None, indexadores=None, timeout=15) -> l
         except (OSError, ValueError, TypeError) as exc:
             raise BuscaErro("lista de indexadores inválida") from exc
     saida = []
+    vistos = set()
     sucesso = False
     for indice in (indexadores or [None]):
         params = {"query": titulo, "type": "search"}
@@ -52,8 +60,11 @@ def pesquisar(paths, titulo: str, abrir=None, indexadores=None, timeout=15) -> l
         req = urllib.request.Request(endereco + "/api/v1/search?" + query,
                                      headers={"X-Api-Key": chave, "Accept": "application/json"})
         try:
-            with (abrir or urllib.request.urlopen)(req, timeout=timeout) as resp:
-                dados = json.loads(resp.read(4 * 1024 * 1024 + 1))
+            with (abrir or urllib.request.build_opener(SemRedirect()).open)(req, timeout=timeout) as resp:
+                raw = resp.read(4 * 1024 * 1024 + 1)
+                if len(raw) > 4 * 1024 * 1024:
+                    continue
+                dados = json.loads(raw)
             if not isinstance(dados, list):
                 continue
             sucesso = True
@@ -64,9 +75,18 @@ def pesquisar(paths, titulo: str, abrir=None, indexadores=None, timeout=15) -> l
                 continue
             magnet, link, nome = item.get("magnetUrl") or "", item.get("downloadUrl") or "", item.get("title") or ""
             # Um link de download é aceito apenas se apontar para o próprio Prowlarr.
-            u, origem = urllib.parse.urlsplit(link), urllib.parse.urlsplit(endereco)
+            if not isinstance(magnet, str) or not isinstance(link, str):
+                continue
+            try:
+                u, origem = urllib.parse.urlsplit(link), urllib.parse.urlsplit(endereco)
+            except ValueError:
+                continue
             local = u.scheme == origem.scheme and u.netloc == origem.netloc
             if isinstance(nome, str) and nome and ((isinstance(magnet, str) and magnet.startswith("magnet:?")) or local):
+                identity = str(item.get("infoHash") or magnet or link)
+                if identity in vistos:
+                    continue
+                vistos.add(identity)
                 saida.append({"titulo": nome[:300], "magnet": magnet, "download_url": link if local else "",
                               "seeders": item.get("seeders") or 0})
     if not sucesso:
@@ -84,10 +104,6 @@ def baixar_torrent(paths, url: str, abrir=None) -> bytes:
     if (a.scheme, a.netloc) != (b.scheme, b.netloc) or b.username or b.password:
         raise BuscaErro("endereço de download fora do Prowlarr")
     req = urllib.request.Request(url, headers={"X-Api-Key": chave})
-    class SemRedirect(urllib.request.HTTPRedirectHandler):
-        def redirect_request(self, req, fp, code, msg, headers, newurl):
-            return None
-
     try:
         with (abrir or urllib.request.build_opener(SemRedirect()).open)(req, timeout=30) as resp:
             final = urllib.parse.urlsplit(resp.geturl())

@@ -1,0 +1,10 @@
+---
+media_stack_project_dir: /opt/deck-commander
+media_stack_project_name: deck-commander
+media_stack_romm_port: 8080
+media_stack_prowlarr_port: 9696
+media_stack_qbt_port: 8081
+media_stack_romm_image: rommapp/romm:5.4.1@sha256:8677fb7b81b1d3db20b849e989a1dadc2a11159e51eb34a2acdcb01102274edf
+media_stack_db_image: mariadb:11.4@sha256:a8992b5e5404d11e03c54a31d0c1bdea3fd116d283aa6d1a627551f29045309b
+media_stack_prowlarr_image: lscr.io/linuxserver/prowlarr@sha256:2806c9b763810589c42157730d547c293639e55c7610e9f5069314854639ec48
+media_stack_qbt_image: lscr.io/linuxserver/qbittorrent@sha256:1fa2f9692501f27ce51c4fffd771d63ec38f1163cb648941c324344b7c5a3915

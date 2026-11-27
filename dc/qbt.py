@@ -7,6 +7,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from http.cookiejar import CookieJar
+from pathlib import Path, PurePosixPath
 
 DEFAULT_URL = "http://127.0.0.1:8790"
 
@@ -15,19 +16,74 @@ class QbtError(RuntimeError):
     pass
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 class Qbt:
     def __init__(self, url: str = DEFAULT_URL, timeout: float = 15):
         self.url = url.rstrip("/")
         self.timeout = timeout
-        self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(CookieJar()))
+        self._cookies = CookieJar()
+        self.opener = urllib.request.build_opener(_NoRedirect(), urllib.request.HTTPCookieProcessor(self._cookies))
         self._v5: bool | None = None
+        self._credentials = None
+        self._mount = None
+
+    @classmethod
+    def from_paths(cls, paths, timeout=15):
+        config = paths.config / "qbittorrent.json"
+        if not config.exists():
+            return cls(timeout=timeout)
+        try:
+            cfg = json.loads(config.read_text("utf-8"))
+            url = urllib.parse.urlsplit(cfg["url"])
+            if not url.hostname or url.username is not None or url.password is not None or url.query or url.fragment:
+                raise ValueError
+            if url.scheme != "https" and not (url.scheme == "http" and url.hostname in ("127.0.0.1", "localhost", "::1")):
+                raise ValueError
+            client = cls(cfg["url"], timeout)
+            client._credentials = (cfg["username"], paths.secrets / "qbittorrent-password")
+            local = Path(cfg["local_downloads"]).expanduser()
+            remote = PurePosixPath(cfg["remote_downloads"])
+            if not local.is_absolute() or not remote.is_absolute() or ".." in remote.parts:
+                raise ValueError
+            client._mount = (local.resolve(), remote)
+            return client
+        except (ValueError, TypeError, KeyError, OSError) as exc:
+            raise QbtError("Configuração do HomeLab qBittorrent inválida") from exc
+
+    def _open(self, req):
+        try:
+            return self.opener.open(req, timeout=self.timeout)
+        except urllib.error.HTTPError as exc:
+            if exc.code not in (401, 403) or not self._credentials:
+                raise
+            exc.close()
+        user, secret = self._credentials
+        body = urllib.parse.urlencode({"username": user, "password": secret.read_text("utf-8").rstrip("\r\n")}).encode()
+        login = urllib.request.Request(self.url + "/api/v2/auth/login", data=body, headers={"Referer": self.url})
+        with self.opener.open(login, timeout=self.timeout) as response:
+            if response.read(64).strip() not in (b"", b"Ok.") or not self._cookies:
+                raise QbtError("Login do qBittorrent recusado")
+        return self.opener.open(req, timeout=self.timeout)
+
+    def _save_path(self, local):
+        if not self._mount:
+            return local
+        root, remote = self._mount
+        try:
+            return str(remote / Path(local).resolve().relative_to(root).as_posix())
+        except ValueError as exc:
+            raise QbtError("Destino fora da pasta compartilhada de downloads") from exc
 
     def _req(self, path: str, data: dict | None = None) -> bytes:
         body = urllib.parse.urlencode(data).encode() if data is not None else None
         req = urllib.request.Request(f"{self.url}/api/v2/{path}", data=body,
                                      headers={"Referer": self.url, "User-Agent": "deck-commander"})
         try:
-            with self.opener.open(req, timeout=self.timeout) as r:
+            with self._open(req) as r:
                 return r.read()
         except OSError as e:
             raise QbtError(f"qBittorrent indisponível: {e}") from e
@@ -44,7 +100,7 @@ class Qbt:
     def add(self, magnet: str, category: str, save_path: str, extra_tags: str = "") -> None:
         if not magnet.startswith("magnet:?"):
             raise QbtError("link inválido: envie um magnet:?")
-        out = self._req("torrents/add", {"urls": magnet, "category": category, "savepath": save_path,
+        out = self._req("torrents/add", {"urls": magnet, "category": category, "savepath": self._save_path(save_path),
                                          "tags": ",".join(filter(None, ["deck-commander", extra_tags]))}).decode()
         if "Fails" in out:
             raise QbtError("o qBittorrent recusou o magnet")
@@ -55,15 +111,16 @@ class Qbt:
             raise QbtError("isso não parece um arquivo .torrent")
         boundary = "----deckcommander" + str(abs(hash(data)) % 10**12)
         parts = []
-        for k, v in (("category", category), ("savepath", save_path), ("tags", ",".join(filter(None, ["deck-commander", extra_tags])))):
+        for k, v in (("category", category), ("savepath", self._save_path(save_path)), ("tags", ",".join(filter(None, ["deck-commander", extra_tags])))):
             parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode())
-        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="torrents"; filename="{filename}"\r\n'
+        # O nome multipart é decorativo. O nome do conteúdo é lido da metainformação.
+        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="torrents"; filename="download.torrent"\r\n'
                      f"Content-Type: application/x-bittorrent\r\n\r\n".encode() + data + b"\r\n")
         body = b"".join(parts) + f"--{boundary}--\r\n".encode()
         req = urllib.request.Request(f"{self.url}/api/v2/torrents/add", data=body, headers={
             "Content-Type": f"multipart/form-data; boundary={boundary}", "Referer": self.url})
         try:
-            with self.opener.open(req, timeout=self.timeout) as r:
+            with self._open(req) as r:
                 out = r.read().decode()
         except urllib.error.HTTPError as e:
             if e.code in (409, 415):  # qBittorrent 5: 415 = arquivo inválido, 409 = já existe
@@ -89,7 +146,23 @@ class Qbt:
         q = {"tag": tag}
         if category:
             q["category"] = category
-        return json.loads(self._req("torrents/info?" + urllib.parse.urlencode(q)))
+        torrents = json.loads(self._req("torrents/info?" + urllib.parse.urlencode(q)))
+        if self._mount:
+            local, remote = self._mount
+            for item in torrents:
+                path = item.get("content_path")
+                if not path:
+                    continue
+                try:
+                    rel = PurePosixPath(path).relative_to(remote)
+                    if ".." in rel.parts:
+                        raise ValueError
+                    actual = (local / rel).resolve()
+                    actual.relative_to(local)
+                    item["content_path"] = str(actual)
+                except ValueError as exc:
+                    raise QbtError("Torrent gerenciado fora da pasta compartilhada") from exc
+        return torrents
 
     def files(self, h: str) -> list[dict]:
         return json.loads(self._req("torrents/files?" + urllib.parse.urlencode({"hash": h})))
@@ -117,4 +190,4 @@ DUP_OK_TAG = "dc-dup-ok"  # baixado com /baixar: o usuário quer esta cópia mes
 QUEUE_PREFS = {"dont_count_slow_torrents": True, "slow_torrent_dl_rate_threshold": 2,
                "slow_torrent_ul_rate_threshold": 2, "slow_torrent_inactive_timer": 60}
 
-DONE_STATES = {"uploading", "stalledUP", "pausedUP", "stoppedUP", "queuedUP", "forcedUP", "checkingUP"}
+DONE_STATES = {"uploading", "stalledUP", "pausedUP", "stoppedUP", "queuedUP", "forcedUP"}

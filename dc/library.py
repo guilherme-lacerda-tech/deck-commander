@@ -175,11 +175,11 @@ def plan(existing: list[dict], games: list[Game], launcher: Path) -> Plan:
     return Plan(add, already, conflicts)
 
 
-def write_shortcuts(path: Path, new_rows: list[dict]) -> int:
+def write_shortcuts(path: Path, new_rows: list[dict], *, first_install: bool = False) -> int:
     """Acrescenta atalhos sem alterar nenhum existente. Recusa se o arquivo não fizer round-trip
     byte-a-byte (formato que não entendemos => não gravamos)."""
     path = Path(path)
-    raw = path.read_bytes()
+    raw = vdf.dump_binary({"shortcuts": {}}) if first_install else path.read_bytes()
     root = vdf.load_binary(raw)
     if vdf.dump_binary(root) != raw:
         raise RuntimeError("shortcuts.vdf não faz round-trip exato — gravação recusada")
@@ -193,7 +193,17 @@ def write_shortcuts(path: Path, new_rows: list[dict]) -> int:
     if len(check) != len(sc):
         tmp.unlink()
         raise RuntimeError("verificação pós-escrita falhou")
-    os.replace(tmp, path)
+    if first_install:
+        try:
+            # Instalação nova: Steam/SRM pode ter criado o arquivo desde o planejamento.
+            os.link(tmp, path)
+        finally:
+            tmp.unlink(missing_ok=True)
+    else:
+        if path.read_bytes() != raw:
+            tmp.unlink(missing_ok=True)
+            raise RuntimeError("Steam alterou os atalhos; tente sincronizar novamente")
+        os.replace(tmp, path)
     return len(new_rows)
 
 

@@ -1,0 +1,69 @@
+services:
+  romm:
+    image: "{{ romm_image | default(media_stack_romm_image) }}"
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_NAME: romm
+      DB_USER: romm
+      DB_PASSWD: {{ romm_db_pass | replace('$', '$$') | to_json }}
+      ROMM_AUTH_SECRET_KEY: {{ romm_auth_secret | replace('$', '$$') | to_json }}
+{% if screenscraper_user is defined and screenscraper_pass is defined %}
+      SCREENSCRAPER_USER: {{ screenscraper_user | replace('$', '$$') | to_json }}
+      SCREENSCRAPER_PASSWORD: {{ screenscraper_pass | replace('$', '$$') | to_json }}
+{% endif %}
+    volumes:
+      - "{{ media_root }}/library:/romm/library"
+      - "{{ media_root }}/assets:/romm/assets"
+      - "{{ media_root }}/config:/romm/config"
+      - resources:/romm/resources
+      - redis_data:/redis-data
+    ports: ["127.0.0.1:{{ media_stack_romm_port }}:8080"]
+    networks: [frontend, database]
+  db:
+    image: "{{ media_stack_db_image }}"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    environment:
+      MARIADB_DATABASE: romm
+      MARIADB_USER: romm
+      MARIADB_PASSWORD: {{ romm_db_pass | replace('$', '$$') | to_json }}
+      MARIADB_RANDOM_ROOT_PASSWORD: 'yes'
+    volumes: ["{{ media_root }}/db:/var/lib/mysql"]
+    networks: [database]
+  prowlarr:
+    image: "{{ media_stack_prowlarr_image }}"
+    restart: unless-stopped
+    ports: ["127.0.0.1:{{ media_stack_prowlarr_port }}:9696"]
+    volumes: ["{{ media_root }}/prowlarr:/config"]
+    networks: [apps]
+  qbittorrent:
+    image: "{{ media_stack_qbt_image }}"
+    restart: unless-stopped
+    environment:
+      WEBUI_PORT: "{{ media_stack_qbt_port }}"
+    ports: ["127.0.0.1:{{ media_stack_qbt_port }}:{{ media_stack_qbt_port }}"]
+    volumes: ["{{ media_root }}/qbittorrent:/config", "{{ media_root }}/downloads:/downloads"]
+    networks: [apps]
+{% if romarr_image is defined %}
+  romarr:
+    image: {{ romarr_image | to_json }}
+    volumes: ["{{ media_root }}/romarr:/config", "{{ media_root }}/library:/roms", "{{ media_root }}/downloads:/downloads"]
+    networks: [apps, frontend]
+{% endif %}
+volumes:
+  resources: {}
+  redis_data: {}
+networks:
+  frontend: {}
+  apps: {}
+  database:
+    internal: true

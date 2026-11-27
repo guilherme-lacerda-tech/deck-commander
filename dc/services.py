@@ -266,7 +266,7 @@ class _Dash(BaseHTTPRequestHandler):
     paths: Paths
 
     def do_GET(self):  # noqa: N802
-        body = health.status_text(self.paths, Store(self.paths.db), Qbt())
+        body = health.status_text(self.paths, Store(self.paths.db), Qbt.from_paths(self.paths))
         page = (f"<!doctype html><meta charset=utf-8><meta http-equiv=refresh content=30><title>Deck Commander</title>"
                 f"<body style='font-family:sans-serif;background:#111;color:#eee'><h1>Deck Commander</h1>"
                 f"<pre style='font-size:16px'>{html.escape(body)}</pre>")

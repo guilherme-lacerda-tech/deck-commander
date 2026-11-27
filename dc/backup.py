@@ -200,7 +200,12 @@ def list_snapshots(dest_root: Path, kind: str | None = None) -> list[Path]:
 def apply_retention(dest_root: Path, kind: str, keep: int) -> list[str]:
     """Mantém os `keep` snapshots VÁLIDOS mais novos; só remove válidos excedentes."""
     msgs = []
-    valid = [s for s in list_snapshots(dest_root, kind) if not verify_snapshot(s, sample=3)]
+    if keep < 1:
+        raise ValueError("retenção exige pelo menos uma cópia válida")
+    candidates = list_snapshots(dest_root, kind)
+    if len(candidates) <= keep:
+        return msgs
+    valid = [s for s in candidates if not verify_snapshot(s)]
     for old in valid[keep:]:
         shutil.rmtree(old)
         msgs.append(f"retenção: removido snapshot antigo {old.name}")

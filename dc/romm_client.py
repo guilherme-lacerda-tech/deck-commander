@@ -14,6 +14,10 @@ import urllib.request
 class RommError(RuntimeError):
     """Falha de comunicação ou resposta não reconhecida."""
 
+    def __init__(self, message, status=None):
+        super().__init__(message)
+        self.status = status
+
 
 class RommClient:
     def __init__(self, base_url: str, token: str, timeout: float = 15):
@@ -46,7 +50,7 @@ class RommClient:
                     raise RommError("Resposta RomM excede o limite")
                 result = json.loads(raw)
         except urllib.error.HTTPError as exc:
-            raise RommError(f"RomM respondeu HTTP {exc.code}") from exc
+            raise RommError(f"RomM respondeu HTTP {exc.code}", exc.code) from exc
         except (OSError, ValueError) as exc:
             raise RommError("Falha ao consultar o RomM") from exc
         if not isinstance(result, dict):

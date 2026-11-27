@@ -75,6 +75,13 @@ def test_retention_keeps_5(env):
     assert len(backup.list_snapshots(env["dest"], "config")) == 5
 
 
+def test_retention_zero_preserves_only_snapshot(env):
+    only = snap(env).path
+    with pytest.raises(ValueError):
+        backup.apply_retention(env["dest"], "config", 0)
+    assert only.is_dir() and backup.verify_snapshot(only) == []
+
+
 def test_restore_requires_steam_guard(env, tmp_path):
     s = snap(env).path
     plan = backup.restore_snapshot(s, dry_run=True)

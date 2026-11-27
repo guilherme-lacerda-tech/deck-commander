@@ -1,0 +1,16 @@
+---
+- name: Validar provisionamento usando o inventário selecionado
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Exigir destinos no grupo do HomeLab
+      ansible.builtin.assert:
+        that: groups.get('homelab', []) | length > 0
+    - name: Executar o playbook sem aplicar mudanças
+      ansible.builtin.command:
+        argv: "{{ [ansible_playbook_python | dirname ~ '/ansible-playbook'] + inventories + ['--check', playbook_dir ~ '/site.yml'] }}"
+      vars:
+        inventories: "{{ ['-i'] | product(ansible_inventory_sources) | list | flatten }}"
+      changed_when: false
+      check_mode: false

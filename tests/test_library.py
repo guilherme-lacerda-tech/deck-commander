@@ -94,3 +94,14 @@ def test_switch2_dump_detected(tmp_path):
     assert [(g.title, g.path.replace("\\", "/").endswith("base/exefs/main")) for g in games] == [("Donkey Kong Bananza", True)]
     cmd = library.build_command(games[0].game_id, {games[0].game_id: {"console": "switch2", "rom": games[0].path}}, {})
     assert cmd[1:3] == ["-f", "-g"] and "lichii" in cmd[0]
+def test_primeiro_atalho_nao_substitui_arquivo_criado_pela_steam(tmp_path):
+    import pytest
+    from dc import library, vdf
+
+    path = tmp_path / "shortcuts.vdf"
+    library.write_shortcuts(path, [{"AppName": "Manual"}], first_install=True)
+    with pytest.raises(FileExistsError):
+        library.write_shortcuts(path, [{"AppName": "Outro"}], first_install=True)
+    assert vdf.read_shortcuts(path) == [{"AppName": "Manual"}]
+
+

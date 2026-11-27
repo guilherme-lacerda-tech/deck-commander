@@ -138,7 +138,7 @@ class Bot:
         self.cfg_path = paths.config / "telegram.json"
         self.cfg = json.loads(self.cfg_path.read_text("utf-8")) if self.cfg_path.exists() else {"allowed": []}
         self.store = Store(paths.db)
-        self.qbt = Qbt()
+        self.qbt = Qbt.from_paths(paths)
         self.hits: dict[int, deque] = defaultdict(deque)
 
     # -- infra -----------------------------------------------------------------
@@ -1238,6 +1238,8 @@ class Bot:
                             "Para voltar ao normal: /sos off  (veja antes com /diagnostico)")
 
     def run(self) -> None:
+        from . import romm_queue
+        romm_queue.start(self.paths)
         offset = self.cfg.get("offset", 0)
         self.log("bot iniciado")
         while True:

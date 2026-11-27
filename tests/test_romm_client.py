@@ -18,13 +18,13 @@ def test_scan_e_consulta_por_http_local():
             requests.append((self.path, self.headers.get("Authorization")))
             self.send_response(202)
             self.end_headers()
-            self.wfile.write(json.dumps({"id": "123"}).encode())
+            self.wfile.write(json.dumps({"task_id": "123"}).encode())
 
         def do_GET(self):
             requests.append((self.path, self.headers.get("Authorization")))
             self.send_response(200)
             self.end_headers()
-            self.wfile.write(json.dumps({"id": "123", "status": "queued"}).encode())
+            self.wfile.write(json.dumps({"task_id": "123", "status": "queued"}).encode())
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -32,7 +32,7 @@ def test_scan_e_consulta_por_http_local():
     try:
         client = RommClient(f"http://127.0.0.1:{server.server_port}", "chave-de-teste")
         task = client.iniciar_scan()
-        assert client.consultar_tarefa(task["id"])["status"] == "queued"
+        assert client.consultar_tarefa(task["task_id"])["status"] == "queued"
         assert requests == [("/api/tasks/scan", "Bearer chave-de-teste"),
                             ("/api/tasks/123", "Bearer chave-de-teste")]
     finally:

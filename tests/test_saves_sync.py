@@ -1,6 +1,21 @@
 """Sincronização de saves: automático ao fechar o jogo."""
 
 
+def test_confirmacao_preserva_ancestral_de_transferencia_incompleta(tmp_path, monkeypatch):
+    import json
+    from dc import saves_sync
+    from dc.paths import get_paths
+
+    paths = get_paths(tmp_path).ensure()
+    base = saves_sync._dir(paths) / "ps2-exemplo.json"
+    base.write_text('{"a":"comum","b":"anterior"}')
+    monkeypatch.setattr(saves_sync, "saves_do_deck", lambda _: {
+        "a": {"sha256": "deck"}, "b": {"sha256": "igual"}})
+    assert saves_sync.confirmar(paths, "ps2-exemplo", {
+        "a": {"sha256": "pc"}, "b": {"sha256": "igual"}}) == {"sincronizados": 1}
+    assert json.loads(base.read_text()) == {"a": "comum", "b": "igual"}
+
+
 def test_saves_automaticos_ao_fechar(tmp_path, monkeypatch):
     """Melhoria: jogo já sincronizado uma vez entra na fila sozinho ao fechar; aviso só se der conflito/falha."""
     from types import SimpleNamespace

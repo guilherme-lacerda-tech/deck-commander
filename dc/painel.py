@@ -59,7 +59,7 @@ class Ponte:
 
     def __init__(self, paths: Paths, qbt=None, store=None):
         self.paths = paths
-        self.qbt = qbt if qbt is not None else Qbt(timeout=8)
+        self.qbt = qbt if qbt is not None else Qbt.from_paths(paths, timeout=8)
         self._store = store
         try:
             self.cfg = json.loads((paths.config / "telegram.json").read_text("utf-8"))
