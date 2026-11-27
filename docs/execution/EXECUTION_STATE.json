@@ -7,7 +7,7 @@
   "baseline_tests": "Windows: 1051 aprovados, 3 pulados, 94.86 s",
   "last": "P0-NOME implementado com catálogo HTTPS, busca Prowlarr assíncrona e seleção automática. Instalado na VM. Super Tilt Bro e Doom Shareware baixados pelo nome, hashes conferidos e abertos por dc-launch. 32488 arquivos originais conferidos após instalação.",
   "next": "Retomar P0-NOME. Verificar possibilidade de autenticação já autorizada do Telegram e Steam na VM sem copiar sessões pessoais. Validar transporte Telegram e atalho visível quando disponíveis. Enquanto dependem de login, ampliar casos reais de aquisição, recuperação e seleção de fontes do P0.",
-  "checkpoint_git": "Consultar o último commit na branch execucao/validacao-integral-20261126",
+  "checkpoint_git": "d884e20",
   "automation": {
     "id": "retomar-o-deck-commander",
     "interval_minutes": 30,
@@ -21,7 +21,9 @@
     "configuration_manifest_entries": 32488,
     "steam_account": "Sem login e sem userdata. Downloads e execução direta serão verificados. Publicação na biblioteca aguarda login.",
     "validation_directory": "/home/deck/commander-nome.ZXdmhF",
-    "game_processes": "Ensaios encerrados após captura. Serviços do Commander ativos."
+    "game_processes": "Ensaios encerrados após captura. Serviços do Commander ativos.",
+    "installed_commit": "d884e20",
+    "archive_sha256": "9d42d319d3cb10e72c234bd698bdd036c060809ca56e0774b4485b04e9983d4e"
   },
   "local_homelab": "/var/lib/deck-commander-validation/run.1eMABM",
   "modified": [
