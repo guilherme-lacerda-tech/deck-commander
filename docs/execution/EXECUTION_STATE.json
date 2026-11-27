@@ -1,0 +1,29 @@
+{
+  "phase": "Controles de primeiro uso e validação de instalação na VM SteamOS",
+  "current": [
+    "C-10",
+    "regressão de instalação SteamOS com EmuDeck"
+  ],
+  "baseline": "b8c48d3",
+  "baseline_tests": "Windows: 1051 aprovados, 3 pulados, 94.86 s",
+  "last": "Aquisição e RomM integrados em 31a0e6e. Primeiro lançamento de controles implementado na cópia local. VM SteamOS 3.8.14 acessada por SSH em overlay.",
+  "next": "Conferir processos locais e estado da VM, validar instalação e atualização sobre o EmuDeck no overlay, comparar configurações e registrar a regressão dos controles.",
+  "checkpoint_git": "31a0e6e",
+  "automation": {"id": "retomar-o-deck-commander", "interval_minutes": 30, "physical_deck_available_for_jobs": false},
+  "vm": {"distribution": "Ubuntu (WSL)", "overlay_directory": "/var/lib/deck-commander-validation/steamos.gVi9Fu", "guest_ssh_loopback_port": 24222},
+  "local_homelab": "/var/lib/deck-commander-validation/run.1eMABM",
+  "modified": [
+    "dc/emulators/__init__.py",
+    "dc/emulators/setup_controls.py",
+    "dc/launch.py",
+    "config/controller-profiles/",
+    "tests/test_primeiro_controle.py",
+    "AGENTS.md",
+    "docs/execution/"
+  ],
+  "failures": [],
+  "blockers": [
+    "Servidor Debian sem inventário de implantação identificado"
+  ],
+  "resume": "Seguir AGENTS.md. Conferir estado real dos processos e do overlay. Usar o PC, a VM ou o HomeLab local a cada rodada."
+}

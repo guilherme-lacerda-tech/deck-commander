@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from .adapters.ini import CfgDoc, IniDoc
+from ..adapters.ini import CfgDoc, IniDoc
 
 H = Path.home()
 VAR = H / ".var/app"
