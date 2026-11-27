@@ -14,6 +14,8 @@ def test_nome_torrent_e_sincronizacao_simulados(tmp_path, monkeypatch):
     downloads, roms = tmp_path / "downloads", tmp_path / "roms"
     b = bot.Bot(paths, "token")
     b.cfg["allowed"] = [1]
+    respostas = []
+    b.call = lambda method, **kw: respostas.append(kw) or {}
     b.limited = lambda uid: False
     class QbtMock:
         def __init__(self): self.entrou = False
@@ -35,8 +37,12 @@ def test_nome_torrent_e_sincronizacao_simulados(tmp_path, monkeypatch):
     def enviar(t):
         return b.handle_message({"from": {"id": 1}, "chat": {"id": 1}, "text": t})
     enviar("Jogo")
-    assert "Jogo GBA" in enviar("GBA")
-    assert "Adicionado" in enviar("/resultado 1")
+    assert "Pesquisando" in enviar("GBA")
+    for _, future in b.searches.values():
+        future.result(timeout=3)
+    b.notify_searches()
+    resposta = respostas[-1]["text"]
+    assert "Jogo GBA" in resposta and "Adicionado" in resposta
     downloads.mkdir()
     (downloads / "jogo.gba").write_bytes(b"conteudo-simulado")
     resposta = syncer.run_sync(paths, b.store, b.qbt)

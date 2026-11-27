@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "games": [
+    {
+      "id": "super-tilt-bro-nes",
+      "titulo": "Super Tilt Bro",
+      "aliases": [
+        "Super Tilt Bro.",
+        "Super Tilt Bros"
+      ],
+      "console": "nes",
+      "filename": "Super Tilt Bro.nes",
+      "url": "https://raw.githubusercontent.com/retrobrews/nes-games/3360c92dae5f0ff97069cc9ffe15626308309446/super-tilt-bro.nes",
+      "sha256": "ed0369a686a945c1f19c30aef9b6d02e184ff592876622610675c3474e2b3d8c",
+      "size": 40976,
+      "license": "WTFPL-2.0",
+      "source_url": "https://supertiltbro.wontfix.it/"
+    },
+    {
+      "id": "doom-shareware-pc",
+      "titulo": "Doom Shareware",
+      "aliases": [
+        "Doom",
+        "DOOM 1993",
+        "Doom shareware PC"
+      ],
+      "console": "doom",
+      "filename": "doom1.wad",
+      "url": "https://buildbot.libretro.com/assets/cores/DOOM/Doom%20%28Shareware%29.zip",
+      "sha256": "fc457ee786736dbc05a4a721fce0801507fc313748e091127cd9e04343930f3a",
+      "size": 1878051,
+      "license": "id Software shareware episode",
+      "source_url": "https://www.chocolate-doom.org/wiki/index.php/Downloads",
+      "archive_member": "Doom/doom1.wad",
+      "file_sha256": "1d7d43be501e67d927e415e0b8f3e29c3bf33075e859721816f652a526cac771",
+      "file_size": 4196020
+    }
+  ]
+}

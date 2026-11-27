@@ -279,6 +279,23 @@ def install_cores(log: list[str]) -> None:
             f.extract(core, emulators.RA_CORES)
         z.unlink()
         log.append(f"core RetroArch instalado: {core}")
+    install_doom_data(log)
+
+
+def install_doom_data(log: list[str]) -> None:
+    """Instala os dados livres do PrBoom na pasta de sistema configurada do RetroArch."""
+    cfg = emulators.CfgDoc.load(emulators.RA_DIR / "retroarch.cfg")
+    configured = cfg.get("system_directory")
+    system = Path(configured).expanduser() if configured and configured != "default" else emulators.RA_DIR / "system"
+    if not system.is_absolute():
+        system = emulators.RA_DIR / system
+    dst = system / "prboom.wad"
+    if dst.exists():
+        return
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    download("https://buildbot.libretro.com/assets/cores/DOOM/prboom.wad", dst,
+             "b4dd3642932193cc42bca0ee98bf30004888ca4850d69e85023b8baacfba1d1d")
+    log.append("dados do PrBoom instalados no diretório de sistema do RetroArch")
 
 
 def install_flatpaks(log: list[str]) -> None:

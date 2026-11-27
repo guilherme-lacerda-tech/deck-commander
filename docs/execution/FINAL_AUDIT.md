@@ -21,3 +21,7 @@ A validação completa do produto segue aberta. O recebimento do comando em uma 
 ## Recuperação
 
 Consultar EXECUTION_STATE.json, TEST_EVIDENCE.md e BLOCKERS.md. O checkpoint no Deck contém o código anterior de três módulos e fica em ~/.local/state/deck-commander/code-checkpoints/. O teste de aquisição usa somente o inventário descartável e a biblioteca vinculada a ele. Os dados de laboratório podem conter credenciais geradas e permanecem fora do Git.
+
+## Prioridade de aquisição por nome
+
+O P0 obrigatório passou a baixar jogos a partir do nome. O catálogo HTTPS funciona em processo separado, com fila SQLite, tamanho e SHA-256 fixados, escrita atômica, recuperação e deduplicação. A busca Prowlarr roda em segundo plano, seleciona uma identidade inequívoca e mantém pedidos sem fonte para nova tentativa. Doom Shareware e Super Tilt Bro foram instalados e abertos na VM SteamOS. A suíte completa aprovou 1080 testes com 3 pulados. O aceite integral ainda inclui transporte Telegram e publicação Steam autenticados, descritos em BLOCKERS.md.

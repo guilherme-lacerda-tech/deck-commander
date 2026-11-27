@@ -1,29 +1,59 @@
 {
-  "phase": "Controles de primeiro uso e validação de instalação na VM SteamOS",
+  "phase": "P0 obrigatório — download automático pelo nome",
   "current": [
-    "C-10",
-    "regressão de instalação SteamOS com EmuDeck"
+    "P0-NOME"
   ],
   "baseline": "b8c48d3",
   "baseline_tests": "Windows: 1051 aprovados, 3 pulados, 94.86 s",
-  "last": "Aquisição e RomM integrados em 31a0e6e. Primeiro lançamento de controles implementado na cópia local. VM SteamOS 3.8.14 acessada por SSH em overlay.",
-  "next": "Conferir processos locais e estado da VM, validar instalação e atualização sobre o EmuDeck no overlay, comparar configurações e registrar a regressão dos controles.",
-  "checkpoint_git": "31a0e6e",
-  "automation": {"id": "retomar-o-deck-commander", "interval_minutes": 30, "physical_deck_available_for_jobs": false},
-  "vm": {"distribution": "Ubuntu (WSL)", "overlay_directory": "/var/lib/deck-commander-validation/steamos.gVi9Fu", "guest_ssh_loopback_port": 24222},
+  "last": "P0-NOME implementado com catálogo HTTPS, busca Prowlarr assíncrona e seleção automática. Instalado na VM. Super Tilt Bro e Doom Shareware baixados pelo nome, hashes conferidos e abertos por dc-launch. 32488 arquivos originais conferidos após instalação.",
+  "next": "Retomar P0-NOME. Verificar possibilidade de autenticação já autorizada do Telegram e Steam na VM sem copiar sessões pessoais. Validar transporte Telegram e atalho visível quando disponíveis. Enquanto dependem de login, ampliar casos reais de aquisição, recuperação e seleção de fontes do P0.",
+  "checkpoint_git": "Consultar o último commit na branch execucao/validacao-integral-20261126",
+  "automation": {
+    "id": "retomar-o-deck-commander",
+    "interval_minutes": 30,
+    "physical_deck_available_for_jobs": false
+  },
+  "vm": {
+    "distribution": "Ubuntu (WSL)",
+    "overlay_directory": "/var/lib/deck-commander-validation/steamos.gVi9Fu",
+    "guest_ssh_loopback_port": 24222,
+    "configuration_manifest": "/var/lib/deck-commander-validation/steamos.gVi9Fu/emudeck.Mjjm8M/before.sha256",
+    "configuration_manifest_entries": 32488,
+    "steam_account": "Sem login e sem userdata. Downloads e execução direta serão verificados. Publicação na biblioteca aguarda login.",
+    "validation_directory": "/home/deck/commander-nome.ZXdmhF",
+    "game_processes": "Ensaios encerrados após captura. Serviços do Commander ativos."
+  },
   "local_homelab": "/var/lib/deck-commander-validation/run.1eMABM",
   "modified": [
-    "dc/emulators/__init__.py",
-    "dc/emulators/setup_controls.py",
-    "dc/launch.py",
-    "config/controller-profiles/",
-    "tests/test_primeiro_controle.py",
     "AGENTS.md",
+    "README.md",
+    "dc/bot.py",
+    "dc/catalogo_downloads.py",
+    "dc/emulators/__init__.py",
+    "dc/services.py",
+    "dc/setup.py",
+    "config/download-catalog.json",
+    "homelab/tests/validate_name_download.py",
+    "tests/test_bot_entradas.py",
+    "tests/test_e2e_mock.py",
+    "tests/test_travas.py",
+    "tests/test_catalogo_downloads.py",
+    "tests/test_doom_download.py",
     "docs/execution/"
   ],
   "failures": [],
   "blockers": [
+    "VM sem primeiro login Steam para verificar biblioteca autenticada",
+    "VM sem token Telegram para transporte público das mensagens",
     "Servidor Debian sem inventário de implantação identificado"
   ],
-  "resume": "Seguir AGENTS.md. Conferir estado real dos processos e do overlay. Usar o PC, a VM ou o HomeLab local a cada rodada."
+  "resume": "Reler a ordem integral, aplicar prioridade P0-NOME, conferir arquivos e processos em andamento, executar pendência do fluxo de aquisição na VM.",
+  "priority_override": "Decisão de 27/11/2026. Nome do jogo até download e instalação é obrigatório e precede as demais funcionalidades.",
+  "tests": [
+    "Windows suíte completa: 1080 passed, 3 skipped, 68.48 s",
+    "VM real: dois downloads HTTPS, hash, instalação e execução nos cores Nestopia e PrBoom",
+    "VM preservação: 32488 hashes originais iguais",
+    "VM instalação repetida, plugin conferido por diff, qBittorrent/power ativos"
+  ],
+  "p0_status": "INTEGRATION_TESTED download e launcher reais. P0-NOME permanece IN_PROGRESS até completar transporte e publicação autenticados."
 }

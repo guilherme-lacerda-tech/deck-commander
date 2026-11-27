@@ -29,6 +29,8 @@ CONSOLES = {
                "cmd": [FLATPAK, "run", "org.DolphinEmu.dolphin-emu", "-b", "-e", "{rom}"]},
     "wii":    {"label": "Wii", "exts": [".rvz", ".wbfs", ".iso", ".wad"],
                "cmd": [FLATPAK, "run", "org.DolphinEmu.dolphin-emu", "-b", "-e", "{rom}"]},
+    "doom":   {"label": "DOOM PC", "exts": [".wad", ".iwad"],
+               "cmd": [FLATPAK, "run", "org.libretro.RetroArch", "-f", "-L", str(RA_CORES / "prboom_libretro.so"), "{rom}"]},
     "snes":   {"label": "Super Nintendo", "exts": [".sfc", ".smc", ".zip"],
                "cmd": [FLATPAK, "run", "org.libretro.RetroArch", "-f", "-L", str(RA_CORES / "snes9x_libretro.so"), "{rom}"]},
     "n64":    {"label": "Nintendo 64", "exts": [".z64", ".n64", ".v64", ".zip"],
@@ -92,6 +94,7 @@ _RYU = ["Applications/publish/Ryujinx", "Applications/Ryujinx*/Ryujinx", "Applic
         "Applications/ryujinx*.AppImage", "Downloads/publish/Ryujinx", "Downloads/*/publish/Ryujinx"]
 _YUZU_ARGS = ["-f", "-g"]
 OPCOES: dict[str, list[dict]] = {
+    "doom": [{"nome": "PrBoom (RetroArch)", "ra_core": "prboom_libretro.so"}],
     "psx": [{"nome": "DuckStation", "globs": _DUCK, "args": ["-fullscreen", "-batch", "--"]},
             {"nome": "DuckStation (Flatpak)", "flatpak": "org.duckstation.DuckStation",
              "args": ["-fullscreen", "-batch", "--"]},
@@ -198,7 +201,7 @@ def flatpaks_dispensaveis(home: Path = H, fora: set[str] | None = None) -> set[s
 
 RA_CORE_FILES = ["snes9x_libretro.so", "mupen64plus_next_libretro.so", "mgba_libretro.so", "nestopia_libretro.so",
                  "gambatte_libretro.so", "genesis_plus_gx_libretro.so", "mednafen_saturn_libretro.so",
-                 "mednafen_pce_fast_libretro.so", "fbneo_libretro.so", "swanstation_libretro.so"]
+                 "mednafen_pce_fast_libretro.so", "fbneo_libretro.so", "swanstation_libretro.so", "prboom_libretro.so"]
 RA_CORE_URL = "https://buildbot.libretro.com/nightly/linux/x86_64/latest/{core}.zip"
 FLATPAK_IDS = ["net.pcsx2.PCSX2", "org.DolphinEmu.dolphin-emu", "org.libretro.RetroArch", "org.ppsspp.PPSSPP",
                "net.kuribo64.melonDS", "org.azahar_emu.Azahar", "info.cemu.Cemu", "net.rpcs3.RPCS3", "app.xemu.xemu",

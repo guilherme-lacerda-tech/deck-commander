@@ -9,3 +9,7 @@
 | Castlevania | O adaptador existente atende Symphony of the Night de PS1. O formato da fonte está identificado em dc/traducao/sotn_fonte.py | Identidade e asset da edição Unity, se for um título diferente. A edição PS1 precisa de validação visual separada | Nunca aplicar uma receita Unity sobre a imagem PS1 |
 
 O desenvolvimento do painel de cheats, da fila, das receitas de tradução e da sincronização de saves segue como trabalho de engenharia. O acesso ao Debian pessoal não é pré-requisito para testar os serviços em Docker.
+
+## Dependências do P0-NOME
+
+A VM acessível tem Steam sem primeiro login e bot sem token. Download HTTPS, instalação e execução de Doom Shareware e Super Tilt Bro foram validados usando o handler local do bot e launcher real. Publicação no cliente Steam autenticado e mensagens pelo Telegram público aguardam essas autenticações. O catálogo padrão contém esses dois jogos. A busca de títulos adicionais usa o catálogo pessoal/familiar e os indexadores Prowlarr configurados.

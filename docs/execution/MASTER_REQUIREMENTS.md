@@ -4,6 +4,7 @@ Cada ID identifica uma obrigação. PENDING significa que o aceite ainda precisa
 
 | ID | Requisito e critério a demonstrar | Fonte | Módulo / arquivos de referência | Dependência | Prioridade | Status | Teste / evidência |
 |---|---|---|---|---|---|---|---|
+| P0-NOME | Enviar só nome, selecionar plataforma quando necessário, pesquisar e baixar automaticamente sem torrent/link do usuário, verificar, importar e abrir. Validar download real na VM. | Decisão do usuário 27/11/2026 | dc/bot.py, catálogo HTTP, dc/prowlarr.py, dc/syncer.py | fonte disponível, emulador | P0 obrigatório antes dos demais módulos | IN_PROGRESS | Retomada em EXECUTION_STATE.json |
 | OE-8-1 | Repositório. | Ordem §8 | Inventário · dc/inventory.py | acesso aos ambientes | P1 | PENDING | Em aberto |
 | OE-8-2 | PC de desenvolvimento. | Ordem §8 | Inventário · dc/inventory.py | acesso aos ambientes | P1 | PENDING | Em aberto |
 | OE-8-3 | Steam Deck. | Ordem §8 | Inventário · dc/inventory.py | acesso aos ambientes | P1 | PENDING | Em aberto |

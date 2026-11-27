@@ -1,6 +1,8 @@
 # Continuidade do Deck Commander
 
-A retomada agendada ocorre a cada 30 minutos nesta conversa. A fonte de estado é `docs/execution/EXECUTION_STATE.json`. Consulte também a matriz e as evidências em `docs/execution/`.
+A cada 30 minutos, releia as 24 seções da ordem de execução anexada a esta conversa. Uma cópia integral está em `docs/execution/ORDEM_DE_EXECUCAO.md`. Compare os critérios da ordem e do Documento Mestre com a matriz, as evidências e o código. Use `docs/execution/EXECUTION_STATE.json` para localizar o ponto de retomada e execute a próxima pendência da fila na mesma rodada.
+
+A decisão do usuário de 27/11/2026 torna obrigatória a prioridade P0-NOME. O usuário envia somente o nome do jogo, escolhe a plataforma quando necessário e o Commander pesquisa, baixa, verifica, importa e disponibiliza automaticamente. O usuário consegue iniciar esse fluxo sem enviar torrent ou link. Instale e valide na VM SteamOS com downloads reais de fontes autorizadas. As demais funcionalidades são secundárias até os critérios desse fluxo serem demonstrados, ressalvadas suas dependências e a preservação de dados.
 
 1. Confira a branch, o último commit, o índice e as alterações locais. Preserve o trabalho iniciado.
 2. Confira se a rodada anterior deixou testes, instalações ou outras operações em execução. Recolha o resultado disponível antes de repetir a operação.
