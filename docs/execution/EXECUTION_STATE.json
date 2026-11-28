@@ -1,5 +1,5 @@
 {
-  "phase": "P0-NOME — preparação da implantação no bot autenticado",
+  "phase": "PAUSED_BY_USER — relatório de paralisação",
   "current": [
     "P0-NOME",
     "integrar fluxo automático à release61158ce e validar Telegram/biblioteca"
@@ -12,7 +12,8 @@
   "automation": {
     "id": "retomar-o-deck-commander",
     "interval_minutes": 30,
-    "physical_deck_available_for_jobs": true
+    "physical_deck_available_for_jobs": true,
+    "status": "PAUSED"
   },
   "vm": {
     "distribution": "Ubuntu (WSL)",
@@ -27,18 +28,14 @@
     "archive_sha256": "9d42d319d3cb10e72c234bd698bdd036c060809ca56e0774b4485b04e9983d4e"
   },
   "local_homelab": "/var/lib/deck-commander-validation/run.1eMABM",
-  "modified": [
-    "dc/catalogo_downloads.py",
-    "tests/test_catalogo_downloads.py",
-    "homelab/tests/validate_download_recovery.py"
-  ],
+  "modified": [],
   "failures": [],
   "blockers": [
     "VM sem contaSteam autenticada; Deck físico já tem autenticação, implantação nova pendente",
     "TokenTelegram existe no Deck; fluxo novo ainda não implantado",
     "ServidorDebian sem inventário de implantação identificado"
   ],
-  "resume": "Corrigir lentidão/fallback da busca real no InternetArchive e preparar release do fluxo por nome sobre61158ce; validar instalação na VM, implantar no Deck preservando saves e testar Telegram até biblioteca autenticada.",
+  "resume": "NÃO EXECUTAR. Aguardar novo pedido explícito do usuário. A próxima etapa técnica anterior permanece em next como registro, sem autorização ativa.",
   "priority_override": "Regressão resolvida em27/11. Retomar P0-NOME no PC/VM. Não repetir abertura/fechamento do DMC para tarefa já concluída.",
   "tests": [
     "Windows suíte completa: 1080 passed, 3 skipped, 68.48 s",
@@ -84,5 +81,14 @@
     "real_query": "Doom Shareware",
     "query_result": "TimeoutError após15 segundos",
     "catalog_module_installed_on_deck": false
-  }
+  },
+  "pause": {
+    "requested_by": "user",
+    "date": "2026-11-28",
+    "reason": "pare tudo e monte um relatório de tudo que fez e tudo que falta fazer",
+    "resume_requires_new_user_request": true,
+    "previous_phase": "P0-NOME — preparação da implantação no bot autenticado",
+    "report": "docs/execution/RELATORIO_PARALISACAO_2026-11-28.md"
+  },
+  "latest_investigation": "Busca Prowlarr/Cardigann pelo InternetArchive apresentou timeout emaprox100s. Mesma query direta comurllib noDeck respondeu emaprox0,9s. Correção/fallback e busca multiplataforma não foram concluídos antes da pausa."
 }

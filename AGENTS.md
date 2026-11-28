@@ -1,5 +1,7 @@
 # Continuidade do Deck Commander
 
+> **PAUSA ORDENADA EM 28/11/2026:** o proprietário pediu parar todo o trabalho e receber um relatório. A automação de retomada está PAUSED. Não executar as instruções de continuidade abaixo até novo pedido explícito do usuário. Relatório em `docs/execution/RELATORIO_PARALISACAO_2026-11-28.md`.
+
 A cada 30 minutos, releia as 24 seções da ordem de execução anexada a esta conversa. Uma cópia integral está em `docs/execution/ORDEM_DE_EXECUCAO.md`. Compare os critérios da ordem e do Documento Mestre com a matriz, as evidências e o código. Use `docs/execution/EXECUTION_STATE.json` para localizar o ponto de retomada e execute a próxima pendência da fila na mesma rodada.
 
 A regressão de abertura do DMC3 foi corrigida no Deck em 27/11/2026 e publicada na release61158ce. O jogo abriu pelo Steam e os22 hashes de saves/cartões de memória foram preservados. Não repita abertura ou fechamento do jogo para esse reparo concluído. Retome P0-NOME no PC/VM, preservando a proteção do atualizador e as alterações locais em andamento.
