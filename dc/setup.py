@@ -388,7 +388,7 @@ def setup_plugin(log: list[str]) -> None:
             try:
                 shutil.copyfile(src, dst); changed.append(str(rel))
             except PermissionError:
-                log.append(f"PLUGIN: sem permissão para atualizar {dst} — reinstale pelo ZIP {PLUGIN_ZIP}")
+                log.append(f"PLUGIN: sem permissão para atualizar {dst} — rode o Instalar-Deck-Commander.sh de novo (ele pede a senha e devolve a pasta ao seu usuário) ou reinstale pelo ZIP {PLUGIN_ZIP}")
                 return
     if not changed:
         log.append("plugin já instalado, em dia")

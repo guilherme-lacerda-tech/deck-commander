@@ -44,3 +44,10 @@ def test_instalador_nao_manda_instalar_zip_que_ele_mesmo_instala(monkeypatch, tm
     setup.setup_plugin(log)
     assert "ZIP" in log[0]
     assert "DC_INSTALADOR=1 ./setup-deck.sh" in CAB
+
+
+def test_plugin_de_outro_dono_e_detectado_pela_pasta_inteira():
+    """28/11/2026: pasta do plugin e plugin.json do root, index.js do usuário: a checagem antiga (só index.js)
+    dizia 'em dia' e a atualização automática nunca conseguia trocar o plugin.json."""
+    assert 'find "$HOME/homebrew/plugins/deck-commander" ! -user "$(id -u)"' in CAB
+    assert '[ ! -w "$HOME/homebrew/plugins/deck-commander/dist/index.js" ]' not in CAB

@@ -162,7 +162,9 @@ else
   if [ -f "$HOME/homebrew/plugins/deck-commander/plugin.json" ] && \
      diff -rq --exclude=__pycache__ "$DEST/decky-plugin" "$HOME/homebrew/plugins/deck-commander" >/dev/null 2>&1; then
     ok "Plugin do Deck Commander já instalado e em dia"; PLUGIN_OK=1
-    if [ ! -w "$HOME/homebrew/plugins/deck-commander/dist/index.js" ] && garantir_senha; then
+    # qualquer arquivo (ou a própria pasta) de outro dono bloqueia a atualização automática; antes só o index.js
+    # era conferido e o plugin.json/pasta do root passavam (achado na VM e no Deck em 28/11/2026)
+    if [ -n "$(find "$HOME/homebrew/plugins/deck-commander" ! -user "$(id -u)" -print -quit 2>/dev/null)" ] && garantir_senha; then
       sudo chown -R "$(id -u):$(id -g)" "$HOME/homebrew/plugins/deck-commander"
       ok "Plugin liberado para a atualização automática"
     fi
