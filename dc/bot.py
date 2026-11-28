@@ -60,6 +60,11 @@ CURTO = {"psx": "PS1", "ps2": "PS2", "ps3": "PS3", "psp": "PSP", "switch": "Swit
          "gc": "GameCube", "wii": "Wii", "wiiu": "Wii U", "x360": "Xbox 360", "xbox": "Xbox"}
 
 
+def busca_normal(texto: str) -> str:
+    from .busca import normalizar
+    return normalizar(texto)
+
+
 def rotulo(c: str | None) -> str:
     from .emulators import CONSOLES
     return CURTO.get(c or "", (CONSOLES.get(c or "") or {}).get("label", c or "?"))
@@ -145,6 +150,8 @@ class Bot:
         self.search_pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="catalog-search")
         self.searches = {}
         self.buscas = {}  # uid -> (texto, chat, future) da busca multiplataforma em andamento
+        import threading
+        self.trava = threading.RLock()  # laço do Telegram x thread de manutenção (ambos mexem em self.cfg)
 
     # -- infra -----------------------------------------------------------------
     def log(self, msg: str) -> None:
@@ -172,6 +179,10 @@ class Bot:
         """`buttons`: lista de textos (o botão envia o próprio texto, ex.: "Sim") ou (rótulo, comando); uma LISTA de
         (rótulo, comando) vira uma linha com vários botões lado a lado (ex.: "ℹ️ jogo" e "⬇️").
         Todo comando citado na mensagem (ex.: "/traduzir aprovar 1a2b") também vira botão."""
+        with self.trava:  # chamado pelo laço do Telegram e pela thread de manutenção (mexe em self.cfg)
+            self._send(chat, text, buttons)
+
+    def _send(self, chat: int, text: str, buttons: list | None = None) -> None:
         text = text.replace(self.token, "***")
         linhas: list[list[tuple[str, str]]] = []
         for b in list(buttons or []) + (self.__dict__.pop("next_buttons", None) or []):  # + pedidos pelo comando
@@ -232,6 +243,10 @@ class Bot:
             self.send(chat, reply)
 
     def save_cfg(self) -> None:
+        with self.trava:
+            self._save_cfg()
+
+    def _save_cfg(self) -> None:
         tmp = self.cfg_path.with_name("telegram.json.tmp")
         tmp.write_text(json.dumps(self.cfg, indent=1), "utf-8")
         tmp.replace(self.cfg_path)
@@ -814,6 +829,12 @@ class Bot:
         destino = args[2] if len(args) > 2 else "deck"
         if destino not in dispositivos.DISPOSITIVOS:
             return "Dispositivo desconhecido."
+        if busca.eh_pacote(r) and (len(args) < 4 or args[3] != "pacote"):
+            # teste real 28/11/2026: 'Pokemon Nintendo Switch ROMS' (44,9 GB, vários jogos) baixou com um toque
+            self.next_buttons = [(f"📦 Baixar o pacote ({busca.tamanho_txt(r.get('tamanho'))})",
+                                  f"/bd {sid} {r['rid']} {destino} pacote"), ("◀ Voltar à lista", f"/bp {sid} 0")]
+            return (f"📦 «{r['titulo']}» é um PACOTE com vários jogos ({busca.tamanho_txt(r.get('tamanho'))}), não um "
+                    "jogo só. Baixa tudo de uma vez e ocupa bastante espaço. Confirme se é isso mesmo que você quer.")
         return self._baixar_resultado(uid, chat, r, destino)
 
     def _detalhe_busca(self, sid: str, r: dict) -> str:
@@ -891,6 +912,13 @@ class Bot:
                 return "Não consegui puxar do Deck da família; confira a conexão com ele."
         else:
             return "Esse tipo de resultado ainda não sabe baixar."
+        if resposta.startswith("Adicionado") and acao["tipo"] in ("prowlarr", "ia_torrent"):
+            # a confirmação mostra o nome que a pessoa ESCOLHEU; o nome interno do torrent vai entre parênteses
+            # (teste real 28/11/2026: escolheu 'Pokemon Nintendo Switch ROMS' e leu 'pokemon-shield_202604')
+            quem = rotulo(console) if console else "plataforma a confirmar"
+            interno = resposta.split(": ", 1)[1].split(". Aviso", 1)[0] if ": " in resposta else ""
+            extra = f" (nome do arquivo: {interno})" if interno and busca_normal(interno) != busca_normal(r["titulo"]) else ""
+            resposta = f"Adicionado ({quem}): {r['titulo']}{extra}. Aviso quando terminar." + self._power_note()
         if resposta.startswith(("Adicionado", "⬇️", "Esse download já está na fila")):
             feitos[chave] = {"at": time.time(), "resposta": resposta.split("\n")[0][:200]}
             self.save_cfg()
@@ -1600,37 +1628,10 @@ class Bot:
                             "Downloads e automações pararam; nada foi apagado. O bot continua aqui.\n"
                             "Para voltar ao normal: /sos off  (veja antes com /diagnostico)")
 
-    def run(self) -> None:
-        from . import romm_queue
-        romm_queue.start(self.paths)
-        offset = self.cfg.get("offset", 0)
-        self.log("bot iniciado")
-        while True:
-            try:
-                ups = self.call("getUpdates", offset=offset, timeout=3 if (self.searches or self.buscas) else 50,
-                                allowed_updates='["message","callback_query"]')
-            except Exception as e:  # noqa: BLE001 — sem rede: espera e tenta de novo
-                self.log(f"rede: {type(e).__name__}"); time.sleep(30); continue
-            for u in ups:
-                offset = u["update_id"] + 1
-                if u.get("callback_query"):
-                    try:
-                        self.handle_callback(u["callback_query"])
-                    except Exception as e:  # noqa: BLE001
-                        self.log(f"erro no botão: {e}")
-                    continue
-                m = u.get("message") or {}
-                if "from" not in m:
-                    continue
-                try:
-                    reply = self.handle_message(m)
-                except Exception as e:  # noqa: BLE001
-                    self.log(f"erro: {e}"); reply = f"❌ erro interno: {e}"
-                if reply:
-                    try:
-                        self.send(m["chat"]["id"], reply)
-                    except Exception as e:  # noqa: BLE001
-                        self.log(f"falha ao responder: {e}")
+    def _manutencao(self) -> None:
+        """Avisos, nuvem, guardião, protetor… Roda numa thread própria (laco_manutencao): nada disso pode atrasar a
+        resposta a um botão ou mensagem."""
+        with self.trava:  # passos rápidos que mexem em self.cfg
             try:
                 self.notify_safe_mode()
             except Exception as e:  # noqa: BLE001
@@ -1647,8 +1648,6 @@ class Bot:
                 self.log(f"aviso de download: {e}")
             try:
                 self.retry_catalog_requests()
-                self.notify_searches()
-                self.notify_buscas()
                 self.notify_catalog_downloads()
             except Exception as e:  # noqa: BLE001 — falha de fonte preserva os pedidos
                 self.log(f"retomada de busca: {type(e).__name__}")
@@ -1677,6 +1676,19 @@ class Bot:
                 familia_servico.avisar_presenca(self)
             except Exception as e:  # noqa: BLE001
                 self.log(f"família: {e}")
+            try:
+                from . import v08_comandos
+                v08_comandos.avisar_convite(self)
+            except Exception as e:  # noqa: BLE001
+                self.log(f"netplay: {e}")
+            try:
+                self.notify_removidos()
+            except Exception as e:  # noqa: BLE001
+                self.log(f"aviso de jogo tirado do Steam: {e}")
+
+    def _manutencao_longa(self) -> None:
+        """Tarefas que podem levar minutos (protetor, guardião, nuvem): SEM a trava, para não segurar o bot."""
+        if True:
             try:  # protetor de tela com a arte dos jogos: refeito 1x por dia (jogos novos, recentes primeiro)
                 marca = self.paths.state / "protetor-montado"
                 if not marca.exists() or time.time() - marca.stat().st_mtime > 86400:
@@ -1695,11 +1707,6 @@ class Bot:
                             self.send(self.cfg["notify_chat"], aviso)
             except Exception as e:  # noqa: BLE001
                 self.log(f"guardião: {e}")
-            try:
-                from . import v08_comandos
-                v08_comandos.avisar_convite(self)
-            except Exception as e:  # noqa: BLE001
-                self.log(f"netplay: {e}")
             try:  # saves na nuvem (Google Drive): de hora em hora, se o PC já ligou a conta
                 marca = self.paths.state / "nuvem-rodou"
                 if (self.paths.config / "rclone.conf").exists() and (
@@ -1712,11 +1719,59 @@ class Bot:
                             self.log("nuvem: " + linha)
             except Exception as e:  # noqa: BLE001
                 self.log(f"nuvem: {e}")
+
+    def _laco_manutencao(self) -> None:
+        while True:
+            for passo in (self._manutencao, self._manutencao_longa):
+                try:
+                    passo()
+                except Exception as e:  # noqa: BLE001 — manutenção nunca derruba o bot
+                    self.log(f"manutenção: {type(e).__name__}: {e}")
+            time.sleep(5)
+
+    def run(self) -> None:
+        from . import romm_queue
+        romm_queue.start(self.paths)
+        offset = self.cfg.get("offset", 0)
+        self.log("bot iniciado")
+        import threading
+        threading.Thread(target=self._laco_manutencao, name="manutencao", daemon=True).start()
+        while True:
             try:
-                self.notify_removidos()
-            except Exception as e:  # noqa: BLE001
-                self.log(f"aviso de jogo tirado do Steam: {e}")
-            self.cfg["offset"] = offset; self.save_cfg()
+                ups = self.call("getUpdates", offset=offset, timeout=2 if (self.searches or self.buscas) else 25,
+                                allowed_updates='["message","callback_query"]')
+            except Exception as e:  # noqa: BLE001 — sem rede: espera e tenta de novo
+                self.log(f"rede: {type(e).__name__}"); time.sleep(30); continue
+            for u in ups:
+                offset = u["update_id"] + 1
+                if u.get("callback_query"):
+                    try:
+                        with self.trava:
+                            self.handle_callback(u["callback_query"])
+                    except Exception as e:  # noqa: BLE001
+                        self.log(f"erro no botão: {e}")
+                    continue
+                m = u.get("message") or {}
+                if "from" not in m:
+                    continue
+                try:
+                    with self.trava:
+                        reply = self.handle_message(m)
+                except Exception as e:  # noqa: BLE001
+                    self.log(f"erro: {e}"); reply = f"❌ erro interno: {e}"
+                if reply:
+                    try:
+                        self.send(m["chat"]["id"], reply)
+                    except Exception as e:  # noqa: BLE001
+                        self.log(f"falha ao responder: {e}")
+            with self.trava:
+                try:
+                    self.notify_searches()
+                    self.notify_buscas()
+                except Exception as e:  # noqa: BLE001
+                    self.log(f"entrega de busca: {type(e).__name__}")
+            with self.trava:
+                self.cfg["offset"] = offset; self.save_cfg()
 
 
 PAIR_TTL = 30 * 60   # o código de pareamento vale 30 minutos

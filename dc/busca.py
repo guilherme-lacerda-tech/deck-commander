@@ -205,7 +205,23 @@ def _rid(fonte: str, ref: str) -> str:
     return hashlib.sha1(f"{fonte}\0{ref}".encode()).hexdigest()[:10]
 
 
+PACOTE_RX = re.compile(r"(?i)\b(roms|collection|cole[cç][aã]o|pack|complete set|full set|bundle|todos os jogos)\b")
+PACOTE_GRANDE = 40 * 2**30  # nenhum jogo avulso das plataformas suportadas chega perto disso
+
+
+def limpar_titulo(titulo: str) -> str:
+    """Tira número de catálogo do começo ('1635 Pokemon Fire Red' -> 'Pokemon Fire Red'): no Internet Archive
+    muitos itens vêm assim e iam para o topo da lista na ordem alfabética."""
+    limpo = re.sub(r"^\s*\(?\d{3,5}\)?\s*[-–.]?\s+(?=\D)", "", titulo or "")
+    return limpo or titulo
+
+
+def eh_pacote(r: dict) -> bool:
+    return bool(PACOTE_RX.search(r.get("titulo") or "")) or (r.get("tamanho") or 0) > PACOTE_GRANDE
+
+
 def resultado(fonte: str, ref: str, titulo: str, console: str | None, **extra) -> dict:
+    titulo = limpar_titulo(titulo)
     r = {"rid": _rid(fonte, ref), "fonte": fonte, "titulo": titulo[:200], "console": console,
          "regiao": extra.pop("regiao", None) or regiao_de(titulo), "formato": extra.pop("formato", None) or formato_de(titulo),
          "ptbr": extra.pop("ptbr", None), "tamanho": extra.pop("tamanho", None)}
@@ -309,7 +325,7 @@ def _p_internet_archive(paths, q, abrir=None):
         filtro = f" AND (title:({alt}) OR subject:({alt}) OR description:({alt}))"
     params = {"q": f"title:({palavras}){filtro} AND mediatype:software AND format:(\"Archive BitTorrent\")",
               "fl[]": ["identifier", "title", "item_size", "licenseurl", "collection", "emulator", "year", "language",
-                       "subject"],
+                       "subject", "downloads"],
               "rows": 60, "output": "json", "sort[]": "downloads desc"}
     url = "https://archive.org/advancedsearch.php?" + urllib.parse.urlencode(params, doseq=True)
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
@@ -327,6 +343,7 @@ def _p_internet_archive(paths, q, abrir=None):
         tam = d.get("item_size")
         out.append(resultado("internet_archive", ident, titulo, _ia_console(d),
                              tamanho=tam if isinstance(tam, int) else None, ano=d.get("year"),
+                             popularidade=d.get("downloads") if isinstance(d.get("downloads"), int) else 0,
                              licenca=d.get("licenseurl"), licenca_verificada=False,
                              capa=f"https://archive.org/services/img/{ident}",
                              origem=f"https://archive.org/details/{ident}",
@@ -469,8 +486,11 @@ def deduplicar(rs: list[dict]) -> list[dict]:
 
 
 def ordenar(rs: list[dict]) -> list[dict]:
-    return sorted(rs, key=lambda r: (-r.get("score", 0), PRIORIDADE_FONTE[r["fonte"]], -(r.get("seeders") or 0),
-                                     r["titulo"].casefold()))
+    """Mais parecido com o que foi digitado; empatou: plataforma conhecida, PT-BR, jogo avulso antes de pacote, fonte,
+    seeders e popularidade — só no fim o alfabeto (antes '1635 Pokemon…' e 'plataforma ?' iam para o topo)."""
+    return sorted(rs, key=lambda r: (-round(r.get("score", 0), 1), r.get("console") is None, not r.get("ptbr"),
+                                     eh_pacote(r), PRIORIDADE_FONTE[r["fonte"]], -(r.get("seeders") or 0),
+                                     -(r.get("popularidade") or 0), r["titulo"].casefold()))
 
 
 # --------------------------------------------------------------------------------------------- sessões
@@ -538,6 +558,8 @@ def linha(r: dict, rotulo) -> str:
         partes.append(r["formato"])  # "NES · 40 KB · NES" repetia a plataforma (visto no Telegram, 28/11/2026)
     if r.get("ptbr"):
         partes.append("🇧🇷 PT-BR")
+    if r["fonte"] != "biblioteca" and eh_pacote(r):
+        partes.append("📦 pacote com vários jogos")
     marca = "✅ na biblioteca" if r["fonte"] == "biblioteca" else NOME_FONTE[r["fonte"]]
     return f"{r['titulo']}\n   {' · '.join(partes)} · {marca}"
 

@@ -302,3 +302,30 @@ def test_so_o_que_ja_tem_diz_nada_novo(x, monkeypatch):
                                                                        acao={"tipo": "biblioteca"})])
     msg(x, "jogo x")
     assert "Nada novo para baixar" in terminar(x)["text"]
+
+
+def test_pacote_pede_confirmacao_e_confirmacao_mostra_o_nome_escolhido(x, monkeypatch):
+    """Teste real 28/11/2026: 'Pokemon Nintendo Switch ROMS' (44,9 GB, vários jogos) baixou com um toque e a
+    confirmação veio com o nome interno do torrent ('pokemon-shield_202604')."""
+    fontes(monkeypatch, internet_archive=lambda p, q, **kw: [busca.resultado(
+        "internet_archive", "pokemon-shield_202604", "Pokemon Nintendo Switch ROMS", "switch", tamanho=48 * 2**30,
+        acao={"tipo": "ia_torrent", "id": "pokemon-shield_202604"})])
+    monkeypatch.setattr(x, "_adicionar_torrent_ia", lambda ident, titulo, console: "Adicionado (Switch): pokemon-shield_202604. Aviso quando terminar.")
+    msg(x, "pokemon switch")
+    lista = terminar(x)
+    assert "📦 pacote com vários jogos" in lista["text"]
+    aviso = tocar(x, lista, "⬇️ 1")
+    assert "PACOTE" in aviso["text"] and "Adicionado" not in aviso["text"]
+    feito = tocar(x, aviso, "📦 Baixar o pacote")
+    assert feito["text"].startswith("Adicionado (Switch): Pokemon Nintendo Switch ROMS (nome do arquivo: pokemon-shield_202604)")
+
+
+def test_ordem_plataforma_conhecida_antes_e_sem_numero_de_catalogo():
+    rs = [busca.resultado("internet_archive", "a", "1635 Pokemon Fire Red (U)", None, acao={}),
+          busca.resultado("internet_archive", "b", "Pokemon Fire Red [GBA]", "gba", acao={}, popularidade=10),
+          busca.resultado("internet_archive", "c", "Pokemon Fire Red ROMS Collection", "gba", acao={}, popularidade=999)]
+    for r in rs:
+        r["score"] = 0.95
+    ordem = [r["rid"] for r in busca.ordenar(rs)]
+    assert ordem[0] == rs[1]["rid"] and ordem[-1] == rs[0]["rid"]  # avulso conhecido > pacote > sem plataforma
+    assert rs[0]["titulo"] == "Pokemon Fire Red (U)"
