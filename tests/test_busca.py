@@ -140,10 +140,14 @@ def test_sessao_expira_pertence_ao_dono_e_limita_quantidade():
 def test_paginacao_e_filtros():
     rs = [busca.resultado("prowlarr", str(i), f"Jogo {i}", "ps2" if i % 2 else "psp", acao={}) for i in range(15)]
     s = {"consulta": busca.interpretar("jogo"), "fontes": {"prowlarr": "ok"}, "resultados": rs, "filtro": None}
+    def plano(bt):
+        return [x for b in bt for x in (b if isinstance(b, list) else [b])]
     txt, bt = busca.pagina(s, "abc", 0, lambda c: c)
     assert "página 1/3" in txt and ("Próxima ▶", "/bp abc 1") in bt and ("Só ps2", "/bf abc ps2") in bt
+    linha1 = bt[0]  # cada jogo: detalhes e baixar lado a lado (teste real 28/11/2026)
+    assert linha1[0][1].startswith("/bi abc ") and linha1[1] == ("⬇️ 1", f"/bd abc {rs[0]['rid']} deck")
     txt, bt = busca.pagina(s, "abc", 2, lambda c: c)
-    assert ("◀ Anterior", "/bp abc 1") in bt and not any(b[0].startswith("Próxima") for b in bt)
+    assert ("◀ Anterior", "/bp abc 1") in bt and not any(b[0].startswith("Próxima") for b in plano(bt))
     s["filtro"] = "psp"
     txt, _ = busca.pagina(s, "abc", 0, lambda c: c)
     assert "8 resultado(s)" in txt

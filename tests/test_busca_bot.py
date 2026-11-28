@@ -108,7 +108,7 @@ def test_detalhe_mostra_dispositivos_e_baixa_uma_vez_so(x, monkeypatch):
     fontes(monkeypatch, prowlarr=prowl({"titulo": "Jogo Teste [PS2]", "magnet": MAG, "tamanho": 2 * 2**30}))
     msg(x, "jogo teste")
     lista = terminar(x)
-    detalhe = tocar(x, lista, "1.")
+    detalhe = tocar(x, lista, "ℹ️ 1.")
     assert "Steam Deck" in detalhe["text"] and "RG505" in detalhe["text"] and "2 GB" in detalhe["text"]
     assert "desempenho inconsistente no RG505" in detalhe["text"]  # PS2 no RG505: política, não chute
     feito = tocar(x, detalhe, "⬇️ Baixar no Steam Deck")
@@ -123,7 +123,7 @@ def test_resultado_torrent_do_prowlarr_vai_para_o_qbittorrent(x, monkeypatch):
     fontes(monkeypatch, prowlarr=prowl({"titulo": "Jogo [PS2]", "url": "http://localhost:9696/dl"}))
     monkeypatch.setattr(prowlarr, "baixar_torrent", lambda p, url: TORRENT)
     msg(x, "jogo")
-    tocar(x, tocar(x, terminar(x), "1."), "⬇️")
+    tocar(x, tocar(x, terminar(x), "ℹ️ 1."), "⬇️")
     assert "Adicionado" in x.sent[-1]["text"] and x.qbt.added == [("resultado.torrent", "ps2")]
 
 
@@ -137,7 +137,7 @@ def test_catalogo_verificado_agenda_pela_fila_propria(x, monkeypatch):
     chamadas = []
     monkeypatch.setattr(catalogo_downloads, "agendar", lambda paths, store, it, chat: chamadas.append(it) or "op1")
     msg(x, "jogo teste")
-    detalhe = tocar(x, terminar(x), "1.")
+    detalhe = tocar(x, terminar(x), "ℹ️ 1.")
     assert "Licença: MIT" in detalhe["text"] and "não verificada" not in detalhe["text"]
     assert "entrou na fila op1" in tocar(x, detalhe, "⬇️")["text"]
     assert chamadas == [item]
@@ -150,7 +150,7 @@ def test_familia_puxa_do_outro_deck(x, monkeypatch):
     puxados = []
     monkeypatch.setattr(fs, "puxar", lambda p, q, gid: puxados.append(gid) or "⬇️ download na fila")
     msg(x, "jogo teste")
-    tocar(x, tocar(x, terminar(x), "1."), "⬇️")
+    tocar(x, tocar(x, terminar(x), "ℹ️ 1."), "⬇️")
     assert puxados == ["ps2-teste"]
 
 
@@ -210,7 +210,7 @@ def test_botao_de_busca_antiga_ou_de_outra_pessoa_nao_vale(x, monkeypatch):
     lista = terminar(x)
     sid = x.cfg["ultima_busca"]["1"]
     x.cfg["buscas"][sid]["at"] -= busca.TTL_SESSAO + 1
-    assert "antiga ou vencida" in tocar(x, lista, "1.")["text"]
+    assert "antiga ou vencida" in tocar(x, lista, "ℹ️ 1.")["text"]
     x.cfg["allowed"].append(2)
     x.cfg["buscas"][sid]["at"] += busca.TTL_SESSAO + 1
     assert "antiga ou vencida" in msg(x, f"/bi {sid} {x.cfg['buscas'][sid]['resultados'][0]['rid']}", uid=2)
@@ -249,5 +249,21 @@ def test_busca_lenta_nao_bloqueia_comandos(x, monkeypatch):
 def test_switch2_nunca_baixa(x, monkeypatch):
     fontes(monkeypatch, prowlarr=prowl({"titulo": "Jogo [Switch 2]", "magnet": MAG}))
     msg(x, "jogo")
-    detalhe = tocar(x, terminar(x), "1.")
+    detalhe = tocar(x, terminar(x), "ℹ️ 1.")
     assert not any(b["text"].startswith("⬇️") for b in botoes(detalhe))
+
+
+def test_lista_tem_baixar_na_mesma_linha_do_jogo(x, monkeypatch):
+    """Teste real 28/11/2026: o dono não achou como baixar (o botão só aparecia no detalhe)."""
+    import json
+    fontes(monkeypatch, prowlarr=prowl({"titulo": "Jogo Teste [PS2]", "magnet": MAG}))
+    msg(x, "jogo teste")
+    kb = json.loads(terminar(x)["reply_markup"])["inline_keyboard"]
+    assert [b["text"] for b in kb[0]] == ["ℹ️ 1. Jogo Teste [PS2]", "⬇️ 1"]
+    assert tocar(x, {"reply_markup": json.dumps({"inline_keyboard": kb})}, "⬇️ 1")["text"].startswith("Adicionado (ps2)")
+    assert x.qbt.added == [(MAG, "ps2")]
+
+
+def test_formato_igual_a_plataforma_nao_repete():
+    r = busca.resultado("catalogo", "s", "Super Tilt Bro", "nes", formato="NES", tamanho=40976, acao={})
+    assert busca.linha(r, lambda c: "NES").count("NES") == 1

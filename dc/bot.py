@@ -169,18 +169,24 @@ class Bot:
         return {"text": label[:60], "callback_data": "c:" + key}
 
     def send(self, chat: int, text: str, buttons: list | None = None) -> None:
-        """`buttons`: lista de textos (o botão envia o próprio texto, ex.: "Sim") ou (rótulo, comando).
+        """`buttons`: lista de textos (o botão envia o próprio texto, ex.: "Sim") ou (rótulo, comando); uma LISTA de
+        (rótulo, comando) vira uma linha com vários botões lado a lado (ex.: "ℹ️ jogo" e "⬇️").
         Todo comando citado na mensagem (ex.: "/traduzir aprovar 1a2b") também vira botão."""
         text = text.replace(self.token, "***")
-        btns = [(b, b) if isinstance(b, str) else tuple(b) for b in (buttons or [])]
-        btns += self.__dict__.pop("next_buttons", None) or []  # botões pedidos pelo comando que gerou a resposta
+        linhas: list[list[tuple[str, str]]] = []
+        for b in list(buttons or []) + (self.__dict__.pop("next_buttons", None) or []):  # + pedidos pelo comando
+            if isinstance(b, list):
+                linhas.append([tuple(x) for x in b])
+            else:
+                linhas.append([(b, b) if isinstance(b, str) else tuple(b)])
         found = [m for m in COMMAND_IN_TEXT.finditer(text)
                  if " " in m.group(1) and not text[m.end():m.end() + 2] == " <"]  # só comando completo
         if len(found) <= 6:  # mensagem de ajuda (cheia de comandos) não vira painel de botões
             for m in found:
                 c = m.group(1).strip()
-                if c not in [x[1] for x in btns]:
-                    btns.append((c, c))
+                if c not in [x[1] for linha in linhas for x in linha]:
+                    linhas.append([(c, c)])
+        btns = [x for linha in linhas for x in linha]
         yn = {lbl.lower(): cmd for lbl, cmd in btns if lbl.lower() in ("sim", "não")}
         if len(yn) == 2:  # pergunta Sim/Não: "sim"/"não" digitado vale como tocar no botão (por 1 hora)
             self.cfg["sim_nao"] = {"chat": chat, "sim": yn["sim"], "nao": yn["não"], "at": time.time()}
@@ -188,8 +194,10 @@ class Bot:
         for n, chunk in enumerate(chunks):
             extra = {}
             if btns and n == len(chunks) - 1:
-                rows = [[self._button(lbl, cmd)] for lbl, cmd in btns] if len(btns) > 2 or any(
-                    len(lbl) > 12 for lbl, _ in btns) else [[self._button(lbl, cmd) for lbl, cmd in btns]]
+                if len(btns) <= 2 and all(len(linha) == 1 for linha in linhas) and not any(len(lbl) > 12 for lbl, _ in btns):
+                    rows = [[self._button(lbl, cmd) for lbl, cmd in btns]]  # Sim / Não lado a lado
+                else:
+                    rows = [[self._button(lbl, cmd) for lbl, cmd in linha] for linha in linhas]
                 extra["reply_markup"] = json.dumps({"inline_keyboard": rows})
                 self.save_cfg()
             self.call("sendMessage", chat_id=chat, text=chunk, **extra)

@@ -498,8 +498,8 @@ def linha(r: dict, rotulo) -> str:
         partes.append(r["regiao"])
     if r["fonte"] != "biblioteca":
         partes.append(tamanho_txt(r.get("tamanho")))
-    if r.get("formato"):
-        partes.append(r["formato"])
+    if r.get("formato") and r["formato"].casefold() not in (partes[0].casefold(), str(r.get("console")).casefold()):
+        partes.append(r["formato"])  # "NES · 40 KB · NES" repetia a plataforma (visto no Telegram, 28/11/2026)
     if r.get("ptbr"):
         partes.append("🇧🇷 PT-BR")
     marca = "✅ na biblioteca" if r["fonte"] == "biblioteca" else NOME_FONTE[r["fonte"]]
@@ -536,7 +536,14 @@ def pagina(s: dict, sid: str, n: int, rotulo) -> tuple[str, list[tuple[str, str]
         texto.append(f"{i}. {linha(r, rotulo)}")
     if aviso:
         texto.append(aviso)
-    botoes = [(f"{i}. {r['titulo'][:40]}", f"/bi {sid} {r['rid']}") for i, r in enumerate(fatia, 1 + n * POR_PAGINA)]
+    # cada jogo: "ℹ️ detalhes" e, se dá para baixar no Deck, "⬇️" na MESMA linha (teste real 28/11/2026: só o nome
+    # levava aos detalhes e o dono não achou o botão de baixar)
+    from . import dispositivos
+    botoes: list = []
+    for i, r in enumerate(fatia, 1 + n * POR_PAGINA):
+        info = (f"ℹ️ {i}. {r['titulo'][:36]}", f"/bi {sid} {r['rid']}")
+        pode = r["fonte"] != "biblioteca" and dispositivos.compatibilidade("deck", r.get("console"))[0] != "nao"
+        botoes.append([info, (f"⬇️ {i}", f"/bd {sid} {r['rid']} deck")] if pode else [info])
     if n > 0:
         botoes.append(("◀ Anterior", f"/bp {sid} {n - 1}"))
     if n + 1 < paginas:
