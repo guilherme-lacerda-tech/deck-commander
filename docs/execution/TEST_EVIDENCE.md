@@ -64,3 +64,11 @@ O timer semanal `deck-commander-tests.timer` foi parado temporariamente enquanto
 A revisão local com Ollama qwen2.5-coder:7b foi registrada em outputs/dmc-regression/local-review.txt. As sugestões genéricas não substituíram os ensaios de isolamento nem foram aplicadas sem evidência. Logs, manifesto do reparo e verificações físicas estão em outputs/dmc-regression/. O código e dados anteriores permanecem no checkpoint físico; nenhuma restauração de save foi executada.
 
 O Deck recebeu correção direta sobre a base 76ab40c. VERSAO.txt continua identificando essa base; a release 61158ce está publicada para o mecanismo normal de atualização. Os saves não foram recopiados do checkpoint para a instalação.
+
+## Retomada do P0-NOME após o reparo do DMC3
+
+No Deck, bot ativo e Prowlarr3.1.0.5799 acessível com um indexadorInternetArchive habilitado. A base física76ab40c com hotfix ainda não contém dc/catalogo_downloads.py. Portanto o fluxo novo demonstrado na VM ainda não está entregue ao bot do proprietário. Não há necessidade de pedir novamente as credenciais já presentes no Deck.
+
+Ensaio real homelab/tests/validate_download_recovery.py na VM, em HOME/XDG/DC_ROOT próprios definidos antes de importar os módulos: pedido Doom pelo handler normal, servidorHTTPS emloopback, morte do worker porSIGKILL durante transferência e novo worker. Preservou1048576 bytes, enviou Range bytes=1048576-, terminou4196020 bytes comSHA-2561d7d43be501e67d927e415e0b8f3e29c3bf33075e859721816f652a526cac771. Uma operação, duas tentativas, instalada emperfil próprio e waiting_steam. Relatório outputs/download-recovery-vm-result.json. O launcher do usuário da VM não foi regravado pelo ensaio.
+
+Windows: python -m pytest -q tests/test_catalogo_downloads.py tests/test_doom_download.py tests/test_bot_entradas.py tests/test_prowlarr.py — 77 aprovados em5,30s. Próxima etapa é release/implantação e validação do transporteTelegram e bibliotecaSteam autenticados.

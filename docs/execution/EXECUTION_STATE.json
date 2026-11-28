@@ -1,13 +1,13 @@
 {
-  "phase": "P0-NOME — recuperação de downloads interrompidos",
+  "phase": "P0-NOME — preparação da implantação no bot autenticado",
   "current": [
     "P0-NOME",
-    "retomada HTTP Range após morte do worker"
+    "integrar fluxo automático à release61158ce e validar Telegram/biblioteca"
   ],
   "baseline": "b8c48d3",
   "baseline_tests": "Windows: 1051 aprovados, 3 pulados, 94.86 s",
-  "last": "Regressão DMC3 resolvida no Deck real: launcher corrigido, jogo abriu pelo Steam, 22 arquivos de saves preservados, testes isolados implantados e release61158ce publicada em main.",
-  "next": "Executar validate_download_recovery.py na VM com Doom Shareware, verificar bytes preservados após SIGKILL, validar hash final e operação única, rodar regressão e implantar.",
+  "last": "VM: download Doom interrompido por SIGKILL; 1048576 bytes preservados e retomada Range exata, arquivo4196020 bytes validadoSHA, operação única em2 tentativas. 77 testes focados aprovados. Deck: bot ativo, Prowlarr3.1.0.5799 responde com1 indexadorInternetArchive, mas módulo catalogo_downloads ainda não instalado.",
+  "next": "Preparar release do fluxo por nome sobre61158ce com os módulos necessários; validar instalação repetida na VM e publicar/implantar no Deck preservando saves, configuração e reparo. Completar transporte Telegram e publicação na biblioteca autenticada.",
   "checkpoint_git": "d884e20",
   "automation": {
     "id": "retomar-o-deck-commander",
@@ -34,11 +34,11 @@
   ],
   "failures": [],
   "blockers": [
-    "VM sem primeiro login Steam para verificar biblioteca autenticada",
-    "VM sem token Telegram para transporte público das mensagens",
-    "Servidor Debian sem inventário de implantação identificado"
+    "VM sem contaSteam autenticada; Deck físico já tem autenticação, implantação nova pendente",
+    "TokenTelegram existe no Deck; fluxo novo ainda não implantado",
+    "ServidorDebian sem inventário de implantação identificado"
   ],
-  "resume": "Continuar recuperação HTTP no PC/VM conforme suspended_work; preservar reparo físico e release61158ce. Conferir processos/artefatos antes de repetir.",
+  "resume": "Preparar release do fluxo por nome sobre61158ce com os módulos necessários; validar instalação repetida na VM e publicar/implantar no Deck preservando saves, configuração e reparo. Completar transporte Telegram e publicação na biblioteca autenticada.",
   "priority_override": "Regressão resolvida em27/11. Retomar P0-NOME no PC/VM. Não repetir abertura/fechamento do DMC para tarefa já concluída.",
   "tests": [
     "Windows suíte completa: 1080 passed, 3 skipped, 68.48 s",
@@ -49,7 +49,7 @@
   "p0_status": "INTEGRATION_TESTED download e launcher reais. P0-NOME permanece IN_PROGRESS até completar transporte e publicação autenticados.",
   "suspended_work": {
     "phase": "P0-NOME — recuperação de downloads interrompidos",
-    "next": "Executar validate_download_recovery.py na VM com Doom Shareware, verificar bytes preservados após SIGKILL, validar hash final e operação única, rodar regressão e implantar.",
+    "next": "Retomada HTTP validada. Seguir next da raiz.",
     "modified": [
       "dc/catalogo_downloads.py",
       "tests/test_catalogo_downloads.py",
@@ -64,5 +64,14 @@
     "physical_base": "76ab40c com reparo de oito arquivos",
     "checkpoint": "/home/deck/.local/state/deck-commander/code-checkpoints/dmc-launch-repair-loaflu21",
     "validation": "Steam abriu DMC3/PCSX2; 22 hashes saves intactos; isolamento físico aprovado; release1050passed5skipped na VM"
+  },
+  "recovery_validation": {
+    "status": "PASSED",
+    "preserved_bytes": 1048576,
+    "total_bytes": 4196020,
+    "attempts": 2,
+    "phase": "waiting_steam",
+    "report": "outputs/download-recovery-vm-result.json",
+    "vm_directory": "/home/deck/commander-nome.ZXdmhF/recovery.jae34Q/case"
   }
 }

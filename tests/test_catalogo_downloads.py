@@ -135,3 +135,99 @@ def test_invalid_destination_rejected_before_enqueue(context):
     with pytest.raises(ValueError):
         catalog.agendar(paths, store, item)
     assert store.list() == []
+
+
+@pytest.mark.parametrize("range_supported", [True, False])
+def test_resume_or_restart_when_server_ignores_range(context, monkeypatch, range_supported):
+    paths, _, item = context
+    payload = catalog.urllib.request.urlopen(None).read()
+    directory = paths.data / "catalog-downloads" / item["sha256"]
+    directory.mkdir(parents=True)
+    partial = directory / (item["filename"] + ".part")
+    partial.write_bytes(payload[:8])
+
+    def response(request, **kwargs):
+        assert request.get_header("Range") == "bytes=8-"
+        result = io.BytesIO(payload[8:] if range_supported else payload)
+        result.status = 206 if range_supported else 200
+        result.headers = {"Content-Range": f"bytes 8-{len(payload) - 1}/{len(payload)}"}
+        result.geturl = lambda: item["url"]
+        return result
+
+    monkeypatch.setattr(catalog.urllib.request, "urlopen", response)
+    target = catalog._download(paths, item)
+    assert target.read_bytes() == payload
+    assert not partial.exists()
+
+
+def test_connection_drop_keeps_received_bytes_for_next_attempt(context, monkeypatch):
+    paths, _, item = context
+    payload = catalog.urllib.request.urlopen(None).read()
+
+    class Disconnect(io.BytesIO):
+        status = 200
+        headers = {}
+
+        def geturl(self):
+            return item["url"]
+
+        def read(self, size=-1):
+            if self.tell():
+                raise ConnectionResetError("rede caiu")
+            return super().read(8)
+
+    monkeypatch.setattr(catalog.urllib.request, "urlopen", lambda *a, **k: Disconnect(payload))
+    with pytest.raises(ConnectionResetError):
+        catalog._download(paths, item)
+    partial = paths.data / "catalog-downloads" / item["sha256"] / (item["filename"] + ".part")
+    assert partial.read_bytes() == payload[:8]
+    assert not partial.with_suffix("").exists()
+
+
+def test_wrong_content_range_is_rejected(context, monkeypatch):
+    paths, _, item = context
+    payload = catalog.urllib.request.urlopen(None).read()
+    directory = paths.data / "catalog-downloads" / item["sha256"]
+    directory.mkdir(parents=True)
+    partial = directory / (item["filename"] + ".part")
+    partial.write_bytes(payload[:8])
+
+    def response(*args, **kwargs):
+        result = io.BytesIO(payload[8:])
+        result.status = 206
+        result.headers = {"Content-Range": f"bytes 0-{len(payload) - 1}/{len(payload)}"}
+        result.geturl = lambda: item["url"]
+        return result
+
+    monkeypatch.setattr(catalog.urllib.request, "urlopen", response)
+    with pytest.raises(ValueError, match="intervalo"):
+        catalog._download(paths, item)
+    assert not list(directory.iterdir())
+
+
+def test_completed_partial_after_crash_is_published_without_network(context, monkeypatch):
+    paths, _, item = context
+    payload = catalog.urllib.request.urlopen(None).read()
+    directory = paths.data / "catalog-downloads" / item["sha256"]
+    directory.mkdir(parents=True)
+    (directory / (item["filename"] + ".part")).write_bytes(payload)
+    monkeypatch.setattr(catalog.urllib.request, "urlopen", lambda *a, **k: pytest.fail("redownload"))
+    assert catalog._download(paths, item).read_bytes() == payload
+
+
+def test_short_response_is_retryable_and_preserved(context, monkeypatch):
+    paths, store, item = context
+    payload = catalog.urllib.request.urlopen(None).read()
+
+    def response(*args, **kwargs):
+        result = io.BytesIO(payload[:8])
+        result.geturl = lambda: item["url"]
+        return result
+
+    monkeypatch.setattr(catalog.urllib.request, "urlopen", response)
+    operation = catalog.agendar(paths, store, item)
+    catalog.run_pending(paths, store)
+    assert store.get(operation).state == "pending"
+    assert json.loads(store.get(operation).result)["phase"] == "retry"
+    partial = paths.data / "catalog-downloads" / item["sha256"] / (item["filename"] + ".part")
+    assert partial.read_bytes() == payload[:8]

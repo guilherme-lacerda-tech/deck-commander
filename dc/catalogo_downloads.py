@@ -7,6 +7,7 @@ rodam num processo separado, recuperável pelo serviço de energia após reiníc
 from __future__ import annotations
 
 import hashlib
+from http.client import IncompleteRead
 import json
 import os
 import re
@@ -153,30 +154,66 @@ def _download(paths, item):
         if target.stat().st_size == item["size"] and _digest(target) == item["sha256"]:
             return target
         raise ValueError("cache existente diverge do hash esperado")
-    if shutil.disk_usage(directory).free < item["size"] + 16 * 1024**2:
+    partial = target.with_name(target.name + ".part")
+    if partial.is_symlink():
+        raise ValueError("arquivo de retomada contém link simbólico")
+    offset = partial.stat().st_size if partial.exists() else 0
+    if offset > item["size"]:
+        raise ValueError("arquivo de retomada excede o tamanho esperado")
+    if offset == item["size"]:
+        if _digest(partial) == item["sha256"]:
+            partial.replace(target)
+            return target
+        partial.unlink()
+        offset = 0
+    if shutil.disk_usage(directory).free < item["size"] - offset + 16 * 1024**2:
         raise OSError("espaço insuficiente para download")
-    fd, temporary = tempfile.mkstemp(prefix="download-", suffix=".part", dir=directory)
-    partial = Path(temporary)
+    headers = {"User-Agent": "DeckCommander/1", "Accept-Encoding": "identity"}
+    if offset:
+        headers["Range"] = f"bytes={offset}-"
+    request = urllib.request.Request(item["url"], headers=headers)
+    # O worker mantém catalog-worker.lock durante a transferência e a publicação.
+    flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(partial, flags, 0o600)
     try:
-        request = urllib.request.Request(item["url"], headers={"User-Agent": "DeckCommander/1"})
-        digest, total = hashlib.sha256(), 0
-        with os.fdopen(fd, "wb") as output, urllib.request.urlopen(request, timeout=30) as response:
+        with os.fdopen(fd, "r+b") as output, urllib.request.urlopen(request, timeout=30) as response:
             if urllib.parse.urlsplit(response.geturl()).scheme != "https":
                 raise ValueError("download redirecionado para conexão insegura")
+            status = getattr(response, "status", 200)
+            metadata = getattr(response, "headers", {})
+            if metadata.get("Content-Encoding", "identity") != "identity":
+                raise ValueError("codificação inesperada no download")
+            if status == 206:
+                expected = f"bytes {offset}-{item['size'] - 1}/{item['size']}"
+                if metadata.get("Content-Range") != expected:
+                    raise ValueError("resposta de retomada não corresponde ao intervalo solicitado")
+            elif status == 200:
+                # Servidor sem Range devolve o arquivo completo, recomeça nesse caso.
+                offset = 0
+                output.truncate(0)
+            else:
+                raise ValueError("resposta inesperada no download")
+            output.seek(offset)
+            total = offset
             while block := response.read(1024 * 1024):
                 total += len(block)
                 if total > item["size"]:
                     raise ValueError("download excede tamanho do catálogo")
-                digest.update(block)
                 output.write(block)
-            output.flush()
+                output.flush()
             os.fsync(output.fileno())
-        if total != item["size"] or digest.hexdigest() != item["sha256"]:
-            raise ValueError("download não corresponde ao SHA-256 e tamanho do catálogo")
+        if total < item["size"]:
+            raise ConnectionError("download interrompido, bytes recebidos preservados")
+        if _digest(partial) != item["sha256"]:
+            raise ValueError("download não corresponde ao SHA-256 do catálogo")
         partial.replace(target)
         return target
-    finally:
+    except IncompleteRead as exc:
+        raise ConnectionError("download interrompido, bytes recebidos preservados") from exc
+    except ValueError:
+        # Bytes incompatíveis nunca participam da próxima tentativa.
         partial.unlink(missing_ok=True)
+        raise
 
 
 def _payload(source, item):
