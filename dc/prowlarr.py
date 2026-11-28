@@ -10,6 +10,10 @@ class BuscaErro(RuntimeError):
     pass
 
 
+class BuscaTempo(BuscaErro):
+    """O Prowlarr não respondeu a tempo (todas as consultas estouraram o prazo)."""
+
+
 class SemIndexadores(BuscaErro):
     """Depois de tirar os indexadores cobertos por outro provedor, não sobrou nenhum."""
 
@@ -78,6 +82,7 @@ def pesquisar(paths, titulo: str, abrir=None, indexadores=None, timeout=15, igno
     saida = []
     vistos = set()
     sucesso = False
+    tempo = False
     for indice in (indexadores or [None]):
         params = {"query": titulo, "type": "search"}
         if indice is not None:
@@ -94,7 +99,8 @@ def pesquisar(paths, titulo: str, abrir=None, indexadores=None, timeout=15, igno
             if not isinstance(dados, list):
                 continue
             sucesso = True
-        except (OSError, ValueError):
+        except (OSError, ValueError) as exc:
+            tempo = tempo or isinstance(exc, TimeoutError) or "timed out" in str(exc).lower()
             continue
         for item in dados[:1000]:
             if not isinstance(item, dict):
@@ -118,7 +124,7 @@ def pesquisar(paths, titulo: str, abrir=None, indexadores=None, timeout=15, igno
                               "seeders": item.get("seeders") or 0, "tamanho": tam if isinstance(tam, int) else None,
                               "indexador": str(item.get("indexer") or "")[:60]})
     if not sucesso:
-        raise BuscaErro("não consegui consultar o Prowlarr")
+        raise (BuscaTempo if tempo else BuscaErro)("não consegui consultar o Prowlarr")
     return saida
 
 

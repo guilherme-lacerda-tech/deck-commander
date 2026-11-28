@@ -60,6 +60,21 @@ REGIOES = [  # (regex no título/consulta, rótulo)
 PTBR_RX = re.compile(r"(?i)pt[-_ ]?br|portugu[eê]s|traduzid|tradu[cç][aã]o|\(br\)|\bbr\b|romsportugues")
 FORMATOS = ("iso", "chd", "rvz", "wbfs", "cso", "pbp", "nsp", "nsz", "xci", "cue", "bin", "gdi", "cdi", "zip",
             "7z", "rar", "nes", "sfc", "smc", "gba", "gb", "gbc", "nds", "3ds", "z64", "n64", "wad", "md")
+# Palavras de franquias comuns: corrigem erro de digitação ANTES de consultar fontes remotas (que só acham a palavra
+# exata). Somadas às palavras dos títulos da biblioteca do dono e do catálogo.
+VOCABULARIO = set("""
+resident evil final fantasy kingdom hearts metal gear solid legend zelda mario kart pokemon sonic hedgehog street
+fighter castlevania metroid devil may cry tekken crash bandicoot spyro dragon silent hill quest ball soulcalibur
+persona shin megami tensei gran turismo need speed grand theft auto ratchet clank jak daxter sly cooper shadow
+colossus okami halo gears forza fable smash bros donkey kong kirby yoshi pikmin xenoblade fire emblem monster
+hunter bloodborne souls sekiro naruto bleach digimon yugioh warriors dynasty samurai ninja gaiden onimusha
+chronicles symphony night tactics vagrant story chrono trigger cross breath wild tears ocarina majora twilight
+princess skyward wind waker galaxy sunshine odyssey party paper luigi mansion wario animal crossing splatoon
+burnout midnight club tony hawk skate guitar hero rock band dance just sims spider batman arkham lego star wars
+harry potter assassin creed prince persia splinter cell rainbow call duty battlefield medal honor doom quake
+wolfenstein half life portal counter strike bioshock fallout elder scrolls skyrim oblivion witcher mass effect
+dragon age god war ghost sparta chains olympus ascension hand drakengard nier ace combat ridge racer tekken
+""".split())
 PRIORIDADE_FONTE = {"biblioteca": 0, "catalogo": 1, "familia": 2, "internet_archive": 3, "prowlarr": 4}
 
 
@@ -113,6 +128,30 @@ def interpretar(texto: str) -> dict:
     termos = " ".join(palavras).strip()
     expandido = " ".join(ABREVIACOES.get(p.casefold(), p) for p in termos.split())
     return {"termos": termos, "busca": expandido, "console": console, "regiao": regiao, "ptbr": ptbr}
+
+
+def corrigir(texto: str, vocab: set[str]) -> str:
+    """Troca palavra quase igual a uma conhecida ("evl" -> "evil", "kingdon" -> "kingdom")."""
+    out = []
+    for w in texto.split():
+        n = normalizar(w)
+        if len(n) >= 3 and n not in vocab and not n.isdigit():
+            perto = difflib.get_close_matches(n, vocab, n=1, cutoff=0.8)
+            out.append(perto[0] if perto else w)
+        else:
+            out.append(w)
+    return " ".join(out)
+
+
+def _vocabulario(paths) -> set[str]:
+    v = set(VOCABULARIO)
+    try:
+        from . import transferir
+        for e in transferir.carregar_mapa().values():
+            v.update(normalizar(e.get("title", "")).split())
+    except Exception:  # noqa: BLE001, S110 — vocabulário extra é conforto
+        pass
+    return {w for w in v if len(w) >= 3}
 
 
 def relevancia(titulo: str, busca: str) -> float:
@@ -305,9 +344,13 @@ def config(paths) -> dict:
 
 def _estado_de_erro(exc: BaseException) -> str:
     import urllib.error
-    from .prowlarr import SemIndexadores
+    from .prowlarr import BuscaErro, BuscaTempo, SemIndexadores
     if isinstance(exc, (_NaoConfigurado, SemIndexadores)):
         return NAO_CONFIG
+    if isinstance(exc, BuscaTempo):
+        return TEMPO
+    if isinstance(exc, BuscaErro):
+        return FORA
     if isinstance(exc, (TimeoutError, cf.TimeoutError)) or "timed out" in str(exc).lower():
         return TEMPO
     if isinstance(exc, urllib.error.HTTPError) and exc.code in (401, 403):
@@ -319,14 +362,28 @@ def _estado_de_erro(exc: BaseException) -> str:
 
 # ------------------------------------------------------------------------------------------------ busca
 def pesquisar(paths, texto: str, provedores=None, funcs=None) -> dict:
-    """Roda as fontes em paralelo. Devolve {"consulta", "resultados", "fontes": {fonte: estado}}."""
+    """Roda as fontes em paralelo. Devolve {"consulta", "resultados", "fontes": {fonte: estado}}.
+    Erro de digitação: pesquisa primeiro como foi escrito; só sem nenhum resultado tenta a palavra corrigida
+    (corrigir antes trocava nomes certos, ex.: "hollow knight" -> "night")."""
     q = interpretar(texto)
     funcs = funcs or PROVEDORES
     provs = list(provedores or config(paths)["provedores"])
-    fontes: dict[str, str] = {}
-    brutos: list[dict] = []
     if not (q["termos"] or "").strip():
         return {"consulta": q, "resultados": [], "fontes": {}}
+    resultados, fontes = _rodada(paths, q, provs, funcs)
+    if not resultados:
+        corrigido = corrigir(q["busca"], _vocabulario(paths))
+        if normalizar(corrigido) != normalizar(q["busca"]):
+            q2 = {**q, "busca": corrigido, "corrigido": corrigido}
+            r2, f2 = _rodada(paths, q2, provs, funcs)
+            if r2:
+                return {"consulta": q2, "resultados": r2, "fontes": f2}
+    return {"consulta": q, "resultados": resultados, "fontes": fontes}
+
+
+def _rodada(paths, q: dict, provs: list[str], funcs: dict) -> tuple[list[dict], dict[str, str]]:
+    fontes: dict[str, str] = {}
+    brutos: list[dict] = []
     kw = {}
     if "internet_archive" in provs and "prowlarr" in provs:
         kw["prowlarr"] = {"ignorar_indexadores": ("internetarchive", "internet archive")}
@@ -347,7 +404,7 @@ def pesquisar(paths, texto: str, provedores=None, funcs=None) -> dict:
             brutos.extend(achados)
     finally:
         ex.shutdown(wait=False, cancel_futures=True)
-    return {"consulta": q, "resultados": ordenar(deduplicar(brutos)), "fontes": fontes}
+    return ordenar(deduplicar(brutos)), fontes
 
 
 def filtrar(itens: list[dict], q: dict) -> list[dict]:
@@ -471,6 +528,8 @@ def pagina(s: dict, sid: str, n: int, rotulo) -> tuple[str, list[tuple[str, str]
     n = max(0, min(n, paginas - 1))
     fatia = vis[n * POR_PAGINA:(n + 1) * POR_PAGINA]
     texto = [f"🔎 {alvo}: {total} resultado(s)" + (f" — página {n + 1}/{paginas}" if paginas > 1 else "")]
+    if q.get("corrigido"):
+        texto.append(f"(mostrando resultados para «{q['corrigido']}»)")
     if s.get("filtro"):
         texto[0] += f" · filtro: {rotulo(s['filtro'])}"
     for i, r in enumerate(fatia, 1 + n * POR_PAGINA):

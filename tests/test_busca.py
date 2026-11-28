@@ -166,3 +166,41 @@ def test_fonte_travada_nao_segura_a_busca_alem_do_tempo(tmp_path, monkeypatch):
     finally:
         libera.set()
     assert time.monotonic() - t0 < 3 and r["fontes"]["prowlarr"] == busca.TEMPO
+
+
+def test_erro_de_digitacao_corrigido_antes_das_fontes_remotas(tmp_path):
+    pedidos = []
+
+    def remota(p, q, **kw):  # como a fonte real: só acha a palavra exata
+        pedidos.append(q["busca"])
+        return [busca.resultado("internet_archive", "re", "Resident Evil 2 (USA)", "psx", acao={})]             if "evil" in q["busca"] else []
+    paths = get_paths(tmp_path).ensure()
+    r = busca.pesquisar(paths, "resident evl", provedores=["internet_archive"], funcs={"internet_archive": remota})
+    assert pedidos == ["resident evl", "resident evil"] and r["consulta"]["corrigido"] == "resident evil"
+    assert r["resultados"]
+    pedidos.clear()
+    busca.pesquisar(paths, "hollow knight", provedores=["internet_archive"],
+                    funcs={"internet_archive": lambda p, q, **k: pedidos.append(q["busca"]) or [
+                        busca.resultado("internet_archive", "h", "Hollow Knight", "pc", acao={})]})
+    assert pedidos == ["hollow knight"]  # nome certo com resultado nunca é "corrigido"
+    assert busca.corrigir("god of war 2", busca.VOCABULARIO) == "god of war 2"  # certo continua certo
+    txt, _ = busca.pagina({**r, "filtro": None}, "s", 0, lambda c: c)
+    assert "mostrando resultados para «resident evil»" in txt
+
+
+def test_prowlarr_tempo_esgotado_e_diferente_de_fora_do_ar(tmp_path):
+    paths = get_paths(tmp_path).ensure()
+    (paths.config / "prowlarr.json").write_text(json.dumps({"url": "http://127.0.0.1:9696", "api_key": "k"}))
+
+    def lento(req, timeout):
+        raise TimeoutError("timed out")
+
+    def caido(req, timeout):
+        raise ConnectionRefusedError("refused")
+    with pytest.raises(prowlarr.BuscaTempo):
+        prowlarr.pesquisar(paths, "x", abrir=lento)
+    with pytest.raises(prowlarr.BuscaErro) as e:
+        prowlarr.pesquisar(paths, "x", abrir=caido)
+    assert not isinstance(e.value, prowlarr.BuscaTempo)
+    assert busca._estado_de_erro(prowlarr.BuscaTempo("x")) == busca.TEMPO
+    assert busca._estado_de_erro(prowlarr.BuscaErro("x")) == busca.FORA
