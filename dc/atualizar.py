@@ -167,9 +167,9 @@ def testar(pasta: Path, rodar=subprocess.run) -> tuple[bool, str]:
     py = Path.home() / ".local/share/deck-commander/venv/bin/python"
     if not py.exists():
         return False, "ambiente de testes ausente — rode o instalador uma vez para preparar atualizações seguras"
-    r = rodar([str(py), "-m", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests"], cwd=str(pasta),
-              capture_output=True, text=True, timeout=1800, check=False)
-    ultima = (r.stdout.strip().splitlines() or ["?"])[-1]
+    from . import test_runner
+    r = test_runner.run(pasta, py, stop_first=True, rodar=rodar)
+    ultima = (r.stdout.strip().splitlines() or r.stderr.strip().splitlines() or ["executor sem resultado"])[-1]
     return r.returncode == 0, ultima
 
 
@@ -217,10 +217,15 @@ def aplicar(paths, sha: str | None = None, home: Path | None = None, baixar=_bai
 
 def depois(log=print) -> None:
     """Roda NA VERSÃO NOVA, logo depois da troca: termina a instalação sem baixar emuladores de novo."""
-    from . import setup
+    from . import library, setup
     from .paths import get_paths
     paths = get_paths().ensure()
     linhas: list[str] = []
+    # O launcher é compartilhado pelos atalhos e tem que apontar para a
+    # instalação definitiva. Versões antigas o deixavam preso ao staging
+    # removido ao terminar a atualização, impedindo todos os jogos de abrir.
+    launcher = library.write_launcher(Path.home(), Path(__file__).resolve().parents[1])
+    linhas.append(f"launcher reparado: {launcher}")
     for passo in (lambda: setup.write_units(linhas), lambda: setup.preparar_primeira_vez(log=linhas),
                   lambda: setup.write_emulators_json(paths, linhas), lambda: setup.setup_plugin(linhas)):
         try:

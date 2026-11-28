@@ -16,7 +16,7 @@ def decidir(deck: dict[str, dict], pc: dict[str, dict], ultimo: dict[str, str]) 
     
     todos_destinos = set(deck.keys()) | set(pc.keys())
     
-    for destino in todos_destinos:
+    for destino in sorted(todos_destinos):
         deck_info = deck.get(destino)
         pc_info = pc.get(destino)
         
@@ -37,16 +37,8 @@ def decidir(deck: dict[str, dict], pc: dict[str, dict], ultimo: dict[str, str]) 
             
             # Se não há informação de última sincronização
             if destino not in ultimo:
-                mtime_deck = deck_info["mtime"]
-                mtime_pc = pc_info["mtime"]
-                diff = abs(mtime_deck - mtime_pc)
-                
-                if diff < 120:
-                    acoes.append({"destino": destino, "acao": "conflito", "motivo": "datas muito próximas"})
-                elif mtime_deck > mtime_pc:
-                    acoes.append({"destino": destino, "acao": "deck->pc", "motivo": "mais novo no Deck"})
-                else:
-                    acoes.append({"destino": destino, "acao": "pc->deck", "motivo": "mais novo no PC"})
+                acoes.append({"destino": destino, "acao": "conflito",
+                              "motivo": "conteúdos diferentes sem versão comum confirmada"})
             # Se há informação de última sincronização
             else:
                 sha_ultimo = ultimo[destino]

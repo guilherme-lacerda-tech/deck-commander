@@ -132,6 +132,7 @@ emuladores e plugins citados.
 python3 -m venv .venv && .venv/bin/pip install pytest && .venv/bin/python -m pytest -q
 ```
 Núcleo em Python 3.11+ **somente biblioteca padrão**; plugin em JavaScript puro (sem build).
+No SteamOS, os testes de atualização e o timer semanal usam `bubblewrap`, com código somente para leitura e HOME, diretórios XDG, processos e rede isolados da sessão do jogador. Requer `bwrap` e o venv dedicado com `pytest`; sem isolamento, a atualização é bloqueada. O pós-atualização regenera o lançador na pasta definitiva.
 Histórico de decisões e validação no hardware: [docs/desenvolvimento/](docs/desenvolvimento/).
 
 Licença: [MIT](LICENSE).

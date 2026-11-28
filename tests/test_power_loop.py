@@ -126,7 +126,8 @@ def test_weekly_tests_safe_mode_only_on_real_failures(tmp_path, monkeypatch):
     class R:
         def __init__(self, c):
             self.returncode, self.stdout = c, "x failed" if c == 1 else "ERROR: usage"
-    monkeypatch.setattr(services.subprocess, "run", lambda *a, **k: R(next(codes)))
+    from dc import test_runner
+    monkeypatch.setattr(test_runner, "run", lambda *a, **k: R(next(codes)))
     for _ in range(4):
         services.run_tests(paths, tmp_path)
     assert calls == []  # problemas de infraestrutura não contam; só 1 falha real até aqui

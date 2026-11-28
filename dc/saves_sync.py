@@ -77,7 +77,11 @@ def _base_emu(deck: dict) -> str | None:
 def confirmar(paths: Paths, game_id: str, pc_final: dict) -> dict:
     deck = saves_do_deck(game_id)
     novo = saves_regra.novo_ultimo(deck, pc_final)
-    _save(_dir(paths) / f"{game_id}.json", novo)
+    manifesto = _dir(paths) / f"{game_id}.json"
+    anterior = _load(manifesto, {})
+    # Uma transferência interrompida não pode apagar o ancestral comum do conflito.
+    anterior.update(novo)
+    _save(manifesto, anterior)
     esc = _load(_dir(paths) / "escolhas.json", {})
     if esc.pop(game_id, None):
         _save(_dir(paths) / "escolhas.json", esc)

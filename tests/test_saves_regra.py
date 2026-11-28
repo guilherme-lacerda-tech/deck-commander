@@ -18,7 +18,7 @@ def test_regras():
 def test_primeira_vez_e_resumo():
     a = acoes(R.decidir({"x": D("a", 5000), "y": D("a", 1000), "z": D("b", 1000)},
                         {"x": D("b", 1000), "y": D("c", 9000), "z": D("c", 1060)}, {}))
-    assert a == {"x": "deck->pc", "y": "pc->deck", "z": "conflito"}
+    assert a == {"x": "conflito", "y": "conflito", "z": "conflito"}
     assert R.resumo([]) .startswith("Saves iguais")
     assert R.novo_ultimo({"x": D("a"), "y": D("b")}, {"x": D("a"), "y": D("c")}) == {"x": "a"}
 
