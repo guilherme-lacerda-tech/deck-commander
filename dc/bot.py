@@ -200,6 +200,10 @@ class Bot:
                     rows = [[self._button(lbl, cmd) for lbl, cmd in linha] for linha in linhas]
                 extra["reply_markup"] = json.dumps({"inline_keyboard": rows})
                 self.save_cfg()
+            elif not btns:
+                # tira teclado de resposta que ficou preso de versão antiga ("Sim / Não" fixo no rodapé do
+                # Telegram, visto pelo dono em 28/11/2026); o bot de hoje só usa botões dentro da mensagem
+                extra["reply_markup"] = json.dumps({"remove_keyboard": True})
             self.call("sendMessage", chat_id=chat, text=chunk, **extra)
 
     def handle_callback(self, cq: dict) -> None:

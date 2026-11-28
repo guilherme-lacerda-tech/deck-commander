@@ -268,3 +268,12 @@ def test_lista_tem_baixar_na_mesma_linha_do_jogo(x, monkeypatch):
 def test_formato_igual_a_plataforma_nao_repete():
     r = busca.resultado("catalogo", "s", "Super Tilt Bro", "nes", formato="NES", tamanho=40976, acao={})
     assert busca.linha(r, lambda c: "NES").count("NES") == 1
+
+
+def test_mensagem_sem_botoes_tira_teclado_preso(x):
+    """28/11/2026: um teclado 'Sim / Não' de versão antiga ficou preso no rodapé do Telegram do dono."""
+    import json
+    x.send(9, "texto simples")
+    assert json.loads(x.sent[-1]["reply_markup"]) == {"remove_keyboard": True}
+    x.send(9, "pergunta", [("Sim", "/x sim"), ("Não", "/x nao")])
+    assert "inline_keyboard" in json.loads(x.sent[-1]["reply_markup"])
