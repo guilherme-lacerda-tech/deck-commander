@@ -49,7 +49,13 @@ def run(monkeypatch, paths, q, readings, between=None):
             between(n["i"])
         if n["i"] >= len(readings):
             raise Stop
-    monkeypatch.setattr(services.time, "sleep", sleep)
+    # Troca o "time" SÓ do módulo services. Antes trocava time.sleep do Python inteiro: no Deck (Python 3.14) o
+    # subprocess com timeout espera chamando time.sleep, cada comando externo do laço adiantava o contador e o teste
+    # falhava em 9 de 10 rodadas no Deck (nunca no Windows). Achado ao implantar em 28/11/2026.
+    import time as _time
+    import types
+    monkeypatch.setattr(services, "time", types.SimpleNamespace(
+        **{**{k: getattr(_time, k) for k in dir(_time) if not k.startswith("_")}, "sleep": sleep}))
     with pytest.raises(Stop):
         services.power_loop(paths, interval=0)
 
