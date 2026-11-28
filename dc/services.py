@@ -46,6 +46,15 @@ def power_loop(paths: Paths, interval: float = 30) -> None:
     cfg_mtime, seed_at, last_written = 0.0, 0.0, None
     ACTIVE = ("downloading", "stalledDL", "metaDL", "queuedDL", "forcedDL")
     while True:
+        # Downloads por nome usam processo próprio para manter a telemetria responsiva.
+        try:
+            if not ops.in_safe_mode(paths):
+                from . import catalogo_downloads
+                if store.conn.execute("SELECT 1 FROM operations WHERE type=? AND state IN ('pending','running','interrupted') LIMIT 1",
+                                      (catalogo_downloads.TYPE,)).fetchone():
+                    catalogo_downloads.iniciar(paths)
+        except OSError as exc:
+            _log(paths, "worker", f"catálogo: {type(exc).__name__}")
         # power.json mudou (ex.: /bateria pelo bot): vale na hora, sem reiniciar o serviço
         try:
             mt = cfgp.stat().st_mtime if cfgp.exists() else 0.0
@@ -265,7 +274,7 @@ class _Dash(BaseHTTPRequestHandler):
     paths: Paths
 
     def do_GET(self):  # noqa: N802
-        body = health.status_text(self.paths, Store(self.paths.db), Qbt())
+        body = health.status_text(self.paths, Store(self.paths.db), Qbt.from_paths(self.paths))
         page = (f"<!doctype html><meta charset=utf-8><meta http-equiv=refresh content=30><title>Deck Commander</title>"
                 f"<body style='font-family:sans-serif;background:#111;color:#eee'><h1>Deck Commander</h1>"
                 f"<pre style='font-size:16px'>{html.escape(body)}</pre>")

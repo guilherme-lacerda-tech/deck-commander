@@ -1,0 +1,19 @@
+---
+- name: Provisionar Deck Commander HomeLab
+  hosts: homelab
+  become: true
+  pre_tasks:
+    - name: Validar plataforma e parâmetros antes de modificar o host
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.distribution in ['Debian', 'Ubuntu']
+          - ansible_facts.distribution != 'Debian' or ansible_facts.distribution_major_version | int >= 13
+          - media_root is defined and media_root is string and media_root is match('^/[^:$\n]+$')
+          - romm_db_pass is defined and romm_db_pass is string and romm_db_pass | length >= 16
+          - romm_auth_secret is defined and romm_auth_secret is string and romm_auth_secret | length >= 32
+        fail_msg: Verifique o sistema, a pasta dedicada e os segredos do inventário.
+        quiet: true
+      no_log: true
+  roles:
+    - docker
+    - media_stack

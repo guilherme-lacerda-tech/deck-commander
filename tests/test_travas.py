@@ -14,7 +14,8 @@ JS = RAIZ / "decky-plugin" / "dist" / "index.js"
 
 def _arquivos(*globs):
     for g in globs:
-        yield from (p for p in RAIZ.glob(g) if "__pycache__" not in p.parts and ".git" not in p.parts)
+        yield from (p for p in RAIZ.glob(g)
+                    if p.is_file() and "__pycache__" not in p.parts and ".git" not in p.parts)
 
 
 def test_todo_python_compila(tmp_path):
@@ -103,7 +104,7 @@ def test_sem_endereco_real_no_repositorio():
     A lista guarda só o sha256 dos valores reais (o próprio teste não os revela)."""
     achados = []
     for p in _arquivos("dc/**/*.py", "tools/**/*.py", "tools/**/*.ps1", "tools/**/*.psm1", "tests/*.py", "docs/*.md",
-                       "*.md", "install.sh", "config/*"):
+                       "*.md", "install.sh", "config/**/*"):
         txt = p.read_text("utf-8", "replace")
         candidatos = set(re.findall(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", txt))
         candidatos |= {m.replace(":", "-") for m in re.findall(r"\b[0-9A-Fa-f]{2}(?:[-:][0-9A-Fa-f]{2}){5}\b", txt)}

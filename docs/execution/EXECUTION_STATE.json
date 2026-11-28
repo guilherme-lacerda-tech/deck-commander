@@ -1,0 +1,88 @@
+{
+  "phase": "P0-NOME — preparação da implantação no bot autenticado",
+  "current": [
+    "P0-NOME",
+    "integrar fluxo automático à release61158ce e validar Telegram/biblioteca"
+  ],
+  "baseline": "b8c48d3",
+  "baseline_tests": "Windows: 1051 aprovados, 3 pulados, 94.86 s",
+  "last": "VM: download Doom interrompido por SIGKILL; 1048576 bytes preservados e retomada Range exata, arquivo4196020 bytes validadoSHA, operação única em2 tentativas. 77 testes focados aprovados. Deck: bot ativo, Prowlarr3.1.0.5799 responde com1 indexadorInternetArchive, mas módulo catalogo_downloads ainda não instalado.",
+  "next": "Corrigir lentidão/fallback da busca real no InternetArchive e preparar release do fluxo por nome sobre61158ce; validar instalação na VM, implantar no Deck preservando saves e testar Telegram até biblioteca autenticada.",
+  "checkpoint_git": "d884e20",
+  "automation": {
+    "id": "retomar-o-deck-commander",
+    "interval_minutes": 30,
+    "physical_deck_available_for_jobs": true
+  },
+  "vm": {
+    "distribution": "Ubuntu (WSL)",
+    "overlay_directory": "/var/lib/deck-commander-validation/steamos.gVi9Fu",
+    "guest_ssh_loopback_port": 24222,
+    "configuration_manifest": "/var/lib/deck-commander-validation/steamos.gVi9Fu/emudeck.Mjjm8M/before.sha256",
+    "configuration_manifest_entries": 32488,
+    "steam_account": "Sem login e sem userdata. Downloads e execução direta serão verificados. Publicação na biblioteca aguarda login.",
+    "validation_directory": "/home/deck/commander-nome.ZXdmhF",
+    "game_processes": "Ensaios encerrados após captura. Serviços do Commander ativos.",
+    "installed_commit": "d884e20",
+    "archive_sha256": "9d42d319d3cb10e72c234bd698bdd036c060809ca56e0774b4485b04e9983d4e"
+  },
+  "local_homelab": "/var/lib/deck-commander-validation/run.1eMABM",
+  "modified": [
+    "dc/catalogo_downloads.py",
+    "tests/test_catalogo_downloads.py",
+    "homelab/tests/validate_download_recovery.py"
+  ],
+  "failures": [],
+  "blockers": [
+    "VM sem contaSteam autenticada; Deck físico já tem autenticação, implantação nova pendente",
+    "TokenTelegram existe no Deck; fluxo novo ainda não implantado",
+    "ServidorDebian sem inventário de implantação identificado"
+  ],
+  "resume": "Corrigir lentidão/fallback da busca real no InternetArchive e preparar release do fluxo por nome sobre61158ce; validar instalação na VM, implantar no Deck preservando saves e testar Telegram até biblioteca autenticada.",
+  "priority_override": "Regressão resolvida em27/11. Retomar P0-NOME no PC/VM. Não repetir abertura/fechamento do DMC para tarefa já concluída.",
+  "tests": [
+    "Windows suíte completa: 1080 passed, 3 skipped, 68.48 s",
+    "VM real: dois downloads HTTPS, hash, instalação e execução nos cores Nestopia e PrBoom",
+    "VM preservação: 32488 hashes originais iguais",
+    "VM instalação repetida, plugin conferido por diff, qBittorrent/power ativos"
+  ],
+  "p0_status": "INTEGRATION_TESTED download e launcher reais. P0-NOME permanece IN_PROGRESS até completar transporte e publicação autenticados.",
+  "suspended_work": {
+    "phase": "P0-NOME — recuperação de downloads interrompidos",
+    "next": "Retomada HTTP validada. Seguir next da raiz.",
+    "modified": [
+      "dc/catalogo_downloads.py",
+      "tests/test_catalogo_downloads.py",
+      "homelab/tests/validate_download_recovery.py",
+      "docs/execution/EXECUTION_STATE.json"
+    ]
+  },
+  "repair": {
+    "status": "RESOLVED",
+    "cause": "pytest sem isolamento regravou launcher com caminho temporário removido",
+    "release": "61158ce",
+    "physical_base": "76ab40c com reparo de oito arquivos",
+    "checkpoint": "/home/deck/.local/state/deck-commander/code-checkpoints/dmc-launch-repair-loaflu21",
+    "validation": "Steam abriu DMC3/PCSX2; 22 hashes saves intactos; isolamento físico aprovado; release1050passed5skipped na VM"
+  },
+  "recovery_validation": {
+    "status": "PASSED",
+    "preserved_bytes": 1048576,
+    "total_bytes": 4196020,
+    "attempts": 2,
+    "phase": "waiting_steam",
+    "report": "outputs/download-recovery-vm-result.json",
+    "vm_directory": "/home/deck/commander-nome.ZXdmhF/recovery.jae34Q/case"
+  },
+  "acquisition_readiness": {
+    "physical_bot_active": true,
+    "telegram_token_valid": true,
+    "prowlarr_reachable": true,
+    "enabled_indexers": [
+      "Internet Archive"
+    ],
+    "real_query": "Doom Shareware",
+    "query_result": "TimeoutError após15 segundos",
+    "catalog_module_installed_on_deck": false
+  }
+}

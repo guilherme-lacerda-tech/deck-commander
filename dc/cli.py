@@ -135,7 +135,7 @@ def _extra(paths, args) -> int:
         print(health.status_text(paths, _store(paths)))
     elif c == "sync":
         from .qbt import Qbt
-        print(syncer.run_sync(paths, _store(paths), Qbt(), confirm_many="tudo" in r))
+        print(syncer.run_sync(paths, _store(paths), Qbt.from_paths(paths), confirm_many="tudo" in r))
     elif c == "calibrar":
         from . import bench
         print(bench.calibrate(paths, r[0], int(r[1]) if len(r) > 1 else 90))
@@ -214,7 +214,7 @@ def _extra(paths, args) -> int:
         print(rp.describe())
         if "--confirm" not in r:
             print("(nada foi feito; repita com --confirm)"); return 0
-        print("\n".join(remove.apply(paths, _store(paths), rp, Qbt())))
+        print("\n".join(remove.apply(paths, _store(paths), rp, Qbt.from_paths(paths))))
     elif c == "qualidade":
         from . import quality, remove
         lm = json.loads((paths.data / "launch-map.json").read_text("utf-8"))

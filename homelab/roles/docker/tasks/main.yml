@@ -1,0 +1,14 @@
+---
+- name: Instalar Docker e suporte a Compose do Debian
+  ansible.builtin.apt:
+    name:
+      - docker.io
+      - "{{ 'docker-compose' if ansible_facts.distribution == 'Debian' else 'docker-compose-v2' }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 86400
+- name: Ativar daemon Docker
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true

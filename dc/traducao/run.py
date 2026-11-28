@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 import os
 import shutil
 import subprocess
@@ -349,6 +350,14 @@ def run(paths: Paths, op: str) -> dict:
     job["finished"] = datetime.now(timezone.utc).isoformat()
     job.pop("pid", None)
     save_job(paths, job)
+    result = job.get("result") or {}
+    if job["status"] == "concluido" and result.get("rom") and result.get("traducao_pt_br"):
+        from .. import romm_queue
+        try:
+            romm_queue.published(paths, [result["rom"]])
+        except (OSError, ValueError, KeyError, TypeError, sqlite3.Error) as exc:
+            job["aviso_romm"] = type(exc).__name__
+            save_job(paths, job)
     return job
 
 

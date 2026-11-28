@@ -93,6 +93,12 @@ def main(argv: list[str]) -> None:
              f"{title}: arquivo do jogo não encontrado" + (" — o cartão SD está colocado?" if sd else "."))
     if not Path(cmd[0]).exists():
         fail(f"erro: emulador não encontrado {cmd[0]}", f"{title}: emulador não encontrado ({Path(cmd[0]).name}).")
+    try:
+        from .emulators.setup_controls import prepare
+        if prepare(cmd):
+            say("Perfil inicial do controle Steam Deck instalado para o primeiro jogador")
+    except OSError as exc:
+        say(f"Perfil inicial de controle indisponível: {type(exc).__name__}")
     if launch_map[game_id].get("console") == "switch":
         try:  # mod de tradução Trinity (Pokémon Z-A) de outra versão trava o jogo: desliga antes de abrir
             from .dedup import base_title_id

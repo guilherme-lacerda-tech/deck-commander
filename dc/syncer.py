@@ -9,12 +9,13 @@ from __future__ import annotations
 
 import glob
 import json
+import sqlite3
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 
 from . import backup, content, library, ops, vdf
-from .lock import OperationLock
+from .lock import LockTimeout, OperationLock
 from .paths import Paths
 from .qbt import DONE_STATES, Qbt
 from .quarantine import quarantine
@@ -55,7 +56,10 @@ def shortcuts_path() -> Path:
 
 
 def rom_roots() -> list[Path]:
-    return [Path.home() / "Emulation/roms"] + [Path(p) for p in sorted(glob.glob("/run/media/*/*/Emulation/roms"))]
+    from .paths import get_paths
+    roots = [Path(_cfg(get_paths())["roms_root"]).expanduser(), Path.home() / "Emulation/roms"]
+    roots.extend(Path(p) for p in sorted(glob.glob("/run/media/*/*/Emulation/roms")))
+    return list(dict.fromkeys(roots))
 
 
 def add_to_steam(paths: Paths, store: Store, op: str) -> list[str]:
@@ -78,7 +82,14 @@ def _add_to_steam(paths: Paths, store: Store, op: str) -> list[str]:
     games, _fora = biblioteca.permitidos(paths, games, store)
     sc = shortcuts_path()
     launcher = library.launcher_path(Path.home())
-    pl = library.plan(vdf.read_shortcuts(sc), games, launcher)
+    try:
+        existing = vdf.read_shortcuts(sc)
+        first_install = False
+    except FileNotFoundError:
+        if sc.is_symlink():
+            raise
+        existing, first_install = [], True
+    pl = library.plan(existing, games, launcher)
     LAST_CONFLICTS[:] = pl.name_conflicts
     if not pl.add:
         library.write_map(paths.data / "launch-map.json", games)
@@ -92,12 +103,15 @@ def _add_to_steam(paths: Paths, store: Store, op: str) -> list[str]:
         rows = [r for r in pl.add if r["LaunchOptions"] not in busy]
         plugin_bridge.enqueue(paths, rows)
         return [r["AppName"] for r in rows]
-    res = backup.create_snapshot({"shortcuts": sc}, paths.backups, paths.quarantine, kind="steam")
-    if not res.ok:
-        raise RuntimeError(f"backup falhou: {res.error}")
+    if not first_install:
+        res = backup.create_snapshot({"shortcuts": sc}, paths.backups, paths.quarantine, kind="steam")
+        if not res.ok:
+            raise RuntimeError(f"backup falhou: {res.error}")
+    else:
+        sc.parent.mkdir(parents=True, exist_ok=True)
     library.write_launcher(Path.home(), Path(__file__).resolve().parents[1])
     library.write_map(paths.data / "launch-map.json", games)
-    library.write_shortcuts(sc, pl.add)
+    library.write_shortcuts(sc, pl.add, first_install=first_install)
     now = datetime.now(timezone.utc).isoformat()
     with store.tx(critical=True) as c:
         for row in pl.add:
@@ -142,13 +156,13 @@ def run_sync(paths: Paths, store: Store, qbt: Qbt | None, confirm_many: bool = F
             store.enqueue("sync", {"confirm_many": confirm_many})
             return "Jogo aberto: /sync ficou na fila e roda quando você sair. Downloads continuam."
         return "Feche o jogo primeiro (o /sync não roda durante o jogo). Downloads continuam."
-    st = _state(paths)
     op = store.enqueue("sync", {"confirm_many": confirm_many})
     store.claim(op)
     t0 = time.monotonic()
     lines, added_files, arrived, arrived_files = [], 0, set(), set()
     try:
         with OperationLock(paths.lock, op, "sync", is_running=store.is_running):
+            st = _state(paths)
             torrents = qbt.torrents() if qbt else []
             todo = [t for t in torrents if t["hash"] not in st["ingested"] and t.get("state") in DONE_STATES]
             for n, t in enumerate(todo):
@@ -158,6 +172,9 @@ def run_sync(paths: Paths, store: Store, qbt: Qbt | None, confirm_many: bool = F
                     lines.append(f"⏳ {len(todo) - n} download(s) ficam para a próxima rodada (extração demorada).")
                     break
                 forced = (explicit or {}).get(t["hash"])
+                if not t.get("content_path") or not Path(t["content_path"]).exists():
+                    lines.append(f"⏳ {t['name']}: aguardando acesso ao download concluído.")
+                    continue
                 item = content.ingest(Path(t["content_path"]), forced or t.get("category") or None,
                                       Path(cfg["roms_root"]), paths.quarantine, paths.state / "work",
                                       confirm_many=confirm_many)
@@ -204,11 +221,17 @@ def run_sync(paths: Paths, store: Store, qbt: Qbt | None, confirm_many: bool = F
                     lines.append(f"⚠️ {t['name']}: {item.note}")
                 _save_state(paths, st)  # cada download concluído fica registrado na hora (nunca entra 2x)
             new = add_to_steam(paths, store, op)
-        st["timeouts"] = 0
-        st["last_sync"] = datetime.now(timezone.utc).isoformat()
-        _save_state(paths, st)
+            st["timeouts"] = 0
+            st["last_sync"] = datetime.now(timezone.utc).isoformat()
+            _save_state(paths, st)
         store.finish(op, True, result={"files": added_files, "shortcuts": len(new)})
         if arrived_files:  # chegou jogo novo: se não estiver em português, já vai para a tradução automática
+            try:
+                from . import romm_queue
+                if romm_queue.published(paths, arrived_files):
+                    lines.append("RomM: varredura na fila.")
+            except (OSError, ValueError, KeyError, TypeError, sqlite3.Error) as exc:
+                lines.append("RomM: falha ao registrar publicação (" + type(exc).__name__ + ").")
             try:
                 from .traducao import run as trad_run
                 lm = json.loads((paths.data / "launch-map.json").read_text("utf-8"))
@@ -234,8 +257,13 @@ def run_sync(paths: Paths, store: Store, qbt: Qbt | None, confirm_many: bool = F
             tail = "\n👉 Toque em /reiniciar para aparecer no Steam (fecha e abre o Steam, ~20 s)." if new else ""
         return "\n".join([head] + lines) + tail
     except TimeoutError as e:
-        st["timeouts"] = st.get("timeouts", 0) + 1
-        _save_state(paths, st)
+        if isinstance(e, LockTimeout):
+            store.finish(op, False, error="outra operação ainda em andamento")
+            return "⏳ Outra operação ainda está em andamento."
+        with OperationLock(paths.lock, op, "sync-timeout", is_running=store.is_running):
+            st = _state(paths)
+            st["timeouts"] = st.get("timeouts", 0) + 1
+            _save_state(paths, st)
         store.finish(op, False, error=str(e))
         if st["timeouts"] >= 3:
             ops.safe_mode_on(paths, "3 timeouts seguidos do /sync", store)

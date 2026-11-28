@@ -1,0 +1,21 @@
+---
+- name: Criar pasta da stack
+  ansible.builtin.file:
+    path: "{{ media_stack_project_dir }}"
+    state: directory
+    mode: '0700'
+- name: Renderizar Compose
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ media_stack_project_dir }}/compose.yml"
+    mode: '0600'
+    validate: docker compose --project-name deck-commander -f %s config --quiet
+  no_log: true
+- name: Aplicar Compose
+  community.docker.docker_compose_v2:
+    project_src: "{{ media_stack_project_dir }}"
+    project_name: "{{ media_stack_project_name }}"
+    state: present
+    wait: true
+    wait_timeout: 300
+  when: not ansible_check_mode

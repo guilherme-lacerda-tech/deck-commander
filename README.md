@@ -1,5 +1,13 @@
 # Deck Commander
 
+### Prioridade obrigatória de entrega
+
+Enviar o nome do jogo e receber o download instalado é o primeiro critério de aceite.
+As demais funcionalidades seguem após esse fluxo e suas dependências.
+O catálogo incluído oferece Doom Shareware e Super Tilt Bro para download HTTPS com SHA-256.
+O catálogo pessoal, o catálogo da família e o Prowlarr configurado ampliam as fontes disponíveis.
+Os testes reais e as pendências de integração estão registrados em `docs/execution/TEST_EVIDENCE.md`.
+
 Centro de comando para o **Steam Deck**: seus jogos de emulador organizados na biblioteca do Steam, com
 capa e aba por console, baixados e instalados por **mensagem no Telegram** — tudo no Gaming Mode, sem
 abrir o modo Desktop no dia a dia.
@@ -19,7 +27,7 @@ abrir o modo Desktop no dia a dia.
 | 📚 **Biblioteca** | Cada ROM vira um jogo no Steam, com capa (SteamGridDB) e na aba do console certo. |
 | ⚡ **Ao vivo** | Um plugin do Decky adiciona o jogo em ~10 s — **sem reiniciar o Steam**. |
 | 🗂️ **Abas** | Uma aba por console (PS1, PS2, Switch, GameCube, Wii, PSP, N64, SNES, GBA…), uma por loja do Unifideck (Epic, GOG) e "Emuladores". Abas vazias ficam escondidas. |
-| 🤖 **Telegram** | Mande o nome do console e encaminhe o `.torrent` (ou cole o magnet). Quando terminar, o jogo entra sozinho na biblioteca e o bot avisa. |
+| 🤖 **Telegram** | Mande o nome do jogo. Escolha a plataforma quando solicitado. O bot busca nas fontes configuradas, baixa a versão identificada e acompanha a instalação. |
 | 🎮 **Emuladores** | Perfis de qualidade por console, BIOS conferidas, avisos de atualização desligados, Switch com A/B no lugar certo. |
 | 🛟 **Segurança** | Backup diário de configs e saves, quarentena (nada é apagado sozinho), safe-mode, autodiagnóstico, testes automáticos semanais. |
 
@@ -74,10 +82,18 @@ O instalador é idempotente (pode rodar de novo para atualizar) e mostra o que f
 
 ## Uso no dia a dia
 
-**Pelo Telegram (o jeito rápido):**
-1. Mande `Switch` (ou `PS2`, `PS1`, `SNES`, `GBA`…).
-2. Encaminhe o arquivo `.torrent` ou cole o link magnet.
-3. Pronto. Quando o download terminar, o bot avisa e o jogo aparece na aba do console, com capa.
+Pelo Telegram
+
+1. Mande o nome do jogo, como `Doom` ou `Super Tilt Bro`.
+2. Escolha a plataforma quando o bot perguntar. Versões ambíguas aparecem para seleção.
+3. O download e a instalação seguem em segundo plano. O bot informa a conclusão ou a dependência pendente.
+
+O catálogo padrão está em `config/download-catalog.json`. Entradas próprias em
+`~/.config/deck-commander/download-catalog.json` complementam esse catálogo, com URL, licença,
+plataforma, tamanho e SHA-256. O Prowlarr usa `~/.config/deck-commander/prowlarr.json`.
+Um pedido sem fonte disponível permanece guardado e é pesquisado novamente a cada 15 minutos.
+O primeiro login da Steam habilita a publicação dos jogos baixados na biblioteca.
+O envio de torrent e magnet também continua disponível pelo bot.
 
 Baixou repetido? O bot avisa **antes** de baixar (responda `/baixar` se quiser mesmo assim). Para limpar o que já
 está repetido: `/duplicados` e `/remover <nº>` (pede confirmação; os arquivos ficam 30 dias na quarentena).
