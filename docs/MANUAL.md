@@ -293,6 +293,8 @@ O EmuDeck usa a mesma pasta `Emulation/roms`. Para não misturar as coisas:
 - **Configuração dos emuladores:** é do EmuDeck. O "continuar de onde parou" só liga se você ligar (painel → Retrô).
 
 ### Ports nativos e outros jogos não-Steam
+Lista de ports de recompilação que batem com a biblioteca do Deck (DK Bananza, Zelda TotK, God of War…): [PORTS-NATIVOS.md](PORTS-NATIVOS.md).
+
 Port nativo é um jogo que a comunidade transformou em programa de PC (não é ROM). Adicione-o na Steam como jogo
 não-Steam (modo Desktop → Steam → "Adicionar jogo não-Steam") e, no painel → Qualidade e controles → **Ports nativos
 e jogos não-Steam**, escolha a aba do console em que ele deve aparecer (ex.: um port de um jogo de Switch na aba

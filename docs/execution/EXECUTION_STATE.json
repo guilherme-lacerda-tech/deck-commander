@@ -125,7 +125,8 @@
       "publicar main após E2E",
       "RG505: agente/destino (ADB inacessível agora)",
       "reconciliar MASTER_REQUIREMENTS.md",
-      "P1: DMC3 desempenho, saves L4/R4/L5"
+      "P1: DMC3 desempenho, saves L4/R4/L5",
+      "Ports nativos: validar DKB Recomp e TotK PC Recomp no Deck (docs/PORTS-NATIVOS.md); sugerir port no painel"
     ],
     "bloqueios": [
       "RG505 ADB inacessível",
