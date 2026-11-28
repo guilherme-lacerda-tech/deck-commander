@@ -1,20 +1,58 @@
-"""Implanta a versão atual no Steam Deck com segurança (substitui os comandos soltos de antes).
+"""Implanta a versão atual no Steam Deck com segurança.
 
-    python tools/implantar.py [deck@IP]          (padrão: o endereço em %USERPROFILE%/.deck-commander/deck.txt)
+    python tools/implantar.py [deck@IP] [--com-jogo-aberto]   (padrão: %USERPROFILE%/.deck-commander/deck.txt)
 
-Antes de copiar, guarda a versão que estava rodando em ~/deck-commander.anterior (/voltar no bot desfaz).
-Recusa se: há merge em conflito/sem terminar, há mudança não salva (commit) em dc/ ou decky-plugin/, ou algum teste
-falha no PC. Depois testa A MESMA versão no Deck (numa pasta temporária) e só então copia, reinicia o bot e o serviço
-de energia e atualiza o plugin do Decky. Nenhuma tradução em andamento é parada (elas rodam em serviços próprios).
-Falhas antigas que isto impede: implantar no meio de um merge com conflito; implantar arquivo de teste quebrado.
+Ordem (cada passo só roda se o anterior deu certo; qualquer falha deixa o Deck com a versão que estava):
+ 1. no PC: recusa merge pendente, mudança sem commit em dc/decky-plugin/config e teste falhando;
+ 2. no Deck: recusa se há jogo aberto (não interrompe partida; --com-jogo-aberto ignora);
+ 3. no Deck: testa A MESMA versão numa pasta temporária DENTRO DO ISOLAMENTO (dc/test_runner: bubblewrap, HOME e
+    XDG falsos, sem rede). Falha real 27/11/2026: teste rodado direto escreveu no HOME do Deck e quebrou o launcher
+    do DMC3 — este script ainda rodava pytest sem isolamento (corrigido 28/11/2026);
+ 4. troca a pasta INTEIRA (a antiga vira ~/deck-commander.anterior; /voltar desfaz). Antes era cópia por cima, que
+    deixava arquivo removido no lugar (ex.: dc/emulators.py ao lado do pacote dc/emulators/);
+ 5. `python3 -m dc.atualizar depois`: refaz launcher, serviços, emuladores.json e plugin do Decky na pasta nova;
+ 6. reinicia bot e energia e roda a revisão ao vivo.
 """
 import os
+import shlex
 import subprocess
 import sys
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[1]
 CHAVE = str(Path.home() / ".ssh" / "deck_commander_ed25519")
+
+# Roda NO DECK. Variáveis: VERSAO, COM_JOGO.
+REMOTO = r"""
+set -u
+NOVA=/tmp/dc-new
+rm -rf "$NOVA" && mkdir "$NOVA" && tar -x -C "$NOVA" || { echo "FALHA: pacote"; exit 1; }
+cd "$NOVA"
+if [ "$COM_JOGO" != 1 ] && PYTHONDONTWRITEBYTECODE=1 python3 -c 'import sys; from dc import ops; sys.exit(0 if ops.game_running() else 1)'; then
+  echo "FALHA: há jogo aberto — não interrompo partida (feche o jogo ou use --com-jogo-aberto)"; exit 1
+fi
+PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY' || { echo "FALHA: testes isolados no Deck"; exit 1; }
+import sys
+from pathlib import Path
+from dc import test_runner
+r = test_runner.run(Path("."), Path.home() / ".local/share/deck-commander/venv/bin/python")
+linhas = (r.stdout or "").strip().splitlines() or (r.stderr or "").strip().splitlines() or ["executor sem resultado"]
+print("testes isolados no Deck:", linhas[-1])
+sys.exit(r.returncode)
+PY
+rm -rf "$HOME/deck-commander.anterior"
+mv "$HOME/deck-commander" "$HOME/deck-commander.anterior" || { echo "FALHA: guardar versão anterior"; exit 1; }
+if ! cp -a "$NOVA" "$HOME/deck-commander"; then
+  rm -rf "$HOME/deck-commander"; mv "$HOME/deck-commander.anterior" "$HOME/deck-commander"
+  echo "FALHA: cópia (versão anterior restaurada)"; exit 1
+fi
+echo "$VERSAO" > "$HOME/deck-commander/VERSAO.txt"
+chmod +x "$HOME"/deck-commander/*.sh
+cd "$HOME/deck-commander" && python3 -m dc.atualizar depois || echo "AVISO: pós-instalação reclamou (veja acima)"
+systemctl --user restart deck-commander-bot deck-commander-power
+rm -rf "$NOVA"
+echo IMPLANTADO
+"""
 
 
 def sh(cmd, **kw):
@@ -27,7 +65,9 @@ def parar(msg):
 
 
 def main():
-    alvo = sys.argv[1] if len(sys.argv) > 1 else None
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    com_jogo = "--com-jogo-aberto" in sys.argv
+    alvo = args[0] if args else None
     if not alvo:
         f = Path.home() / ".deck-commander" / "deck.txt"
         alvo = f.read_text().strip() if f.exists() else "deck@steamdeck"
@@ -41,28 +81,20 @@ def main():
     if r.returncode != 0:
         parar("testes falharam no PC:\n" + "\n".join(r.stdout.splitlines()[-15:]))
     print(r.stdout.strip().splitlines()[-1])
-    import shlex
     commit = sh(["git", "log", "-1", "--format=%h %cd", "--date=format:%d/%m %H:%M"]).stdout.strip()
-    versao = commit or "desconhecida"  # guardada no Deck: /voltar mostra qual é qual
+    versao = commit or "desconhecida"  # guardada no Deck: /voltar e o atualizador usam
     ssh = ["ssh", "-i", CHAVE, "-o", "BatchMode=yes", alvo]
-    remoto = ("rm -rf /tmp/dc-new && mkdir /tmp/dc-new && tar -x -C /tmp/dc-new && cd /tmp/dc-new && "
-              "nice ~/.local/share/deck-commander/venv/bin/python -m pytest -q -p no:cacheprovider tests 2>&1 | tail -1 && "
-              "test ${PIPESTATUS[0]} -eq 0 && rm -rf ~/deck-commander.anterior && cp -a ~/deck-commander ~/deck-commander.anterior && "
-              "cp -a /tmp/dc-new/. ~/deck-commander/ && echo " + shlex.quote(versao) + " > ~/deck-commander/VERSAO.txt && "
-              "systemctl --user restart deck-commander-bot deck-commander-power && cd ~/deck-commander && "
-              "python3 -c 'from dc import setup; l=[]; setup.setup_plugin(l); print(*l)' && echo IMPLANTADO")
-    p = subprocess.run(ssh + ["bash -c " + shlex.quote(remoto)], input=subprocess.run(
-        ["git", "archive", "--format=tar", "HEAD"], cwd=RAIZ, capture_output=True).stdout, capture_output=True, timeout=1800)
+    remoto = f"VERSAO={shlex.quote(versao)} COM_JOGO={1 if com_jogo else 0} bash -c {shlex.quote(REMOTO)}"
+    pacote = subprocess.run(["git", "archive", "--format=tar", "HEAD"], cwd=RAIZ, capture_output=True).stdout
+    p = subprocess.run(ssh + [remoto], input=pacote, capture_output=True, timeout=3600)
     saida = p.stdout.decode("utf-8", "replace") + p.stderr.decode("utf-8", "replace")
     print(saida.strip())
     if "IMPLANTADO" not in saida:
-        parar("os testes no Deck falharam ou a cópia não terminou (o Deck continua com a versão anterior)")
-    # revisão AO VIVO (pedido do usuário 11/11/2026: "o que tava funcionando parou de funcionar"): confere no
-    # aparelho cada coisa que já funcionou. Não desfaz a implantação, mas avisa alto.
+        parar("um passo falhou no Deck (acima); o Deck continua com a versão anterior")
+    # revisão AO VIVO (pedido do usuário 11/11/2026): confere no aparelho cada coisa que já funcionou.
     rv = subprocess.run(ssh + ["cd ~/deck-commander && XDG_RUNTIME_DIR=/run/user/$(id -u) timeout 600 python3 -m dc.revisao_viva"],
                         capture_output=True, timeout=700)
-    texto = rv.stdout.decode("utf-8", "replace").strip()
-    print(texto)
+    print(rv.stdout.decode("utf-8", "replace").strip())
     if rv.returncode != 0:
         print("ATENÇÃO: a revisão ao vivo achou FALHA (acima). Corrigir antes de dizer que está pronto.")
 
