@@ -60,8 +60,9 @@ def test_same_magnet_twice_and_no_auto_jargon(b):
 
 def test_free_text_download_request_gets_hint(b):
     resposta = b.handle_message(msg("baixa god of war pra mim"))
-    assert "qual plataforma" in resposta
-    assert b.cfg["catalogo"]["1"]["titulo"] == "god of war"
+    assert "Pesquisando «god of war» em todas as plataformas" in resposta
+    for v in b.buscas.values():
+        v["future"].result(timeout=30)
     assert b.handle_message(msg("valeu")) is None
 
 

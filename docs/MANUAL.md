@@ -45,17 +45,53 @@ O caminho de um jogo que você possui ou pode obter legalmente:
   Se algo falhar, o Deck continua na versão anterior. Para desfazer uma atualização: `/voltar`.
 
 ## 3. Baixar um jogo
-O bot também pode consultar um Prowlarr configurado pelo proprietário: ele procura o nome, filtra resultados que
-identificam a plataforma e oferece uma lista para escolher. Após a escolha, envia o magnet ao qBittorrent; a
-sincronização e a fila de tradução existentes cuidam do conteúdo concluído. Esse caminho requer um servidor
-Prowlarr com indexadores configurados e resultados que ofereçam magnet. Ele não garante encontrar todo jogo nem
-instalar automaticamente traduções que não sejam compatíveis. O Deck não inclui esse servidor por padrão.
+### Pesquisar pelo nome (o jeito mais simples)
+Mande só o nome no Telegram, por exemplo `god`. O bot procura **em todas as plataformas** e em todas as fontes
+ligadas, e responde com uma lista. Cada linha mostra:
+- plataforma;
+- região;
+- tamanho;
+- formato;
+- PT-BR, quando o nome indica;
+- de onde veio.
+
+- **Só uma plataforma:** `god psp`, `god ps2` (a plataforma pode vir no começo ou no fim).
+- **Abreviações:** valem as mais comuns (`re4`, `gow`, `dmc3`, `mgs`, `ff7`…).
+- **Erros de digitação:** os comuns são aceitos (`resident evl`).
+- **Idioma e região:** `pt-br` e `usa` filtram a lista.
+- **Filtrar depois:** com a lista aberta, mande só o nome da plataforma (ex.: `PSP`) ou use os botões "Só …".
+  Os botões ◀ ▶ trocam de página.
+- **Detalhes:** toque num jogo para ver os detalhes:
+  - fonte e licença, avisando quando ela é só declarada por quem enviou;
+  - se já está na sua biblioteca;
+  - compatibilidade com o Steam Deck e com o RG505.
+
+  Depois toque em **⬇️ Baixar no Steam Deck**.
+- **Toque duplo:** o mesmo botão tocado duas vezes não baixa duas vezes.
+- **Lista vencida:** lista de busca antiga (mais de 30 min) não vale mais. Pesquise de novo.
+- **Nada encontrado:** o bot diferencia "nenhum resultado" de "a fonte falhou" e diz qual fonte falhou. Com
+  **🔔 Avisar quando aparecer**, o pedido fica guardado: ele pesquisa de novo a cada 6 h, por 30 dias, e avisa
+  quando aparecer.
+- **RG505:** por enquanto mostra a compatibilidade; o envio direto ainda é feito pelo bot do RG505 no PC.
+
+Fontes, em `~/.config/deck-commander/busca.json` (`{"provedores": [...]}`):
+- `biblioteca`;
+- `catalogo` (verificado por SHA-256);
+- `familia`;
+- `prowlarr`;
+- `internet_archive` (adaptador direto; só entra se você ligar).
+
+O Internet Archive atende o Prowlarr com ~85 s de atraso, medido no Deck em 28/11/2026. Direto, responde em 1–3 s.
+Com o adaptador ligado, o indexador do Internet Archive é pulado no Prowlarr.
+
+O bot também pode consultar um Prowlarr configurado pelo proprietário. Esse caminho requer um servidor Prowlarr
+com indexadores configurados. Ele não garante encontrar todo jogo nem instalar automaticamente traduções que não
+sejam compatíveis. O Deck não inclui esse servidor por padrão.
 
 Configuração local (não enviar a chave ao chat nem colocá-la no Git): crie
 `~/.config/deck-commander/prowlarr.json` com as propriedades `url` e `api_key` do seu servidor e restrinja o
 arquivo ao usuário (`chmod 600`). A configuração é lida a cada pesquisa.
 
-Você pode mandar apenas o nome para escolher uma plataforma e consultar fontes legais: `Hades` → `PC`.
 O Commander não procura nem baixa ROMs comerciais de fontes não autorizadas; para emulação, importe dump próprio,
 homebrew ou um arquivo/link que você tem autorização para usar.
 

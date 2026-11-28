@@ -94,12 +94,12 @@ COMMAND_IN_TEXT = re.compile(
     r"(/(?:traduzir|converter|sync|devolver|remover|qualidade|controles|status|disk|calibrar)"
     r"(?: (?!<)[A-Za-z0-9_\-]+)*?)(?=[ 	]*(?:$|[—(.,:;→]| - ))", re.MULTILINE)
 HELP = """Deck Commander — comandos
-Mande só o nome de um jogo e escolha a plataforma. Eu procuro nas fontes configuradas,
-baixo a versão identificada e preparo a biblioteca automaticamente.
+Mande só o nome de um jogo (ex.: god). Eu procuro em todas as plataformas e fontes configuradas
+e mostro a lista; toque num jogo para ver os detalhes e baixar. Para uma plataforma só: god psp.
 Aviso aqui quando o download terminar.
 
 /add [console] <magnet> — baixa (console: ps2 psx gc wii snes n64 gba psp nds switch)
-/procurar <jogo> — procura e baixa pelo nome
+/busca <jogo> [plataforma] — procura em todas as plataformas (o mesmo que mandar só o nome)
 /sync — leva downloads concluídos para a biblioteca  (/sync tudo confirma pacotes grandes)
 /console <id ou nome> <console> — diz ou corrige o console de um download (também baixando)
 /reiniciar — reinicia o Steam para mostrar jogos novos
@@ -144,6 +144,7 @@ class Bot:
         self.hits: dict[int, deque] = defaultdict(deque)
         self.search_pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="catalog-search")
         self.searches = {}
+        self.buscas = {}  # uid -> (texto, chat, future) da busca multiplataforma em andamento
 
     # -- infra -----------------------------------------------------------------
     def log(self, msg: str) -> None:
@@ -265,9 +266,19 @@ class Bot:
         P, S = self.paths, self.store
         if cmd in ("/help", "/start"):
             return HELP
-        if cmd == "/procurar":
+        if cmd in ("/procurar", "/busca"):
             titulo = " ".join(args).strip()
-            return self._iniciar_catalogo(uid, titulo, chat) if titulo else "Uso: /procurar <nome do jogo>"
+            return self._iniciar_busca(uid, titulo, chat) if titulo else "Uso: /busca <nome do jogo> [plataforma]"
+        if cmd in ("/bp", "/bf", "/bi", "/bd"):
+            return self._comando_busca(uid, chat, cmd, args)
+        if cmd == "/avisar":
+            texto = " ".join(args).strip()[:120]
+            if not texto:
+                return "Uso: /avisar <jogo> [plataforma]"
+            self.cfg.setdefault("vigias", {})[f"{uid}:{texto.casefold()}"] = {
+                "uid": uid, "texto": texto, "chat": chat, "at": time.time(), "proxima": time.time() + 6 * 3600}
+            self.save_cfg()
+            return f"🔔 Guardei «{texto}». Pesquiso de novo a cada 6 horas (por 30 dias) e aviso aqui quando aparecer."
         if cmd == "/buscar_novamente":
             pedido = self.cfg.get("catalogo", {}).get(str(uid)) or {}
             if not pedido.get("console"):
@@ -691,6 +702,12 @@ class Bot:
         # Fora de links e arquivos, só uma mensagem que seja inteiramente o
         # nome do console é seleção de console. "Mario Kart Wii", por exemplo,
         # é um título, não uma resposta "Wii".
+        sid_recente = (self.cfg.get("ultima_busca") or {}).get(str(uid))
+        if escolha_exata and sid_recente:  # "PS2" sozinho logo depois de uma busca = filtrar a lista
+            from . import busca
+            s = busca.sessao(self.cfg, sid_recente, uid)
+            if s and not s["consulta"].get("console"):
+                return self._comando_busca(uid, chat, "/bf", [sid_recente, escolha_exata])
         c = escolha_exata if escolha_exata != "pc" else None
         # Não trate nomes inequívocos de plataformas ainda não suportadas como
         # título de jogo: a resposta precisa continuar clara (PS5 não vira
@@ -708,8 +725,200 @@ class Bot:
         import re as _re
         if _re.search(r"\w", text) and _re.fullmatch(r"\s*[\w .:'-]{2,80}\s*", text) and len(text.split()) <= 8 and not _re.search(
                 r"(?i)\b(ok|oi|ol[aá]|valeu|obrigad[oa]|blz|beleza|sim|n[aã]o|bom dia|boa (tarde|noite)|kk+|haha)\b", text):
-            return self._iniciar_catalogo(uid, text, chat)
+            return self._iniciar_busca(uid, text, chat)
         return None  # conversa comum: ignora
+
+    # -- busca multiplataforma (dc/busca.py) -------------------------------------------------------
+    def _iniciar_busca(self, uid: int, texto: str, chat: int | None) -> str:
+        from . import busca
+        texto = " ".join((texto or "").split())[:120]
+        texto = re.sub(r"^(?:baixa|baixar|download|instala|instalar|quero jogar|procura|procurar)\s+", "", texto, flags=re.I)
+        texto = re.sub(r"\s+(?:pra|para) mim$", "", texto, flags=re.I).strip()
+        q = busca.interpretar(texto)
+        if not q["termos"]:
+            return "Diga o nome do jogo (ex.: god ou god psp)."
+        anterior = self.buscas.get(uid)
+        if anterior and not anterior["future"].done():
+            return f"Ainda estou pesquisando «{anterior['texto']}». Mando a lista assim que terminar."
+        self.buscas[uid] = {"texto": texto, "chat": chat, "vigia": False,
+                            "future": self.search_pool.submit(busca.pesquisar, self.paths, texto)}
+        alvo = f" ({rotulo(q['console'])})" if q.get("console") else " em todas as plataformas"
+        return f"🔎 Pesquisando «{q['termos']}»{alvo}…"
+
+    def notify_buscas(self) -> None:
+        from . import busca
+        for uid, b in list(self.buscas.items()):
+            if not b["future"].done():
+                continue
+            self.buscas.pop(uid)
+            texto, chat = b["texto"], b["chat"]
+            try:
+                resposta = b["future"].result()
+            except Exception as e:  # noqa: BLE001 — a busca inteira quebrou: diz, não finge "nada encontrado"
+                self.log(f"busca quebrou: {e!r}")
+                if not b["vigia"]:
+                    self.send(chat, f"❌ A pesquisa de «{texto}» falhou ({type(e).__name__}). Nada foi baixado; tente de novo.")
+                continue
+            if b["vigia"]:  # pedido guardado: só fala quando aparece algo
+                if not resposta["resultados"]:
+                    continue
+                self.cfg.get("vigias", {}).pop(f"{uid}:{texto.casefold()}", None)
+            sid = busca.nova_sessao(self.cfg, uid, resposta)
+            self.save_cfg()
+            txt, botoes = busca.pagina(self.cfg["buscas"][sid], sid, 0, rotulo)
+            if b["vigia"]:
+                txt = f"🔔 Apareceu resultado para o pedido guardado «{texto}».\n" + txt
+            elif not resposta["resultados"]:
+                botoes = botoes + [("🔔 Avisar quando aparecer", f"/avisar {texto}")]
+            self.send(chat, txt, botoes)
+
+    def _comando_busca(self, uid: int, chat: int, cmd: str, args: list[str]) -> str:
+        from . import busca, dispositivos
+        s = busca.sessao(self.cfg, args[0], uid) if args else None
+        if s is None:
+            return "Essa lista é de uma busca antiga ou vencida (30 min). Mande o nome do jogo de novo."
+        sid = args[0]
+        if cmd == "/bp":
+            n = int(args[1]) if len(args) > 1 and args[1].isdigit() else 0
+            txt, self.next_buttons = busca.pagina(s, sid, n, rotulo)
+            return txt
+        if cmd == "/bf":
+            alvo = args[1] if len(args) > 1 else "todas"
+            s["filtro"] = None if alvo == "todas" else alvo
+            self.save_cfg()
+            txt, self.next_buttons = busca.pagina(s, sid, 0, rotulo)
+            return txt
+        r = busca.item(s, args[1]) if len(args) > 1 else None
+        if r is None:
+            return "Esse resultado não existe nesta busca. Abra a lista de novo."
+        if cmd == "/bi":
+            return self._detalhe_busca(sid, r)
+        destino = args[2] if len(args) > 2 else "deck"
+        if destino not in dispositivos.DISPOSITIVOS:
+            return "Dispositivo desconhecido."
+        return self._baixar_resultado(uid, chat, r, destino)
+
+    def _detalhe_busca(self, sid: str, r: dict) -> str:
+        from . import busca, dispositivos, transferir
+        linhas = [f"🎮 {r['titulo']}",
+                  f"Plataforma: {rotulo(r['console']) if r.get('console') else 'não identificada'}"]
+        for rot, chave in (("Região", "regiao"), ("Formato", "formato"), ("Ano", "ano")):
+            if r.get(chave):
+                linhas.append(f"{rot}: {r[chave]}")
+        if r["fonte"] != "biblioteca":
+            linhas.append(f"Tamanho: {busca.tamanho_txt(r.get('tamanho'))}")
+        linhas.append(f"Fonte: {busca.NOME_FONTE[r['fonte']]}" + (f" ({r['indexador']})" if r.get("indexador") else "")
+                      + (f" · {r['seeders']} seeders" if r.get("seeders") else ""))
+        if r.get("licenca"):
+            linhas.append(f"Licença: {r['licenca']}"
+                          + ("" if r.get("licenca_verificada") else " (declarada por quem enviou, não verificada)"))
+        if r.get("ptbr"):
+            linhas.append("PT-BR: indicado no nome do arquivo")
+        else:
+            linhas.append("PT-BR: depois de instalar procuro tradução da comunidade primeiro; sem ela, ofereço a IA "
+                          "se o formato do jogo for suportado")
+        na_bib = [g for g, e in transferir.carregar_mapa().items()
+                  if e.get("console") == r.get("console")
+                  and busca.normalizar(e.get("title", "")) == busca.normalizar(r["titulo"])]
+        if r["fonte"] == "biblioteca" or na_bib:
+            linhas.append("✅ Já está na sua biblioteca do Deck")
+        linhas.append("")
+        for d, info in dispositivos.DISPOSITIVOS.items():
+            nivel, por = dispositivos.compatibilidade(d, r.get("console"))
+            linhas.append(f"{dispositivos.SIMBOLO[nivel]} {info['nome']}: {por}"
+                          + ("" if info["envio"] else " — envio direto ainda não ligado a este bot"))
+        if r.get("origem"):
+            linhas.append(r["origem"])
+        botoes = []
+        if r["fonte"] != "biblioteca" and not na_bib:
+            for d, info in dispositivos.DISPOSITIVOS.items():
+                nivel, _ = dispositivos.compatibilidade(d, r.get("console"))
+                if info["envio"] and nivel != "nao":
+                    botoes.append((f"⬇️ Baixar no {info['nome']}", f"/bd {sid} {r['rid']} {d}"))
+        botoes.append(("◀ Voltar à lista", f"/bp {sid} 0"))
+        self.next_buttons = botoes
+        return "\n".join(linhas)
+
+    def _baixar_resultado(self, uid: int, chat: int, r: dict, destino: str) -> str:
+        """Um toque = no máximo um pedido: o mesmo resultado no mesmo destino não é pedido de novo."""
+        from . import dispositivos
+        if ops.in_safe_mode(self.paths):
+            return "Safe-mode ativo; nenhum download foi iniciado."
+        nivel, por = dispositivos.compatibilidade(destino, r.get("console"))
+        if nivel == "nao" or not dispositivos.DISPOSITIVOS[destino]["envio"]:
+            return f"Não baixei: {dispositivos.DISPOSITIVOS[destino]['nome']} — {por}."
+        chave = f"{r['rid']}:{destino}"
+        feitos = self.cfg.setdefault("aquisicoes", {})
+        for k in [k for k, v in feitos.items() if time.time() - v.get("at", 0) > 7 * 86400]:
+            feitos.pop(k)
+        if chave in feitos:
+            return f"Esse já foi pedido: {feitos[chave]['resposta']}"
+        acao, console = r["acao"], r.get("console")
+        if acao["tipo"] == "biblioteca":
+            return "Esse já está na sua biblioteca."
+        if acao["tipo"] == "catalogo":
+            resposta = self._agendar_catalogo(uid, chat, acao["item"])
+        elif acao["tipo"] == "magnet":
+            resposta = self.handle(uid, chat, f"/add {console} {acao['magnet']}" if console else f"/add {acao['magnet']}")
+        elif acao["tipo"] == "prowlarr":
+            resposta = self._adicionar_torrent_prowlarr(acao.get("download_url", ""), r["titulo"], console)
+        elif acao["tipo"] == "ia_torrent":
+            resposta = self._adicionar_torrent_ia(acao["id"], r["titulo"], console)
+        elif acao["tipo"] == "familia":
+            from . import familia_servico
+            try:
+                resposta = familia_servico.puxar(self.paths, self.qbt, acao["gid"])
+            except Exception as e:  # noqa: BLE001
+                self.log(f"falha ao puxar da família: {type(e).__name__}")
+                return "Não consegui puxar do Deck da família; confira a conexão com ele."
+        else:
+            return "Esse tipo de resultado ainda não sabe baixar."
+        if resposta.startswith(("Adicionado", "⬇️", "Esse download já está na fila")):
+            feitos[chave] = {"at": time.time(), "resposta": resposta.split("\n")[0][:200]}
+            self.save_cfg()
+        return resposta
+
+    def _adicionar_torrent_prowlarr(self, url: str, titulo: str, console: str | None) -> str:
+        from . import prowlarr
+        try:
+            dados = prowlarr.baixar_torrent(self.paths, url)
+        except prowlarr.BuscaErro:
+            return "Não consegui pegar o torrent no Prowlarr. Tente de novo em instantes."
+        return self._adicionar_torrent_bytes(dados, titulo, console)
+
+    def _adicionar_torrent_ia(self, ident: str, titulo: str, console: str | None) -> str:
+        from . import busca
+        if not re.fullmatch(r"[A-Za-z0-9._-]{1,120}", ident or ""):
+            return "Identificador inválido."
+        url = f"https://archive.org/download/{ident}/{ident}_archive.torrent"
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": busca.USER_AGENT})
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                final = urllib.parse.urlsplit(resp.geturl())
+                if final.scheme != "https" or not (final.hostname or "").endswith("archive.org"):
+                    return "O torrent redirecionou para fora do Internet Archive; não baixei."
+                dados = resp.read(5 * 1024 * 1024 + 1)
+        except OSError:
+            return "Não consegui pegar o torrent no Internet Archive. Tente de novo em instantes."
+        if len(dados) > 5 * 1024 * 1024:
+            return "Torrent grande demais; não baixei."
+        return self._adicionar_torrent_bytes(dados, titulo, console)
+
+    def _adicionar_torrent_bytes(self, dados: bytes, titulo: str, console: str | None) -> str:
+        from . import dedup
+        if not looks_like_torrent(dados):
+            return "O arquivo recebido não é um torrent válido. Não baixei."
+        nome = dedup.torrent_name(dados) or titulo
+        if self._already(nome, console):
+            return "Esse jogo já parece estar na biblioteca ou na fila; não baixei outra cópia."
+        cat = console or "auto"
+        try:
+            self.qbt.add_file(dados, "resultado.torrent", cat, str(Path(syncer._cfg(self.paths)["downloads_root"]) / cat))
+        except QbtError as e:
+            return f"❌ Não consegui adicionar no qBittorrent: {e}"
+        quem = rotulo(cat) if console else "plataforma a confirmar"
+        return f"Adicionado ({quem}): {nome[:80]}. Aviso quando terminar." + self._power_note()
+
 
     def _iniciar_catalogo(self, uid: int, titulo: str, chat: int | None = None) -> str:
         """Guarda um único pedido curto e pede a plataforma, sem iniciar download."""
@@ -843,6 +1052,19 @@ class Bot:
 
     def retry_catalog_requests(self) -> None:
         """Retoma pedidos persistidos quando a fonte estava indisponível."""
+        from . import busca
+        vigias = self.cfg.get("vigias", {})
+        for chave, v in list(vigias.items()):
+            if time.time() - v.get("at", 0) > 30 * 86400 or v.get("uid") not in self.cfg["allowed"]:
+                vigias.pop(chave)
+                self.save_cfg()
+                continue
+            if time.time() < v.get("proxima", 0) or v["uid"] in self.buscas:
+                continue
+            v["proxima"] = time.time() + 6 * 3600
+            self.save_cfg()
+            self.buscas[v["uid"]] = {"texto": v["texto"], "chat": v["chat"], "vigia": True,
+                                     "future": self.search_pool.submit(busca.pesquisar, self.paths, v["texto"])}
         for uid, pedido in list(self.cfg.get("catalogo", {}).items()):
             if (pedido.get("status") != "waiting_source" or not pedido.get("chat")
                     or time.time() < pedido.get("next_retry_at", 0) or int(uid) not in self.cfg["allowed"]):
@@ -1367,7 +1589,7 @@ class Bot:
         self.log("bot iniciado")
         while True:
             try:
-                ups = self.call("getUpdates", offset=offset, timeout=3 if self.searches else 50,
+                ups = self.call("getUpdates", offset=offset, timeout=3 if (self.searches or self.buscas) else 50,
                                 allowed_updates='["message","callback_query"]')
             except Exception as e:  # noqa: BLE001 — sem rede: espera e tenta de novo
                 self.log(f"rede: {type(e).__name__}"); time.sleep(30); continue
@@ -1408,6 +1630,7 @@ class Bot:
             try:
                 self.retry_catalog_requests()
                 self.notify_searches()
+                self.notify_buscas()
                 self.notify_catalog_downloads()
             except Exception as e:  # noqa: BLE001 — falha de fonte preserva os pedidos
                 self.log(f"retomada de busca: {type(e).__name__}")

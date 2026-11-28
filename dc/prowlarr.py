@@ -10,6 +10,10 @@ class BuscaErro(RuntimeError):
     pass
 
 
+class SemIndexadores(BuscaErro):
+    """Depois de tirar os indexadores cobertos por outro provedor, não sobrou nenhum."""
+
+
 class SemRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
@@ -34,8 +38,17 @@ def configuracao(paths):
     return endereco, chave
 
 
-def pesquisar(paths, titulo: str, abrir=None, indexadores=None, timeout=15) -> list[dict] | None:
-    """Consulta fontes individualmente quando fornecidas; uma falha não impede as demais."""
+def _indexadores_ativos(endereco, chave, abrir, timeout) -> list[dict]:
+    req = urllib.request.Request(endereco + "/api/v1/indexer", headers={"X-Api-Key": chave, "Accept": "application/json"})
+    with (abrir or urllib.request.build_opener(SemRedirect()).open)(req, timeout=timeout) as resp:
+        dados = json.loads(resp.read(2 * 1024 * 1024))
+    return [i for i in dados if isinstance(i, dict) and i.get("enable")]
+
+
+def pesquisar(paths, titulo: str, abrir=None, indexadores=None, timeout=15, ignorar=()) -> list[dict] | None:
+    """Consulta fontes individualmente quando fornecidas; uma falha não impede as demais.
+    `ignorar`: nomes/definições de indexador que outro provedor já cobre (ex.: Internet Archive direto, que o
+    Archive atende em ~1 s, contra ~85 s pelo Prowlarr — medido no Deck em 28/11/2026)."""
     cfg = configuracao(paths)
     if cfg is None:
         return None
@@ -49,6 +62,19 @@ def pesquisar(paths, titulo: str, abrir=None, indexadores=None, timeout=15) -> l
             indexadores = [int(i) for i in ids if int(i) > 0]
         except (OSError, ValueError, TypeError) as exc:
             raise BuscaErro("lista de indexadores inválida") from exc
+    if ignorar:
+        fora = {n.casefold() for n in ignorar}
+        try:
+            ativos = _indexadores_ativos(endereco, chave, abrir, timeout)
+        except (OSError, ValueError) as exc:
+            raise BuscaErro("não consegui consultar o Prowlarr") from exc
+        validos = [int(i["id"]) for i in ativos
+                   if str(i.get("name", "")).casefold() not in fora
+                   and str(i.get("definitionName", "")).casefold() not in fora
+                   and (not indexadores or int(i["id"]) in indexadores)]
+        if not validos:
+            raise SemIndexadores("nenhum indexador além dos cobertos por outra fonte")
+        indexadores = validos
     saida = []
     vistos = set()
     sucesso = False
@@ -87,8 +113,10 @@ def pesquisar(paths, titulo: str, abrir=None, indexadores=None, timeout=15) -> l
                 if identity in vistos:
                     continue
                 vistos.add(identity)
+                tam = item.get("size")
                 saida.append({"titulo": nome[:300], "magnet": magnet, "download_url": link if local else "",
-                              "seeders": item.get("seeders") or 0})
+                              "seeders": item.get("seeders") or 0, "tamanho": tam if isinstance(tam, int) else None,
+                              "indexador": str(item.get("indexer") or "")[:60]})
     if not sucesso:
         raise BuscaErro("não consegui consultar o Prowlarr")
     return saida

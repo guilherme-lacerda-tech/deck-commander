@@ -29,20 +29,26 @@ def test_nome_torrent_e_sincronizacao_simulados(tmp_path, monkeypatch):
     monkeypatch.setattr(syncer, "_cfg", lambda p: {"downloads_root": str(downloads), "roms_root": str(roms),
                                                      "sync_during_game": "block"})
     monkeypatch.setattr(ops, "game_running", lambda: False)
-    monkeypatch.setattr(prowlarr, "pesquisar", lambda p, titulo: [{"titulo": "Jogo GBA", "magnet": "",
-                                                                   "download_url": "http://localhost:9696/d"}])
+    monkeypatch.setattr(prowlarr, "configuracao", lambda p: ("http://localhost:9696", "k"))
+    monkeypatch.setattr(prowlarr, "pesquisar", lambda p, titulo, **kw: [{"titulo": "Jogo [GBA]", "magnet": "",
+                                                                         "download_url": "http://localhost:9696/d"}])
+    from dc import busca
+    monkeypatch.setattr(busca, "config", lambda paths: {"provedores": ["prowlarr"]})
     monkeypatch.setattr(prowlarr, "baixar_torrent", lambda p, url: TORRENT)
     monkeypatch.setattr(b, "_already", lambda *a: None)
     monkeypatch.setattr(syncer, "add_to_steam", lambda *a: [])
     def enviar(t):
         return b.handle_message({"from": {"id": 1}, "chat": {"id": 1}, "text": t})
-    enviar("Jogo")
-    assert "Pesquisando" in enviar("GBA")
-    for _, future in b.searches.values():
-        future.result(timeout=3)
-    b.notify_searches()
-    resposta = respostas[-1]["text"]
-    assert "Jogo GBA" in resposta and "Adicionado" in resposta
+    assert "Pesquisando" in enviar("Jogo")
+    for v in b.buscas.values():
+        v["future"].result(timeout=5)
+    b.notify_buscas()
+    assert "Jogo [GBA]" in respostas[-1]["text"]
+    sid = b.cfg["ultima_busca"]["1"]
+    rid = b.cfg["buscas"][sid]["resultados"][0]["rid"]
+    assert "Steam Deck" in enviar(f"/bi {sid} {rid}")
+    resposta = enviar(f"/bd {sid} {rid} deck")
+    assert "Adicionado" in resposta
     downloads.mkdir()
     (downloads / "jogo.gba").write_bytes(b"conteudo-simulado")
     resposta = syncer.run_sync(paths, b.store, b.qbt)

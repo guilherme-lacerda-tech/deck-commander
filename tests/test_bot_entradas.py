@@ -102,37 +102,12 @@ def test_unknown_console_answers_clearly(x):
     assert "Não conheço o console" in msg(x, "Swich")
 
 
-def test_nome_de_jogo_pede_plataforma_sem_iniciar_download(x):
-    r = msg(x, "Devil May Cry 3")
-    assert "qual plataforma" in r.lower()
-    assert x.qbt.added == []
-    assert x.cfg["catalogo"]["1"]["titulo"] == "Devil May Cry 3"
 
 
-def test_titulo_com_nome_de_console_nao_vira_escolha_de_console(x):
-    assert "qual plataforma" in msg(x, "Mario Kart Wii")
-    assert x.cfg["catalogo"]["1"]["titulo"] == "Mario Kart Wii"
-    assert x.qbt.added == []
 
 
-def test_pedido_sem_fonte_fica_persistido_para_retomada(x):
-    msg(x, "Hades")
-    assert "Pesquisando" in msg(x, "PC")
-    r = finish_search(x)
-    assert "aguardando uma fonte" in r
-    assert "Hades" in r
-    assert x.qbt.added == []
-    assert x.cfg["catalogo"]["1"]["status"] == "waiting_source"
-    assert x.cfg["catalogo"]["1"]["console"] == "pc"
 
 
-def test_plataforma_retro_sem_fonte_preserva_pedido(x):
-    msg(x, "Devil May Cry 3")
-    msg(x, "PS2")
-    r = finish_search(x)
-    assert "aguardando uma fonte" in r.lower()
-    assert x.cfg["catalogo"]["1"]["titulo"] == "Devil May Cry 3"
-    assert x.qbt.added == []
 
 
 def test_magnet_com_console_nao_e_engolido_pelo_catalogo(x):
@@ -146,45 +121,12 @@ def test_pc_nao_e_categoria_de_torrent():
     assert bot.parse_console("PC") is None
 
 
-def test_escolha_experimental_preserva_titulo_para_nova_plataforma(x):
-    msg(x, "Hades")
-    assert "escolha outra plataforma" in msg(x, "Switch 2")
-    assert "Hades" in msg(x, "PC")
 
 
-def test_pedido_por_nome_inicia_jogo_do_catalogo_compartilhado(x, monkeypatch):
-    from dc import familia_servico as fs
-    item = {"titulo": "Jogo Teste", "console": "ps2", "gid": "ps2-teste", "magnet": MAG}
-    monkeypatch.setattr(fs, "catalogo_guardado", lambda p: {"jogos": [item]})
-    chamadas = []
-    monkeypatch.setattr(fs, "puxar", lambda p, q, gid: chamadas.append(gid) or "download na fila")
-    monkeypatch.setattr(x, "_already", lambda *a: None)
-    msg(x, "Jogo Teste")
-    assert "download na fila" in msg(x, "PS2")
-    assert chamadas == ["ps2-teste"]
 
 
-def test_pedido_nao_baixa_versao_ambigua(x, monkeypatch):
-    from dc import familia_servico as fs
-    item = {"titulo": "Jogo Teste", "console": "ps2", "gid": "um", "magnet": MAG}
-    monkeypatch.setattr(fs, "catalogo_guardado", lambda p: {"jogos": [item, {**item, "gid": "dois"}]})
-    msg(x, "Jogo Teste")
-    assert "mais de uma versão" in msg(x, "PS2")
-    assert x.qbt.added == []
 
 
-def test_busca_prowlarr_escolhe_console_e_adiciona_download(x, monkeypatch):
-    from dc import prowlarr
-    monkeypatch.setattr(prowlarr, "pesquisar", lambda p, titulo: [
-        {"titulo": "Jogo Teste PS2", "magnet": MAG, "seeders": 1},
-        {"titulo": "Jogo Teste Wii", "magnet": MAG, "seeders": 1}])
-    msg(x, "Jogo Teste")
-    assert "Pesquisando" in msg(x, "PS2")
-    resposta = finish_search(x)
-    assert "Jogo Teste PS2" in resposta and "Jogo Teste Wii" not in resposta
-    assert "Adicionado (ps2)" in resposta
-    assert x.qbt.added == [(MAG, "ps2")]
-    assert "1" not in x.cfg["catalogo"]
 
 
 def test_resultado_busca_expirado_nao_baixa(x):
@@ -193,17 +135,6 @@ def test_resultado_busca_expirado_nao_baixa(x):
     assert x.qbt.added == []
 
 
-def test_resultado_torrent_e_enviado_ao_qbittorrent(x, monkeypatch):
-    from dc import prowlarr
-    monkeypatch.setattr(prowlarr, "pesquisar", lambda p, titulo: [
-        {"titulo": "Jogo PS2", "magnet": "", "download_url": "http://localhost:9696/download"}])
-    monkeypatch.setattr(prowlarr, "baixar_torrent", lambda p, url: TORRENT)
-    monkeypatch.setattr(x, "_already", lambda *a: None)
-    msg(x, "Jogo")
-    msg(x, "PS2")
-    resposta = finish_search(x)
-    assert "Jogo PS2" in resposta and "Adicionado (ps2)" in resposta
-    assert x.qbt.added == [("resultado.torrent", "ps2")]
 
 
 def test_file_that_is_not_a_torrent(x, monkeypatch):
@@ -263,92 +194,16 @@ def test_stranger_is_refused_even_with_magnet(x):
     assert "Acesso negado" in r and x.qbt.added == []
 
 
-def test_plataforma_no_botao_executa_busca(x, monkeypatch):
-    from dc import prowlarr
-    monkeypatch.setattr(prowlarr, "pesquisar", lambda *args: [
-        {"titulo": "Jogo Teste PS2", "magnet": MAG, "seeders": 1}])
-    x.send(9, msg(x, "Jogo Teste"))
-    button = x._button("PS2", "PS2")
-    x.handle_callback({"id": "q", "from": {"id": 1}, "data": button["callback_data"],
-                       "message": {"chat": {"id": 9}}})
-    assert "Adicionado (ps2)" in finish_search(x)
-    assert x.qbt.added == [(MAG, "ps2")]
 
 
-def test_nome_direto_unico_agenda_sem_pedir_arquivo_ou_plataforma(x, monkeypatch):
-    from dc import catalogo_downloads
-    item = {"id": "jogo", "titulo": "Jogo Teste", "console": "nes"}
-    monkeypatch.setattr(catalogo_downloads, "pesquisar", lambda *args: [item])
-    chamadas = []
-    monkeypatch.setattr(catalogo_downloads, "agendar",
-                        lambda paths, store, game, chat: chamadas.append((game, chat)) or "op123")
-    assert "entrou na fila op123" in msg(x, "Jogo Teste")
-    assert chamadas == [(item, 9)]
-    assert "1" not in x.cfg["catalogo"]
 
 
-def test_nome_multiplataforma_usa_plataforma_escolhida(x, monkeypatch):
-    from dc import catalogo_downloads
-    itens = [{"id": "nes", "titulo": "Jogo Teste", "console": "nes"},
-             {"id": "snes", "titulo": "Jogo Teste", "console": "snes"}]
-    monkeypatch.setattr(catalogo_downloads, "pesquisar",
-                        lambda paths, title, console=None: [i for i in itens if not console or i["console"] == console])
-    chamadas = []
-    monkeypatch.setattr(catalogo_downloads, "agendar",
-                        lambda paths, store, item, chat: chamadas.append(item["console"]) or "op")
-    assert "qual plataforma" in msg(x, "Jogo Teste")
-    assert chamadas == []
-    assert "entrou na fila" in msg(x, "SNES")
-    assert chamadas == ["snes"]
 
 
-def test_busca_lenta_nao_bloqueia_comandos(x, monkeypatch):
-    import threading
-    from dc import prowlarr
-    aguardando = threading.Event()
-    iniciou = threading.Event()
-    def pesquisar(*args):
-        iniciou.set()
-        aguardando.wait(3)
-        return []
-    monkeypatch.setattr(prowlarr, "pesquisar", pesquisar)
-    try:
-        msg(x, "Jogo Teste")
-        assert "Pesquisando" in msg(x, "NES")
-        assert iniciou.wait(1)
-        assert not x.searches[1][1].done()
-        assert "comandos" in msg(x, "/help")
-    finally:
-        aguardando.set()
-        finish_search(x)
 
 
-def test_pedido_sem_fonte_retoma_apos_reabrir_bot(x, monkeypatch):
-    from dc import prowlarr
-    msg(x, "Jogo Teste")
-    msg(x, "PS2")
-    assert "aguardando uma fonte" in finish_search(x)
-    x.cfg["catalogo"]["1"]["next_retry_at"] = 0
-    x.save_cfg()
-    novo = bot.Bot(x.paths, "TOK")
-    novo.qbt = x.qbt
-    novo.call = x.call
-    novo.sent = x.sent
-    monkeypatch.setattr(prowlarr, "pesquisar", lambda *args: [
-        {"titulo": "Jogo Teste PS2", "magnet": MAG, "seeders": 1}])
-    novo.retry_catalog_requests()
-    assert "Adicionado (ps2)" in finish_search(novo)
-    assert novo.qbt.added == [(MAG, "ps2")]
 
 
-def test_busca_generica_preserva_escolha_de_titulo(x, monkeypatch):
-    from dc import prowlarr
-    monkeypatch.setattr(prowlarr, "pesquisar", lambda *args: [
-        {"titulo": "Jogo Teste 2 PS2", "magnet": MAG, "seeders": 50}])
-    msg(x, "Jogo Teste")
-    msg(x, "PS2")
-    assert "Escolha o título" in finish_search(x)
-    assert x.qbt.added == []
 
 
 def test_download_concluido_notifica_chat_uma_vez(x):
