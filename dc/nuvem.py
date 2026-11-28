@@ -30,6 +30,20 @@ PASTAS: list[tuple[str, str]] = [
     ("melonDS/saves", ".var/app/net.kuribo64.melonDS/data/melonDS")
 ]
 
+def pastas(home: Path) -> list[tuple[str, str]]:
+    """PASTAS + as que dependem do que está instalado. Falta achada em 28/11/2026: nenhum save de Switch (Lichii/Eden)
+    nem do port nativo do Bananza ia para a nuvem."""
+    from .lichii import saves
+    extra = []
+    s = saves(home)
+    if s.exists():
+        extra.append(("Lichii/save", str(s.relative_to(home))))
+    dkb = home / "Games/DKB-Recomp/game/profile"  # port nativo (DKB Recomp): saves ficam no próprio port
+    if dkb.exists():
+        extra.append(("Ports/DKB-Recomp-profile", str(dkb.relative_to(home))))
+    return PASTAS + extra
+
+
 def instalar_rclone(bin_dir: Path, baixar: Callable[[str], bytes], sha256: str = RCLONE_SHA256) -> Path:
     """Instala o rclone na pasta bin_dir, baixando e verificando o checksum."""
     rclone_path = bin_dir / "rclone"
@@ -88,6 +102,9 @@ class Nuvem:
             "--create-empty-src-dirs", "--compare", "size,modtime",
             "--conflict-resolve", "newer", "--conflict-loser", "num",
             "--max-delete", "10", "--resilient", "--recover",
+            # trava de uma sincronização interrompida (Deck dormiu/desligou no meio) vence em 30 min; antes ficava
+            # presa e o backup do PCSX2/sstates falhou a cada hora desde 01:48 de 28/11/2026
+            "--max-lock", "30m",
             "--workdir", str(self.estado.parent / "bisync")
         ]
         if primeira:
@@ -102,7 +119,7 @@ class Nuvem:
             estado_atual = {}
 
         resultados = []
-        for nome_nuvem, caminho_relativo in PASTAS:
+        for nome_nuvem, caminho_relativo in pastas(self.home):
             local = self.home / caminho_relativo
             if not local.exists():
                 continue

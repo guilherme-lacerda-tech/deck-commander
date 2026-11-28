@@ -46,7 +46,8 @@ _LICHII_RX = re.compile(r'^(player_0_button_([abxy]))="(engine:sdl,[^"]*?button:
 
 
 def _lichii(home: Path) -> list[Path]:
-    return [home / ".config/eden/qt-config.ini", home / "Emulation/Lichii/user/config/qt-config.ini"]
+    from .lichii import pastas  # build 410: ~/.config/lichii (antes eden)
+    return [pastas(home)[0] / "qt-config.ini", home / "Emulation/Lichii/user/config/qt-config.ini"]
 
 
 def _ryu_modo(home: Path) -> str | None:

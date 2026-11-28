@@ -394,7 +394,8 @@ def _nomes_tid(pasta: Path, tid: str) -> list[str]:
 
 
 def _emu_lichii(m: Manifesto, home: Path) -> None:
-    C, D = home / ".config/eden", home / ".local/share/eden"
+    from .lichii import pastas
+    C, D = pastas(home)  # build 410 do Lichii: ~/.config/lichii e ~/.local/share/lichii (antes eden)
     tid = (m.info.get("title_id") or "").upper()
     m.info["dados_emulador"] = {"config": str(C), "dados": str(D)}
     m.troca(D, "{EMU}")
@@ -419,10 +420,10 @@ def _emu_lichii(m: Manifesto, home: Path) -> None:
     m.add_arvore(D / "nand/system/save", "config-global", "{EMU}/nand/system/save")  # perfis de usuário (UUID dos saves)
     m.add_arvore(D / "play_time", "config-global", "{EMU}/play_time")
     m.add_arvore(D / "amiibo", "config-global", "{EMU}/amiibo")
-    m.excluir(home / ".cache/eden/shader", "cache de shader: depende da GPU/driver/sistema; o PC recompila")
+    m.excluir(home / ".cache" / D.name / "shader", "cache de shader: depende da GPU/driver/sistema; o PC recompila")
     m.excluir(D / "log", "logs")
     m.excluir(D / "crash_dumps", "logs")
-    m.notas.append("Saves do Lichii: ~/.local/share/eden/nand/user/save/0000000000000000/<UUID do perfil>/<TITLE ID>/ "
+    m.notas.append(f"Saves do Lichii: ~/.local/share/{D.name}/nand/user/save/0000000000000000/<UUID do perfil>/<TITLE ID>/ "
                    "— o perfil (UUID) vem junto em nand/system/save/8000000000000010.")
 
 
