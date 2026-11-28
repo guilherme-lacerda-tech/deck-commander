@@ -105,6 +105,7 @@ Aviso aqui quando o download terminar.
 
 /add [console] <magnet> — baixa (console: ps2 psx gc wii snes n64 gba psp nds switch)
 /busca <jogo> [plataforma] — procura em todas as plataformas (o mesmo que mandar só o nome)
+/melhores <plataforma e/ou gênero> — os mais bem avaliados (ex.: ps2 · fps · rpg psp); também vale mandar só "ps2" ou "fps"
 /sync — leva downloads concluídos para a biblioteca  (/sync tudo confirma pacotes grandes)
 /console <id ou nome> <console> — diz ou corrige o console de um download (também baixando)
 /reiniciar — reinicia o Steam para mostrar jogos novos
@@ -150,6 +151,7 @@ class Bot:
         self.search_pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="catalog-search")
         self.searches = {}
         self.buscas = {}  # uid -> (texto, chat, future) da busca multiplataforma em andamento
+        self.descobertas = {}  # uid -> lista de "mais bem avaliados" sendo montada (dc/descobrir.py)
         import threading
         self.trava = threading.RLock()  # laço do Telegram x thread de manutenção (ambos mexem em self.cfg)
 
@@ -298,6 +300,14 @@ class Bot:
             return self._iniciar_busca(uid, titulo, chat) if titulo else "Uso: /busca <nome do jogo> [plataforma]"
         if cmd in ("/bp", "/bf", "/bi", "/bd"):
             return self._comando_busca(uid, chat, cmd, args)
+        if cmd in ("/melhores", "/top"):
+            from . import descobrir
+            pedido_desc = descobrir.interpretar(" ".join(args)) if args else None
+            if not pedido_desc:
+                return "Uso: /melhores <plataforma e/ou gênero> — ex.: /melhores ps2 · /melhores fps · /melhores rpg psp"
+            return self._iniciar_descoberta(uid, chat, pedido_desc)
+        if cmd == "/dp":  # página da lista de melhores
+            return self._pagina_descoberta(uid, args)
         if cmd == "/avisar":
             texto = " ".join(args).strip()[:120]
             if not texto:
@@ -748,7 +758,16 @@ class Bot:
             if r:
                 return r
             pend[str(uid)] = {"console": c, "at": time.time()}; self.save_cfg()
+            from . import descobrir
+            if c in descobrir.PLATAFORMA_WD:
+                self._iniciar_descoberta(uid, chat, {"console": c, "genero": None})
+                return (f"⭐ Buscando os jogos mais bem avaliados de {rotulo(c)}…\n"
+                        f"(Se for encaminhar um .torrent ou magnet agora: próximo .torrent ou magnet = {c}.)")
             return f"Ok, próximo .torrent ou magnet = {c}. Pode encaminhar."
+        from . import descobrir
+        pedido_desc = descobrir.interpretar(text)
+        if pedido_desc:
+            return self._iniciar_descoberta(uid, chat, pedido_desc)
         import re as _re
         if _re.search(r"\w", text) and _re.fullmatch(r"\s*[\w .:'-]{2,80}\s*", text) and len(text.split()) <= 8 and not _re.search(
                 r"(?i)\b(ok|oi|ol[aá]|valeu|obrigad[oa]|blz|beleza|sim|n[aã]o|bom dia|boa (tarde|noite)|kk+|haha)\b", text):
@@ -771,6 +790,66 @@ class Bot:
                             "future": self.search_pool.submit(busca.pesquisar, self.paths, texto)}
         alvo = f" ({rotulo(q['console'])})" if q.get("console") else " em todas as plataformas"
         return f"🔎 Pesquisando «{q['termos']}»{alvo}…"
+
+    def _iniciar_descoberta(self, uid: int, chat: int, pedido: dict) -> str:
+        from . import descobrir
+        anterior = self.descobertas.get(uid)
+        if anterior and not anterior["future"].done():
+            return "Ainda estou montando a lista anterior. Já mando."
+        self.descobertas[uid] = {"pedido": pedido, "chat": chat,
+                                 "future": self.search_pool.submit(descobrir.melhores, self.paths, pedido["console"],
+                                                                   tuple(pedido["genero"]) if pedido["genero"] else None)}
+        return f"⭐ Montando os mais bem avaliados: {descobrir.titulo(pedido['console'], pedido['genero'], rotulo)}…"
+
+    def notify_descobertas(self) -> None:
+        for uid, d in list(self.descobertas.items()):
+            if not d["future"].done():
+                continue
+            self.descobertas.pop(uid)
+            try:
+                jogos = d["future"].result()
+            except Exception as e:  # noqa: BLE001 — Wikidata fora: diz, não finge lista vazia
+                self.log(f"descoberta falhou: {e!r}")
+                self.send(d["chat"], "❌ Não consegui consultar as notas agora (Wikidata fora do ar ou lento). Tente de novo em instantes.")
+                continue
+            self.cfg.setdefault("descobertas", {})[str(uid)] = {"pedido": d["pedido"], "jogos": jogos[:40], "at": time.time()}
+            self.save_cfg()
+            txt = self._pagina_descoberta(uid, ["0"])
+            self.send(d["chat"], txt)
+
+    def _pagina_descoberta(self, uid: int, args: list[str]) -> str:
+        from . import descobrir
+        s = (self.cfg.get("descobertas") or {}).get(str(uid))
+        if not s or time.time() - s.get("at", 0) > 3600:
+            return "Essa lista venceu. Mande de novo (ex.: ps2, fps, rpg psp)."
+        jogos, pedido = s["jogos"], s["pedido"]
+        genero = tuple(pedido["genero"]) if pedido["genero"] else None
+        nome = descobrir.titulo(pedido["console"], genero, rotulo)
+        if not jogos:
+            return f"Não achei jogos com nota para {nome} no Wikidata."
+        n = int(args[0]) if args and args[0].isdigit() else 0
+        por, paginas = 8, (len(jogos) + 7) // 8
+        n = max(0, min(n, paginas - 1))
+        fatia = jogos[n * por:(n + 1) * por]
+        linhas = [f"⭐ Mais bem avaliados — {nome}" + (f" (página {n + 1}/{paginas})" if paginas > 1 else "")]
+        botoes: list = []
+        for i, j in enumerate(fatia, 1 + n * por):
+            nota = (f"{j['nota']}" + ("" if j["tipo_nota"] == "plataforma" else " geral")) if j.get("nota") else "sem nota"
+            ano = f" ({j['ano']})" if j.get("ano") else ""
+            linhas.append(f"{i}. {j['nome']}{ano} — {nota}")
+            alvo = j["nome"] + (f" {pedido['console']}" if pedido["console"] else "")
+            botoes.append((f"🔎 {i}. {j['nome'][:38]}", f"/busca {alvo}"))
+        linhas.append("Nota do Metacritic pelo Wikidata (\"geral\" = sem a plataforma; \"sem nota\" = entre os mais "
+                      "conhecidos). Toque em 🔎 para procurar onde baixar.")
+        nav = []
+        if n > 0:
+            nav.append(("◀ Anterior", f"/dp {n - 1}"))
+        if n + 1 < paginas:
+            nav.append(("Próxima ▶", f"/dp {n + 1}"))
+        if nav:
+            botoes.append(nav)
+        self.next_buttons = botoes
+        return "\n".join(linhas)
 
     def notify_buscas(self) -> None:
         from . import busca
@@ -1738,7 +1817,7 @@ class Bot:
         threading.Thread(target=self._laco_manutencao, name="manutencao", daemon=True).start()
         while True:
             try:
-                ups = self.call("getUpdates", offset=offset, timeout=2 if (self.searches or self.buscas) else 25,
+                ups = self.call("getUpdates", offset=offset, timeout=2 if (self.searches or self.buscas or self.descobertas) else 25,
                                 allowed_updates='["message","callback_query"]')
             except Exception as e:  # noqa: BLE001 — sem rede: espera e tenta de novo
                 self.log(f"rede: {type(e).__name__}"); time.sleep(30); continue
@@ -1768,6 +1847,7 @@ class Bot:
                 try:
                     self.notify_searches()
                     self.notify_buscas()
+                    self.notify_descobertas()
                 except Exception as e:  # noqa: BLE001
                     self.log(f"entrega de busca: {type(e).__name__}")
             with self.trava:

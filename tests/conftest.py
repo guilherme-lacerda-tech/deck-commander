@@ -9,5 +9,12 @@ def _no_retry_wait(monkeypatch):
     monkeypatch.setattr(ia, "_ollama_up", lambda spec: True)  # sem rede nos testes
 
 
+@pytest.fixture(autouse=True)
+def _sem_wikidata(monkeypatch):
+    """'PS2' sozinho dispara a lista de mais bem avaliados (Wikidata): teste nunca depende de internet."""
+    from dc import descobrir
+    monkeypatch.setattr(descobrir, "_baixar", lambda consulta, abrir=None, timeout=60: [])
+
+
 # fixture "b" (bot de tradução) usada também por test_motores e test_parar_tarefa
 from tests.test_traducao_bot import b  # noqa: E402,F401
