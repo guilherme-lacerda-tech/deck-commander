@@ -544,15 +544,17 @@ def pagina(s: dict, sid: str, n: int, rotulo) -> tuple[str, list[tuple[str, str]
         info = (f"ℹ️ {i}. {r['titulo'][:36]}", f"/bi {sid} {r['rid']}")
         pode = r["fonte"] != "biblioteca" and dispositivos.compatibilidade("deck", r.get("console"))[0] != "nao"
         botoes.append([info, (f"⬇️ {i}", f"/bd {sid} {r['rid']} deck")] if pode else [info])
+    nav = []
     if n > 0:
-        botoes.append(("◀ Anterior", f"/bp {sid} {n - 1}"))
+        nav.append(("◀ Anterior", f"/bp {sid} {n - 1}"))
     if n + 1 < paginas:
-        botoes.append(("Próxima ▶", f"/bp {sid} {n + 1}"))
+        nav.append(("Próxima ▶", f"/bp {sid} {n + 1}"))
+    if nav:
+        botoes.append(nav)
     consoles = sorted({r["console"] for r in s["resultados"] if r.get("console")})
     if not q.get("console") and len(consoles) > 1:
-        if s.get("filtro"):
-            botoes.append(("Todas as plataformas", f"/bf {sid} todas"))
-        for c in consoles[:8]:
-            if c != s.get("filtro"):
-                botoes.append((f"Só {rotulo(c)}", f"/bf {sid} {c}"))
+        # filtros 3 por linha (teste real 28/11/2026: um por linha virava uma parede de botões)
+        filtros = ([("Todas", f"/bf {sid} todas")] if s.get("filtro") else []) + [
+            (f"Só {rotulo(c)}", f"/bf {sid} {c}") for c in consoles[:9] if c != s.get("filtro")]
+        botoes += [filtros[i:i + 3] for i in range(0, len(filtros), 3)]
     return "\n".join(texto), botoes
