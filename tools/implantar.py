@@ -84,6 +84,8 @@ def main():
     commit = sh(["git", "log", "-1", "--format=%h %cd", "--date=format:%d/%m %H:%M"]).stdout.strip()
     versao = commit or "desconhecida"  # guardada no Deck: /voltar e o atualizador usam
     ssh = ["ssh", "-i", CHAVE, "-o", "BatchMode=yes", alvo]
+    if os.environ.get("DC_SSH_CONFIG"):  # ex.: a VM de teste (D:/vm-steamos), em outra porta
+        ssh[1:1] = ["-F", os.environ["DC_SSH_CONFIG"]]
     remoto = f"VERSAO={shlex.quote(versao)} COM_JOGO={1 if com_jogo else 0} bash -c {shlex.quote(REMOTO)}"
     pacote = subprocess.run(["git", "archive", "--format=tar", "HEAD"], cwd=RAIZ, capture_output=True).stdout
     p = subprocess.run(ssh + [remoto], input=pacote, capture_output=True, timeout=3600)
