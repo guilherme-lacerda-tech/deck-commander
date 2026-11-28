@@ -277,3 +277,28 @@ def test_mensagem_sem_botoes_tira_teclado_preso(x):
     assert json.loads(x.sent[-1]["reply_markup"]) == {"remove_keyboard": True}
     x.send(9, "pergunta", [("Sim", "/x sim"), ("Não", "/x nao")])
     assert "inline_keyboard" in json.loads(x.sent[-1]["reply_markup"])
+
+
+def test_o_que_ja_tem_nao_ocupa_a_lista_de_baixar(x, monkeypatch):
+    """Dono, 28/11/2026: 'só apareceu o que eu já tenho na biblioteca, pra que eu vou querer baixar?'"""
+    fontes(monkeypatch,
+           biblioteca=lambda p, q, **kw: [busca.resultado("biblioteca", "g1", "God of War Chains of Olympus", "psp",
+                                                          acao={"tipo": "biblioteca"})],
+           prowlarr=prowl({"titulo": "God of War Ghost of Sparta [PSP]", "magnet": MAG},
+                          {"titulo": "God of War Chains of Olympus [PSP]", "magnet": MAG2}))
+    msg(x, "god psp")
+    envio = terminar(x)
+    txt = envio["text"]
+    assert "2 para baixar" in txt and "Você já tem: God of War Chains of Olympus (PSP)" in txt
+    assert txt.index("Ghost of Sparta") > txt.index("Você já tem")
+    item_chains = txt.split("Chains of Olympus [PSP]")[1].split("\n")[1]  # cada item: título + linha de detalhes
+    item_sparta = txt.split("Ghost of Sparta [PSP]")[1].split("\n")[1]
+    assert "já tem um com esse nome" in item_chains and "já tem" not in item_sparta
+    assert all("biblioteca" not in b["text"] for b in botoes(envio))
+
+
+def test_so_o_que_ja_tem_diz_nada_novo(x, monkeypatch):
+    fontes(monkeypatch, biblioteca=lambda p, q, **kw: [busca.resultado("biblioteca", "g1", "Jogo X", "psp",
+                                                                       acao={"tipo": "biblioteca"})])
+    msg(x, "jogo x")
+    assert "Nada novo para baixar" in terminar(x)["text"]

@@ -151,7 +151,7 @@ def test_paginacao_e_filtros():
     assert ("◀ Anterior", "/bp abc 1") in plano(bt) and not any(b[0].startswith("Próxima") for b in plano(bt))
     s["filtro"] = "psp"
     txt, _ = busca.pagina(s, "abc", 0, lambda c: c)
-    assert "8 resultado(s)" in txt
+    assert "8 para baixar" in txt
 
 
 def test_fonte_travada_nao_segura_a_busca_alem_do_tempo(tmp_path, monkeypatch):

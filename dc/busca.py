@@ -451,7 +451,9 @@ def filtrar(itens: list[dict], q: dict) -> list[dict]:
 
 def _chave(r: dict) -> tuple:
     tam = r.get("tamanho")
-    return (normalizar(r["titulo"]), r.get("console"), r.get("regiao"), round(tam / 2**20) if tam else None)
+    # o que já está na biblioteca nunca "engole" a versão para baixar (pode ser outra região/versão): fica separado
+    return (r["fonte"] == "biblioteca", normalizar(r["titulo"]), r.get("console"), r.get("regiao"),
+            round(tam / 2**20) if tam else None)
 
 
 def deduplicar(rs: list[dict]) -> list[dict]:
@@ -501,7 +503,15 @@ def item(s: dict, rid: str) -> dict | None:
 
 
 def visiveis(s: dict) -> list[dict]:
-    return [r for r in s["resultados"] if not s.get("filtro") or r.get("console") == s["filtro"]]
+    """O que dá para BAIXAR. O que já está na biblioteca vai numa linha à parte (dono, 28/11/2026: "pra que eu vou
+    querer baixar o que eu já tenho?")."""
+    return [r for r in s["resultados"] if r["fonte"] != "biblioteca"
+            and (not s.get("filtro") or r.get("console") == s["filtro"])]
+
+
+def ja_tem(s: dict) -> list[dict]:
+    return [r for r in s["resultados"] if r["fonte"] == "biblioteca"
+            and (not s.get("filtro") or r.get("console") == s["filtro"])]
 
 
 # ------------------------------------------------------------------------------------------- apresentação
@@ -542,7 +552,13 @@ def pagina(s: dict, sid: str, n: int, rotulo) -> tuple[str, list[tuple[str, str]
     q = s["consulta"]
     alvo = f"«{q['termos']}»" + (f" ({rotulo(q['console'])})" if q.get("console") else " em todas as plataformas")
     aviso = resumo_fontes(s["fontes"])
+    tem = ja_tem(s)
+    linha_tem = ("✅ Você já tem: " + "; ".join(f"{r['titulo']} ({rotulo(r['console'])})" for r in tem[:6])
+                 + (f" e mais {len(tem) - 6}" if len(tem) > 6 else "")) if tem else ""
+    meus = {(normalizar(r["titulo"]), r.get("console")) for r in tem}
     if not vis:
+        if tem and not any(e in (FORA, TEMPO, AUTH, ERRO) for e in s["fontes"].values()):
+            return (f"{linha_tem}\nNada novo para baixar em {alvo} nas fontes ligadas." + (f"\n{aviso}" if aviso else ""), [])
         if any(e in (FORA, TEMPO, AUTH, ERRO) for e in s["fontes"].values()) and not any(
                 e == OK for e in s["fontes"].values()):
             return (f"Não consegui pesquisar {alvo}: as fontes falharam.\n{aviso}\nTente de novo em alguns minutos.",
@@ -553,13 +569,16 @@ def pagina(s: dict, sid: str, n: int, rotulo) -> tuple[str, list[tuple[str, str]
     paginas = (total + POR_PAGINA - 1) // POR_PAGINA
     n = max(0, min(n, paginas - 1))
     fatia = vis[n * POR_PAGINA:(n + 1) * POR_PAGINA]
-    texto = [f"🔎 {alvo}: {total} resultado(s)" + (f" — página {n + 1}/{paginas}" if paginas > 1 else "")]
+    texto = [f"🔎 {alvo}: {total} para baixar" + (f" — página {n + 1}/{paginas}" if paginas > 1 else "")]
+    if linha_tem and n == 0:
+        texto.append(linha_tem)
     if q.get("corrigido"):
         texto.append(f"(mostrando resultados para «{q['corrigido']}»)")
     if s.get("filtro"):
         texto[0] += f" · filtro: {rotulo(s['filtro'])}"
     for i, r in enumerate(fatia, 1 + n * POR_PAGINA):
-        texto.append(f"{i}. {linha(r, rotulo)}")
+        mesmo = (normalizar(r["titulo"]), r.get("console")) in meus
+        texto.append(f"{i}. {linha(r, rotulo)}" + (" · ✅ já tem um com esse nome" if mesmo else ""))
     if aviso:
         texto.append(aviso)
     # cada jogo: "ℹ️ detalhes" e, se dá para baixar no Deck, "⬇️" na MESMA linha (teste real 28/11/2026: só o nome
