@@ -209,3 +209,21 @@ def test_prowlarr_tempo_esgotado_e_diferente_de_fora_do_ar(tmp_path):
     assert not isinstance(e.value, prowlarr.BuscaTempo)
     assert busca._estado_de_erro(prowlarr.BuscaTempo("x")) == busca.TEMPO
     assert busca._estado_de_erro(prowlarr.BuscaErro("x")) == busca.FORA
+
+
+def test_plataforma_pelo_assunto_e_consulta_filtrada_na_fonte(tmp_path):
+    """Teste real 28/11/2026: 'God of War: Ghost of Sparta' não diz PSP no título, só no assunto; sumia do filtro PSP."""
+    pedidos = []
+    docs = [{"identifier": "gow-gos", "title": "God of War: Ghost of Sparta",
+             "subject": ["God of War: Ghost of Sparta", "God of War", "PSP", "ROM", "Game", "2010"]},
+            {"identifier": "gow2", "title": "God Of War II (USA)", "subject": "Sony PlayStation 2"}]
+
+    def abrir(req, timeout):
+        pedidos.append(req.full_url)
+        return Resp(json.dumps({"response": {"docs": docs}}).encode())
+    paths = get_paths(tmp_path).ensure()
+    out = busca._p_internet_archive(paths, busca.interpretar("god of war psp"), abrir=abrir)
+    assert [r["console"] for r in out] == ["psp", "ps2"]
+    import urllib.parse
+    consulta = urllib.parse.unquote_plus(pedidos[0])
+    assert "subject:(psp OR \"playstation portable\")" in consulta

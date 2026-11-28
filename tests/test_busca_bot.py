@@ -223,8 +223,9 @@ def test_digitar_a_plataforma_depois_filtra_a_lista(x, monkeypatch):
                                        {"titulo": "God of War Ghost of Sparta [PSP]", "magnet": MAG2}))
     msg(x, "god of war")
     terminar(x)
-    r = msg(x, "PSP")
-    assert "Sparta" in r and "[PS2]" not in r and "filtro" in r
+    assert "Pesquisando «god of war» (PSP)" in msg(x, "PSP")  # busca NOVA na plataforma (teste real 28/11/2026)
+    r = terminar(x)["text"]
+    assert "Sparta" in r and "[PS2]" not in r
     assert x.qbt.added == []
 
 

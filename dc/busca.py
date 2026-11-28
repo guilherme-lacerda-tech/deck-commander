@@ -265,10 +265,30 @@ IA_COLECAO_CONSOLE = {  # coleções do Internet Archive -> console (softwarelib
 }
 
 
+PALAVRAS_PLATAFORMA = {  # como cada plataforma aparece em título/assunto/descrição nas fontes
+    "psp": ["psp", "playstation portable"], "ps2": ["ps2", "playstation 2"], "psx": ["psx", "ps1", "playstation"],
+    "ps3": ["ps3", "playstation 3"], "gc": ["gamecube", "ngc"], "wii": ["wii"], "wiiu": ["wii u", "wiiu"],
+    "switch": ["switch", "nsp", "xci"], "n64": ["n64", "nintendo 64"], "snes": ["snes", "super nintendo"],
+    "nes": ["nes", "famicom"], "gba": ["gba", "game boy advance"], "gb": ["game boy", "gameboy"],
+    "gbc": ["game boy color", "gbc"], "nds": ["nds", "nintendo ds"], "n3ds": ["3ds", "nintendo 3ds"],
+    "genesis": ["genesis", "mega drive", "megadrive"], "sms": ["master system"], "gg": ["game gear"],
+    "dc": ["dreamcast"], "saturn": ["saturn"], "segacd": ["sega cd", "mega cd"], "xbox": ["xbox"],
+    "x360": ["xbox 360", "x360"], "pce": ["pc engine", "turbografx"], "arcade": ["arcade", "mame"],
+    "pc": ["pc", "windows", "dos"],
+}
+
+
 def _ia_console(doc: dict) -> str | None:
     c = console_de(doc.get("title", ""))
     if c:
         return c
+    # "assunto" do item: ["God of War: Ghost of Sparta", "PSP", "ROM"] — o título sozinho não dizia a plataforma e o
+    # Ghost of Sparta sumia do filtro PSP (teste real do dono, 28/11/2026)
+    assunto = doc.get("subject") or []
+    for s in ([assunto] if isinstance(assunto, str) else assunto):
+        c = console_de("", str(s)) if len(str(s)) <= 40 else None
+        if c:
+            return c
     cols = doc.get("collection") or []
     for col in ([cols] if isinstance(cols, str) else cols):
         for chave, cons in IA_COLECAO_CONSOLE.items():
@@ -282,8 +302,14 @@ def _p_internet_archive(paths, q, abrir=None):
     palavras = " ".join(re.findall(r"[\w]+", termos))
     if not palavras:
         return []
-    params = {"q": f"title:({palavras}) AND mediatype:software AND format:(\"Archive BitTorrent\")",
-              "fl[]": ["identifier", "title", "item_size", "licenseurl", "collection", "emulator", "year", "language"],
+    filtro = ""
+    if q.get("console"):  # plataforma pedida: a própria fonte filtra (antes só filtrava os 60 mais baixados)
+        nomes = PALAVRAS_PLATAFORMA.get(q["console"], [q["console"]])
+        alt = " OR ".join(f'"{n}"' if " " in n else n for n in nomes)
+        filtro = f" AND (title:({alt}) OR subject:({alt}) OR description:({alt}))"
+    params = {"q": f"title:({palavras}){filtro} AND mediatype:software AND format:(\"Archive BitTorrent\")",
+              "fl[]": ["identifier", "title", "item_size", "licenseurl", "collection", "emulator", "year", "language",
+                       "subject"],
               "rows": 60, "output": "json", "sort[]": "downloads desc"}
     url = "https://archive.org/advancedsearch.php?" + urllib.parse.urlencode(params, doseq=True)
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})

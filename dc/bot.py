@@ -792,7 +792,13 @@ class Bot:
             return txt
         if cmd == "/bf":
             alvo = args[1] if len(args) > 1 else "todas"
-            s["filtro"] = None if alvo == "todas" else alvo
+            if alvo != "todas":
+                # "Só PSP" = pesquisar de novo NA plataforma: a fonte devolve os jogos dela que a 1ª lista (os mais
+                # baixados de todas as plataformas) não trouxe. Teste real 28/11/2026: Ghost of Sparta não aparecia.
+                if not re.fullmatch(r"[a-z0-9]{1,10}", alvo):
+                    return "Plataforma inválida."
+                return self._iniciar_busca(uid, f"{s['consulta']['termos']} {alvo}", chat)
+            s["filtro"] = None
             self.save_cfg()
             txt, self.next_buttons = busca.pagina(s, sid, 0, rotulo)
             return txt
