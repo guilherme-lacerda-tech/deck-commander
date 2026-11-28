@@ -206,3 +206,14 @@ def test_after_update_repairs_launcher_after_staging_is_gone(tmp_path):
     assert launched.returncode == 2 and "ModuleNotFoundError" not in launched.stderr
     assert "sem game_id" in (get_paths(home).logs / "launch.log").read_text("utf-8")
     assert save.read_bytes() == b"latest gameplay must survive"
+
+
+def test_commit_local_desconhecido_do_github_nao_vira_oferta_de_rebaixamento():
+    """28/11/2026: Deck com versão implantada do PC antes de publicar; o GitHub responde 404 na comparação e o
+    atualizador oferecia 'versão nova' = a antiga do GitHub, sem a busca recém-implantada."""
+    from dc import atualizar
+
+    def nao_conhece(url):
+        raise OSError("HTTP Error 404: Not Found")
+    assert atualizar._a_frente("72092f8", "61158ce" + "0" * 33, get_json=nao_conhece) is False
+    assert atualizar._a_frente("", "61158ce" + "0" * 33, get_json=nao_conhece) is True  # sem registro: oferece

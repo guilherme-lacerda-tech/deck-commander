@@ -110,15 +110,17 @@ def verificar(paths, get_json=_get_json, home: Path | None = None, agora: float 
 def _a_frente(local: str, remoto: str, get_json=_get_json) -> bool:
     """A versão do GitHub está À FRENTE da instalada? (o GitHub compara os dois commits). Falha real 16/11/2026: logo
     depois de um envio a API ainda respondia o commit anterior e o Deck oferecia "atualizar" para uma versão MAIS
-    VELHA. Instalação sem registro de versão (ou de um commit que o GitHub não conhece): oferece a do GitHub."""
+    VELHA. Instalação sem registro de versão: oferece a do GitHub. Commit local que o GitHub NÃO conhece (implantado
+    do PC antes de publicar, 28/11/2026): NÃO oferece — "atualizar" seria voltar para uma versão sem o que foi
+    implantado; quando a versão local for publicada, a comparação volta a funcionar."""
     if not local:
         return True
     if remoto.startswith(local) or local.startswith(remoto[:7]):
         return False
     try:
         cmp = get_json(f"https://api.github.com/repos/{REPO}/compare/{local}...{remoto}")
-    except Exception:  # noqa: BLE001 — commit local desconhecido do GitHub (ex.: 404)
-        return True
+    except Exception:  # noqa: BLE001 — commit local desconhecido do GitHub (ex.: 404) ou GitHub fora
+        return False
     return cmp.get("status") == "ahead"
 
 
