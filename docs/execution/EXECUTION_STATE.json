@@ -90,5 +90,45 @@
     "previous_phase": "P0-NOME — preparação da implantação no bot autenticado",
     "report": "docs/execution/RELATORIO_PARALISACAO_2026-11-28.md"
   },
-  "latest_investigation": "Busca Prowlarr/Cardigann pelo InternetArchive apresentou timeout emaprox100s. Mesma query direta comurllib noDeck respondeu emaprox0,9s. Correção/fallback e busca multiplataforma não foram concluídos antes da pausa."
+  "latest_investigation": "Busca Prowlarr/Cardigann pelo InternetArchive apresentou timeout emaprox100s. Mesma query direta comurllib noDeck respondeu emaprox0,9s. Correção/fallback e busca multiplataforma não foram concluídos antes da pausa.",
+  "status": "ACTIVE_CLAUDE",
+  "reassuncao": {
+    "data": "2026-11-28",
+    "agente": "Claude",
+    "branch": "consolida/2026-11-28 (worktree C:/dev/dc-consolida)",
+    "deck_fisico": {
+      "commit": "72092f8",
+      "implantado_por": "tools/implantar.py (testes isolados no Deck 1120 ok/4 pulados; revisão 16/16)",
+      "checkpoint": "~/.local/state/deck-commander/code-checkpoints/implantacao-busca-20261128",
+      "saves": "34 arquivos idênticos antes/depois",
+      "config": "~/.config/deck-commander/busca.json liga internet_archive direto"
+    },
+    "vm": {
+      "commit": "692e887",
+      "testes_isolados": "1117 ok/5 pulados",
+      "steam_login": "pendente (dono)"
+    },
+    "github_main": "61158ce (consolidação ainda NÃO publicada: aguardando E2E real pelo Telegram)",
+    "feito": [
+      "consolidação 61158ce+4fd16bb",
+      "relatório de reassunção",
+      "causa do timeout Prowlarr (User-Agent)",
+      "busca multiplataforma dc/busca.py",
+      "implantador isolado",
+      "checkpoint_deck.sh",
+      "dono do plugin no instalador"
+    ],
+    "proximo": [
+      "E2E real: dono manda 'super tilt' no Telegram -> /bd -> catálogo -> biblioteca -> abrir (homebrew WTFPL)",
+      "publicar main após E2E",
+      "RG505: agente/destino (ADB inacessível agora)",
+      "reconciliar MASTER_REQUIREMENTS.md",
+      "P1: DMC3 desempenho, saves L4/R4/L5"
+    ],
+    "bloqueios": [
+      "RG505 ADB inacessível",
+      "Steam da VM sem login",
+      "servidor Debian pessoal não localizado"
+    ]
+  }
 }
