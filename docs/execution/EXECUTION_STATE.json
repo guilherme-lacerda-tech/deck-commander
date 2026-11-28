@@ -97,7 +97,7 @@
     "agente": "Claude",
     "branch": "consolida/2026-11-28 (worktree C:/dev/dc-consolida)",
     "deck_fisico": {
-      "commit": "d145dac",
+      "commit": "7a07a19",
       "implantado_por": "tools/implantar.py (testes isolados no Deck 1121 ok/4 pulados; revisão 16/16)",
       "checkpoint": "~/.local/state/deck-commander/code-checkpoints/implantacao-atualizador-20261128",
       "saves": "34 arquivos idênticos antes/depois",
@@ -108,7 +108,7 @@
       "testes_isolados": "1117 ok/5 pulados",
       "steam_login": "pendente (dono)"
     },
-    "github_main": "61158ce (consolidação ainda NÃO publicada: aguardando E2E real pelo Telegram)",
+    "github_main": "7a07a19 (publicado 28/11 após E2E real)",
     "feito": [
       "consolidação 61158ce+4fd16bb",
       "relatório de reassunção",
@@ -121,17 +121,19 @@
       "teste de energia instável no Deck (sleep global) corrigido"
     ],
     "proximo": [
-      "E2E real: dono manda 'super tilt' no Telegram -> /bd -> catálogo -> biblioteca -> abrir (homebrew WTFPL)",
-      "publicar main após E2E",
       "RG505: agente/destino (ADB inacessível agora)",
       "reconciliar MASTER_REQUIREMENTS.md",
       "P1: DMC3 desempenho, saves L4/R4/L5",
-      "Ports nativos: validar DKB Recomp e TotK PC Recomp no Deck (docs/PORTS-NATIVOS.md); sugerir port no painel"
+      "Ports nativos: validar DKB Recomp e TotK PC Recomp no Deck (docs/PORTS-NATIVOS.md); sugerir port no painel",
+      "aviso de versão nova de emulador AppImage/Lichii",
+      "RG505 revisão completa quando ligar",
+      "Super Tilt Bro (NES) esticado para 16:10 — conferir proporção do Nestopia"
     ],
     "bloqueios": [
       "RG505 ADB inacessível",
       "Steam da VM sem login",
       "servidor Debian pessoal não localizado"
-    ]
+    ],
+    "e2e_telegram": "28/11: 'god psp' (Ghost of Sparta + 'Você já tem'), Super Tilt Bro/Anguna/ASCII WAR por nome -> download SHA-256 -> biblioteca -> abriram pelo Steam (capturas em outputs-e2e/)"
   }
 }
