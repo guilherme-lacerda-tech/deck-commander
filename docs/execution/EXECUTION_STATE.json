@@ -97,9 +97,9 @@
     "agente": "Claude",
     "branch": "consolida/2026-11-28 (worktree C:/dev/dc-consolida)",
     "deck_fisico": {
-      "commit": "72092f8",
-      "implantado_por": "tools/implantar.py (testes isolados no Deck 1120 ok/4 pulados; revisão 16/16)",
-      "checkpoint": "~/.local/state/deck-commander/code-checkpoints/implantacao-busca-20261128",
+      "commit": "d145dac",
+      "implantado_por": "tools/implantar.py (testes isolados no Deck 1121 ok/4 pulados; revisão 16/16)",
+      "checkpoint": "~/.local/state/deck-commander/code-checkpoints/implantacao-atualizador-20261128",
       "saves": "34 arquivos idênticos antes/depois",
       "config": "~/.config/deck-commander/busca.json liga internet_archive direto"
     },
@@ -116,7 +116,9 @@
       "busca multiplataforma dc/busca.py",
       "implantador isolado",
       "checkpoint_deck.sh",
-      "dono do plugin no instalador"
+      "dono do plugin no instalador",
+      "atualizador não oferece rebaixamento para commit desconhecido",
+      "teste de energia instável no Deck (sleep global) corrigido"
     ],
     "proximo": [
       "E2E real: dono manda 'super tilt' no Telegram -> /bd -> catálogo -> biblioteca -> abrir (homebrew WTFPL)",
