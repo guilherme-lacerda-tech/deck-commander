@@ -34,6 +34,35 @@
       "archive_member": "Doom/doom1.wad",
       "file_sha256": "1d7d43be501e67d927e415e0b8f3e29c3bf33075e859721816f652a526cac771",
       "file_size": 4196020
+    },
+    {
+      "id": "anguna-gba",
+      "titulo": "Anguna",
+      "aliases": [
+        "Anguna Warriors of Virtue",
+        "Anguna GBA"
+      ],
+      "console": "gba",
+      "filename": "Anguna.gba",
+      "url": "https://raw.githubusercontent.com/retrobrews/gba-games/add86969f1a7a3b9534822a9a015d05ed20a0dcf/anguna.gba",
+      "sha256": "cd3b969d5ed6b38b2039c11b894d6db2fc3fad209a7fd046bee241cc66069851",
+      "size": 1710888,
+      "license": "freeware (Nathan Tolbert, distribuição gratuita)",
+      "source_url": "https://www.tolberts.net/anguna/"
+    },
+    {
+      "id": "ascii-war-md",
+      "titulo": "ASCII WAR",
+      "aliases": [
+        "Ascii War"
+      ],
+      "console": "genesis",
+      "filename": "ASCII WAR.bin",
+      "url": "https://raw.githubusercontent.com/retrobrews/md-games/69799854cb357a252ff5eda173381feb5e81aac5/asciiwar.bin",
+      "sha256": "cbb6122cc1d9790348582b319b41b6d2f0454a340ebb15428ef8beb75eef500b",
+      "size": 2387437,
+      "license": "homebrew de ComradeOj, distribuição gratuita permitida pelo autor",
+      "source_url": "https://github.com/retrobrews/md-games"
     }
   ]
 }
