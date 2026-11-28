@@ -18,9 +18,26 @@ Name, ID, HDR Support, App Collection Game, Hidden, Direct Launch, Boxart URL
 '''
 
 
+@pytest.fixture(autouse=True)
+def home(tmp_path, monkeypatch):
+    """A sincronização também escreve launcher/controles fora de Paths."""
+    from dc import syncer
+
+    isolated = tmp_path / "home"
+    isolated.mkdir()
+    monkeypatch.setattr(pc_remoto.Path, "home", lambda: isolated)
+    monkeypatch.setenv("HOME", str(isolated))
+    monkeypatch.setenv("USERPROFILE", str(isolated))
+    monkeypatch.setenv("DC_ROOT", str(tmp_path / "dc"))
+    # Esses módulos podem ter sido importados antes do fixture. Seus caminhos
+    # globais não acompanham a troca de Path.home().
+    monkeypatch.setattr(tabs, "SETTINGS", isolated / "homebrew/settings/TabMaster/settings.json")
+    monkeypatch.setattr(syncer, "shortcuts_path", lambda: isolated / ".steam/steam/userdata/1/config/shortcuts.vdf")
+    return isolated
+
+
 @pytest.fixture
-def paths(tmp_path, monkeypatch):
-    monkeypatch.setattr(pc_remoto.Path, "home", lambda: tmp_path / "home")
+def paths(tmp_path, home):
     return get_paths(tmp_path / "dc").ensure()
 
 
@@ -286,23 +303,27 @@ def test_bot_routes_pc_command(tmp_path, monkeypatch):
     assert x.handle(1, 1, "/pc status") == "ok pc" and seen == [["status"]]
 
 
-def test_sincronizar_usa_a_lista_que_o_pc_manda(tmp_path, monkeypatch):
-    from dc import pc_remoto
-    from dc.paths import get_paths
-    paths = get_paths(tmp_path / "dc").ensure()
+def test_sincronizar_usa_a_lista_que_o_pc_manda(paths, home, tmp_path, monkeypatch):
+    from dc import library
+
+    # Regressão de 27/11: o teste rodava no staging do atualizador e gravava
+    # dc-launch no HOME do jogador. O staging era apagado e nenhum jogo abria.
+    external_home = tmp_path / "player-home"
+    external_launcher = library.launcher_path(external_home)
+    external_launcher.parent.mkdir(parents=True)
+    external_launcher.write_bytes(b"launcher instalado do jogador\n")
+    monkeypatch.setenv("HOME", str(external_home))
+    monkeypatch.setenv("USERPROFILE", str(external_home))
     (paths.data / "pc-apps.json").write_text('{"apps": ["Desktop", "Fortnite", "God of War Ragnarök"]}', "utf-8")
     assert pc_remoto.lista_do_pc(paths) == ["Desktop", "Fortnite", "God of War Ragnarök"]
     monkeypatch.setattr(pc_remoto, "listar_apps", lambda *a, **k: (_ for _ in ()).throw(AssertionError("não usa")))
     monkeypatch.setattr(pc_remoto, "online", lambda *a, **k: None)  # PC dormindo: mesmo assim sincroniza
-    try:
-        pc_remoto.sincronizar(paths, cfg={}, shortcuts=[], plugin_ativo=False)
-    except AssertionError:
-        raise
-    except Exception:  # noqa: BLE001 - o resto da sincronização (atalhos) não é o foco aqui
-        pass
-    import json
+    result = pc_remoto.sincronizar(paths, cfg={}, shortcuts=[], plugin_ativo=False)
     lm = json.loads((paths.data / "launch-map.json").read_text("utf-8"))
     assert any(e.get("title") == "Fortnite" for e in lm.values())
+    assert "plugin" in result["aviso"]
+    assert library.launcher_path(home).is_file()
+    assert external_launcher.read_bytes() == b"launcher instalado do jogador\n"
 
 
 def test_na_tv(cfg):

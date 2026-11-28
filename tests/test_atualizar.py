@@ -1,7 +1,12 @@
 """Atualização automática (pedido 15/11/2026: "toda atualização precisa reinstalar")."""
 import io
 import json
+import os
+import shutil
+import subprocess
+import sys
 import tarfile
+from pathlib import Path
 
 import pytest
 
@@ -167,3 +172,37 @@ def test_versao_do_github_mais_velha_nao_e_oferecida(P, tmp_path):
     assert A.verificar(P, _commit(status="behind"), tmp_path) is None
     assert A.verificar(P, _commit(status="diverged"), tmp_path) is None
     assert A.verificar(P, _commit(status="ahead"), tmp_path)["sha"] == SHA
+
+
+def test_after_update_repairs_launcher_after_staging_is_gone(tmp_path):
+    """Regressão real de 27/11: pytest publicou um launcher que dependia de /tmp."""
+    from dc import library
+    home = tmp_path / "private-home"
+    home.mkdir()
+    staging = tmp_path / "dc-atualizar-extracted"
+    staging.mkdir()
+    shutil.copytree(Path(A.__file__).parent, staging / "dc", ignore=shutil.ignore_patterns("__pycache__"))
+    launcher = library.write_launcher(home, staging)
+    save = home / "Emulation/saves/progress.p2s"
+    save.parent.mkdir(parents=True)
+    save.write_bytes(b"latest gameplay must survive")
+    installed = home / "deck-commander"
+    staging.rename(installed)
+    assert not staging.exists()
+    env = {key: os.environ[key] for key in ("SYSTEMROOT", "WINDIR", "COMSPEC") if key in os.environ}
+    env.update(HOME=str(home), USERPROFILE=str(home), DC_ROOT=str(home), PATH=os.defpath,
+               PYTHONIOENCODING="utf-8", PYTHONDONTWRITEBYTECODE="1",
+               XDG_RUNTIME_DIR=str(home / "runtime"),
+               DBUS_SESSION_BUS_ADDRESS="unix:path=/nonexistent-dc-test-bus",
+               XDG_CONFIG_HOME=str(home / ".config"), XDG_DATA_HOME=str(home / ".local/share"),
+               XDG_STATE_HOME=str(home / ".local/state"), XDG_CACHE_HOME=str(home / ".cache"))
+    result = subprocess.run([sys.executable, "-m", "dc.atualizar", "depois"], cwd=installed,
+                            env=env, capture_output=True, text=True, encoding="utf-8", timeout=60)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert str(staging) not in launcher.read_text("utf-8")
+    # Exatamente o launcher persistido, executado fora da árvore do programa.
+    launched = subprocess.run([sys.executable, str(launcher)], cwd=home, env=env,
+                              capture_output=True, text=True, encoding="utf-8", timeout=30)
+    assert launched.returncode == 2 and "ModuleNotFoundError" not in launched.stderr
+    assert "sem game_id" in (get_paths(home).logs / "launch.log").read_text("utf-8")
+    assert save.read_bytes() == b"latest gameplay must survive"

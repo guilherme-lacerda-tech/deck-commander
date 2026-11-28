@@ -220,12 +220,11 @@ def power_loop(paths: Paths, interval: float = 30) -> None:
 
 
 def run_tests(paths: Paths, repo: Path) -> dict:
+    from . import test_runner
     venv_py = H / ".local/share/deck-commander/venv/bin/python"
-    py = str(venv_py) if venv_py.exists() else sys.executable
     t0 = time.time()
-    r = subprocess.run([py, "-m", "pytest", "-q", "-p", "no:cacheprovider", str(repo / "tests")],
-                       capture_output=True, text=True, cwd=repo)
-    summary = (r.stdout.strip().splitlines() or ["?"])[-1]
+    r = test_runner.run(repo, venv_py)
+    summary = (r.stdout.strip().splitlines() or r.stderr.strip().splitlines() or ["executor sem resultado"])[-1]
     # returncode 1 = algum teste falhou de verdade. 2-5 = problema para RODAR os testes (pytest ausente,
     # coleta interrompida...): é registrado, mas não conta para o safe-mode (não é defeito do DC).
     rep = {"at": datetime.now(timezone.utc).isoformat(), "ok": r.returncode == 0, "summary": summary,

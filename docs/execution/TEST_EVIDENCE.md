@@ -39,3 +39,28 @@ Os downloads estão em ~/Emulation/roms/nes/Super Tilt Bro e ~/Emulation/roms/do
 A VM está sem conta Steam autenticada e sem token Telegram. O teste exerceu o handler de mensagens com entradas locais e a aquisição em rede real. As operações ficaram em waiting_steam com os arquivos instalados. Faltam o transporte público do Telegram e a visualização do atalho na Steam autenticada para fechar o aceite integral P0-NOME. Títulos comerciais adicionais requerem fontes configuradas que disponibilizem a edição solicitada. Os testes desta rodada usaram Doom Shareware e Super Tilt Bro.
 
 A implantação final usa o commit d884e20, exportado por git archive, SHA-256 9d42d319d3cb10e72c234bd698bdd036c060809ca56e0774b4485b04e9983d4e. VERSAO.txt identifica o commit na VM. O serviço power foi reiniciado e a repetição dos dois pedidos reutilizou as operações e arquivos existentes.
+
+## Regressão física do lançador em 27/11/2026
+
+O proprietário reconectou o Deck e autorizou o reparo. Versão instalada 76ab40c. Executar `~/.local/share/deck-commander/bin/dc-launch` em `/home/deck` reproduziu `ModuleNotFoundError: No module named dc`. O script continha `sys.path.insert` para `/tmp/dc-atualizar-qlnngmyw/x/deck-commander-76ab40c8411cb4334cbb0138fba5d05abbb8a1a6`, removido pelo atualizador. Não houve tentativa de abrir o PCSX2 nessa falha.
+
+Foi criado o checkpoint físico `~/.local/state/deck-commander/code-checkpoints/dmc-launch-repair-loaflu21` com launcher, atalhos, mapa, configurações PCSX2 e cópias integrais de 20 arquivos de estados e dois cartões de memória, total 294493974 bytes. O launcher foi substituído atomicamente mantendo o caminho dos atalhos, agora importando `/home/deck/deck-commander`. A execução sem argumentos retornou 2, conforme o contrato, sem erro de importação.
+
+O Steam recebeu `steam://rungameid/15551694511443804160` na sessão existente às 17:47 de 27/11. O registro gameprocess_log confirmou o atalho original, dc-launch PID1503492 e PCSX2 PID1503521. O emulog confirmou execução ELF SLES_541.86, CRC18C9343F, Vulkan RADV, áudio Cubeb e Steam Virtual Gamepad. Não foi enviado comando de carregar, salvar ou escolher estado. Os 22 arquivos originais mantiveram SHA-256 idêntico. O mapa permaneceu idêntico. O único campo alterado em shortcuts.vdf foi LastPlayTime do DMC3, escrito pelo Steam ao abrir.
+
+A leitura de FPS após abertura mostrou a tela PAL em aproximadamente 50 quadros por segundo. Isso comprova renderização do jogo nessa tela; não é uma medição de desempenho em combate. O jogo ficou aberto para o proprietário.
+
+O timer semanal `deck-commander-tests.timer` foi parado temporariamente enquanto sua execução sem isolamento é corrigida. A revisão encontrou o mesmo risco no teste pré-atualização. Causa localizada no teste avulso `test_sincronizar_usa_a_lista_que_o_pc_manda`: paths temporários sem isolar Path.home, chamando pc_remoto.sincronizar e gravando o launcher do usuário. Validações adicionais e reativação do timer serão registradas após a implantação do reparo.
+
+### Proteção implantada e versão publicada
+
+- VM SteamOS 3.8.14: suíte da branch em isolamento real bubblewrap, **1090 aprovados e 5 pulados em 37,62 s**. Código montado somente para leitura, HOME/XDG/processos/rede privados.
+- VM: ensaio externo do isolamento tentou escrever na fonte e acessar o launcher/saves do host; **1 aprovado em 0,65 s**, sentinelas preservadas.
+- Windows: testes do atualizador, runner, power e PC remoto, **50 aprovados e 1 pulado em 5,11 s**.
+- VM: cópia exata do código físico com o reparo detectou um teste de saves desatualizado. O código já tratava divergência inicial como conflito, mas o teste ainda esperava sobrescrita por data. Atualizada a expectativa para a regra de preservação já implantada. Resultado **1048 aprovados e 5 pulados em 32,68 s**. Nenhum save foi alterado para corrigir o teste.
+- Deck físico: oito arquivos de código/testes instalados após comparar os hashes anteriores, criar backup e conferir os hashes novos. Apenas os trechos relativos ao reparo foram aplicados em services.py. Um processo pytest real dentro do isolamento passou (**1 aprovado em 0,01 s**). Bot, power e timer semanal ativos; launcher permanece no caminho definitivo. Conferência final: **22 saves/cartões de memória com SHA-256 idêntico** ao checkpoint, e todos os hashes do reparo corretos.
+- Release corretiva em worktree independente a partir de origin/main: **1050 aprovados e 5 pulados em 32,03 s** na VM. Inclui as três proteções de saves já implantadas anteriormente, evitando perdê-las na próxima atualização. Publicado por fast-forward em main, commit **61158ce**. Não contém as alterações pendentes de aquisição por nome.
+
+A revisão local com Ollama qwen2.5-coder:7b foi registrada em outputs/dmc-regression/local-review.txt. As sugestões genéricas não substituíram os ensaios de isolamento nem foram aplicadas sem evidência. Logs, manifesto do reparo e verificações físicas estão em outputs/dmc-regression/. O código e dados anteriores permanecem no checkpoint físico; nenhuma restauração de save foi executada.
+
+O Deck recebeu correção direta sobre a base 76ab40c. VERSAO.txt continua identificando essa base; a release 61158ce está publicada para o mecanismo normal de atualização. Os saves não foram recopiados do checkpoint para a instalação.

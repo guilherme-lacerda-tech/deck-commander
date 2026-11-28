@@ -1,17 +1,18 @@
 {
-  "phase": "P0 obrigatório — download automático pelo nome",
+  "phase": "P0-NOME — recuperação de downloads interrompidos",
   "current": [
-    "P0-NOME"
+    "P0-NOME",
+    "retomada HTTP Range após morte do worker"
   ],
   "baseline": "b8c48d3",
   "baseline_tests": "Windows: 1051 aprovados, 3 pulados, 94.86 s",
-  "last": "P0-NOME implementado com catálogo HTTPS, busca Prowlarr assíncrona e seleção automática. Instalado na VM. Super Tilt Bro e Doom Shareware baixados pelo nome, hashes conferidos e abertos por dc-launch. 32488 arquivos originais conferidos após instalação.",
-  "next": "Retomar P0-NOME. Verificar possibilidade de autenticação já autorizada do Telegram e Steam na VM sem copiar sessões pessoais. Validar transporte Telegram e atalho visível quando disponíveis. Enquanto dependem de login, ampliar casos reais de aquisição, recuperação e seleção de fontes do P0.",
+  "last": "Regressão DMC3 resolvida no Deck real: launcher corrigido, jogo abriu pelo Steam, 22 arquivos de saves preservados, testes isolados implantados e release61158ce publicada em main.",
+  "next": "Executar validate_download_recovery.py na VM com Doom Shareware, verificar bytes preservados após SIGKILL, validar hash final e operação única, rodar regressão e implantar.",
   "checkpoint_git": "d884e20",
   "automation": {
     "id": "retomar-o-deck-commander",
     "interval_minutes": 30,
-    "physical_deck_available_for_jobs": false
+    "physical_deck_available_for_jobs": true
   },
   "vm": {
     "distribution": "Ubuntu (WSL)",
@@ -27,21 +28,9 @@
   },
   "local_homelab": "/var/lib/deck-commander-validation/run.1eMABM",
   "modified": [
-    "AGENTS.md",
-    "README.md",
-    "dc/bot.py",
     "dc/catalogo_downloads.py",
-    "dc/emulators/__init__.py",
-    "dc/services.py",
-    "dc/setup.py",
-    "config/download-catalog.json",
-    "homelab/tests/validate_name_download.py",
-    "tests/test_bot_entradas.py",
-    "tests/test_e2e_mock.py",
-    "tests/test_travas.py",
     "tests/test_catalogo_downloads.py",
-    "tests/test_doom_download.py",
-    "docs/execution/"
+    "homelab/tests/validate_download_recovery.py"
   ],
   "failures": [],
   "blockers": [
@@ -49,13 +38,31 @@
     "VM sem token Telegram para transporte público das mensagens",
     "Servidor Debian sem inventário de implantação identificado"
   ],
-  "resume": "Reler a ordem integral, aplicar prioridade P0-NOME, conferir arquivos e processos em andamento, executar pendência do fluxo de aquisição na VM.",
-  "priority_override": "Decisão de 27/11/2026. Nome do jogo até download e instalação é obrigatório e precede as demais funcionalidades.",
+  "resume": "Continuar recuperação HTTP no PC/VM conforme suspended_work; preservar reparo físico e release61158ce. Conferir processos/artefatos antes de repetir.",
+  "priority_override": "Regressão resolvida em27/11. Retomar P0-NOME no PC/VM. Não repetir abertura/fechamento do DMC para tarefa já concluída.",
   "tests": [
     "Windows suíte completa: 1080 passed, 3 skipped, 68.48 s",
     "VM real: dois downloads HTTPS, hash, instalação e execução nos cores Nestopia e PrBoom",
     "VM preservação: 32488 hashes originais iguais",
     "VM instalação repetida, plugin conferido por diff, qBittorrent/power ativos"
   ],
-  "p0_status": "INTEGRATION_TESTED download e launcher reais. P0-NOME permanece IN_PROGRESS até completar transporte e publicação autenticados."
+  "p0_status": "INTEGRATION_TESTED download e launcher reais. P0-NOME permanece IN_PROGRESS até completar transporte e publicação autenticados.",
+  "suspended_work": {
+    "phase": "P0-NOME — recuperação de downloads interrompidos",
+    "next": "Executar validate_download_recovery.py na VM com Doom Shareware, verificar bytes preservados após SIGKILL, validar hash final e operação única, rodar regressão e implantar.",
+    "modified": [
+      "dc/catalogo_downloads.py",
+      "tests/test_catalogo_downloads.py",
+      "homelab/tests/validate_download_recovery.py",
+      "docs/execution/EXECUTION_STATE.json"
+    ]
+  },
+  "repair": {
+    "status": "RESOLVED",
+    "cause": "pytest sem isolamento regravou launcher com caminho temporário removido",
+    "release": "61158ce",
+    "physical_base": "76ab40c com reparo de oito arquivos",
+    "checkpoint": "/home/deck/.local/state/deck-commander/code-checkpoints/dmc-launch-repair-loaflu21",
+    "validation": "Steam abriu DMC3/PCSX2; 22 hashes saves intactos; isolamento físico aprovado; release1050passed5skipped na VM"
+  }
 }
